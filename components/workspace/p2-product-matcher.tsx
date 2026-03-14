@@ -197,58 +197,62 @@ export function P2ProductMatcher({
               从左侧添加服务
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto space-y-1">
-              {selectedData.map((sd) => {
+            <div className="flex-1 overflow-y-auto">
+              {/* Table header */}
+              <div className="grid grid-cols-[1fr_60px_80px_24px] items-center gap-x-2 border-b border-[#e5e7eb] px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#9ca3af]">
+                <span>服务名称</span>
+                <span>难度</span>
+                <span>周期</span>
+                <span />
+              </div>
+
+              {/* Table rows */}
+              {selectedData.map((sd, idx) => {
                 const product = selectedProductsMap.get(sd.productId)
                 if (!product) return null
 
                 return (
                   <div
                     key={sd.productId}
-                    className="rounded-sm border border-[#e5e7eb] bg-white p-1.5 text-[12px]"
+                    className={`grid grid-cols-[1fr_60px_80px_24px] items-center gap-x-2 px-2 py-1.5 text-[12px] ${
+                      idx % 2 === 0 ? 'bg-white' : 'bg-[#f9fafb]'
+                    } hover:bg-[#eff6ff]`}
                   >
-                    {/* Product header */}
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-[#111827] truncate">{product.name}</p>
-                        {product.difficulty && (
-                          <span className="text-[10px] text-[#f59e0b]">
-                            {getDifficultyStars(product.difficulty)}
-                          </span>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => removeProduct(sd.productId)}
-                        className="shrink-0 text-[#9ca3af] hover:text-[#dc2626]"
-                        aria-label="移除"
+                    {/* Name */}
+                    <span className="truncate font-medium text-[#111827]" title={product.name}>
+                      {product.name}
+                    </span>
+
+                    {/* Difficulty */}
+                    <span className="text-[10px] text-[#f59e0b] tracking-tighter">
+                      {getDifficultyStars(product.difficulty) || '—'}
+                    </span>
+
+                    {/* Cycle selector */}
+                    {product.billingCycles && product.billingCycles.length > 0 ? (
+                      <select
+                        value={sd.cycle || ''}
+                        onChange={(e) => updateCycle(sd.productId, e.target.value)}
+                        className="h-6 w-full rounded-sm border border-[#e5e7eb] bg-white px-1 text-[11px] text-[#111827] outline-none focus:border-[#2563eb]"
                       >
-                        <Minus size={12} />
-                      </button>
-                    </div>
-
-                    {/* Service unit */}
-                    <div className="flex items-center gap-1 text-[11px] mb-1">
-                      <span className="text-[#6b7280]">服务单位:</span>
-                      <span className="text-[#374151]">次/月</span>
-                    </div>
-
-                    {/* Billing cycle selector if available */}
-                    {product.billingCycles && product.billingCycles.length > 0 && (
-                      <div className="flex items-center gap-1">
-                        <span className="text-[11px] text-[#6b7280]">周期:</span>
-                        <select
-                          value={sd.cycle || ''}
-                          onChange={(e) => updateCycle(sd.productId, e.target.value)}
-                          className="h-6 rounded-sm border border-[#e5e7eb] bg-white px-1 text-[11px] text-[#111827] outline-none focus:border-[#2563eb]"
-                        >
-                          {product.billingCycles.map((cycle) => (
-                            <option key={cycle} value={cycle}>
-                              {cycle}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                        {product.billingCycles.map((cycle) => (
+                          <option key={cycle} value={cycle}>
+                            {cycle}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-[11px] text-[#9ca3af]">—</span>
                     )}
+
+                    {/* Remove */}
+                    <button
+                      onClick={() => removeProduct(sd.productId)}
+                      className="flex h-5 w-5 items-center justify-center rounded-sm text-[#9ca3af] hover:bg-[#fee2e2] hover:text-[#dc2626]"
+                      aria-label="移除"
+                    >
+                      <Minus size={11} />
+                    </button>
                   </div>
                 )
               })}
