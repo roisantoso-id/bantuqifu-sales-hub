@@ -2,7 +2,8 @@
 
 import { useState, useMemo } from 'react'
 import { ChevronLeft, Plus, Edit2, Archive, ExternalLink, X, Search, Building2, Globe } from 'lucide-react'
-import type { Opportunity, ActionLog, Lead, ChinaEntity } from '@/lib/types'
+import type { ChinaEntity } from '@/lib/types'
+import type { CustomerOpportunityRow, CustomerActionLogRow } from '@/app/actions/customer'
 import { ChinaEntitySearchDialog } from './china-entity-search-dialog'
 import { DomesticEntityCard } from './domestic-entity-card'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -10,27 +11,16 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 interface CustomerProfileProps {
   customerId: string
   customerName: string
-  opportunities: Opportunity[]
-  leads: Lead[]
-  actionLogs: Record<string, ActionLog[]>
+  level?: string
+  phone?: string | null
+  email?: string | null
+  opportunities: CustomerOpportunityRow[]
+  actionLogs: CustomerActionLogRow[]
   onBack: () => void
   onCreateOpportunity?: () => void
-  onAddNote?: (note: string) => void
 }
 
-type TabId = 'opportunities' | 'leads' | 'actions' | 'companies'
-
-interface ConsolidatedAction {
-  id: string
-  timestamp: string
-  operatorName: string
-  actionType: string
-  actionLabel: string
-  opportunityId?: string
-  opportunityStage?: string
-  remark: string
-  files?: any[]
-}
+type TabId = 'opportunities' | 'actions' | 'companies'
 
 interface ForeignEntity {
   id: string
@@ -39,57 +29,31 @@ interface ForeignEntity {
   registrationNumber?: string
   legalPerson?: string
   regCapital?: string
-  businessScope?: string
-  notes?: string
 }
 
 export function CustomerProfile({
   customerId,
   customerName,
+  level,
+  phone,
+  email,
   opportunities,
-  leads,
   actionLogs,
   onBack,
   onCreateOpportunity,
-  onAddNote,
 }: CustomerProfileProps) {
   const [activeTab, setActiveTab] = useState<TabId>('opportunities')
-  const [newNote, setNewNote] = useState('')
   const [chinaEntityDialogOpen, setChinaEntityDialogOpen] = useState(false)
   const [chinaEntities, setChinaEntities] = useState<ChinaEntity[]>([])
   const [foreignEntities, setForeignEntities] = useState<ForeignEntity[]>([])
   const [foreignFormOpen, setForeignFormOpen] = useState(false)
 
-  const customerOpportunities = useMemo(
-    () => opportunities.filter((o) => o.customerId === customerId),
-    [opportunities, customerId]
-  )
-
-  const customerLeads = useMemo(
-    () => leads.filter((l) => l.convertedOpportunityId && customerOpportunities.some((o) => o.id === l.convertedOpportunityId)),
-    [leads, customerOpportunities]
-  )
+  // 商机已经按 customerId 过滤（由父组件传入），直接使用
+  const customerOpportunities = opportunities
 
   const consolidatedActions = useMemo(() => {
-    const allActions: ConsolidatedAction[] = []
-    customerOpportunities.forEach((opp) => {
-      const logs = actionLogs[opp.id] ?? []
-      logs.forEach((log) => {
-        allActions.push({
-          id: log.id,
-          timestamp: log.timestamp,
-          operatorName: log.operatorName,
-          actionType: log.actionType,
-          actionLabel: log.actionLabel,
-          opportunityId: opp.id,
-          opportunityStage: opp.stageId,
-          remark: log.remark,
-          files: log.files,
-        })
-      })
-    })
-    return allActions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-  }, [customerOpportunities, actionLogs])
+    return [...actionLogs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+  }, [actionLogs])
 
   const metrics = useMemo(
     () => ({
@@ -168,8 +132,7 @@ export function CustomerProfile({
         <div className="flex gap-6">
           {([
             { id: 'opportunities', label: `关联商机 (${customerOpportunities.length})` },
-            { id: 'leads',         label: `关联线索 (${customerLeads.length})` },
-            { id: 'actions',       label: '全量跟进记录' },
+            { id: 'actions',       label: `全量跟进记录 (${consolidatedActions.length})` },
             { id: 'companies',     label: `关联企业${totalCompanies > 0 ? ` (${totalCompanies})` : ''}` },
           ] as const).map(({ id, label }) => (
             <button
@@ -190,15 +153,7 @@ export function CustomerProfile({
       {/* Tab Content */}
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'opportunities' && <OpportunitiesTab opportunities={customerOpportunities} />}
-        {activeTab === 'leads' && <LeadsTab leads={customerLeads} />}
-        {activeTab === 'actions' && (
-          <ActionsTab
-            actions={consolidatedActions}
-            newNote={newNote}
-            onNewNoteChange={setNewNote}
-            onAddNote={() => { if (newNote.trim()) { onAddNote?.(newNote); setNewNote('') } }}
-          />
-        )}
+        {activeTab === 'actions' && <ActionsTab actions={consolidatedActions} />}
         {activeTab === 'companies' && (
           <CompaniesTab
             chinaEntities={chinaEntities}
@@ -569,40 +524,48 @@ function ForeignEntityForm({
 }
 
 // ─── Opportunities Tab ────────────────────────────────────────────────────────
-function OpportunitiesTab({ opportunities }: { opportunities: Opportunity[] }) {
+function OpportunitiesTab({ opportunities }: { opportunities: CustomerOpportunityRow[] }) {
   return (
     <div className="p-4">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b border-[#e5e7eb] bg-[#f9fafb]">
-            {['商机编号', '产品名称', '阶段', '金额', '创建人', '状态'].map((h) => (
-              <th key={h} className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {opportunities.map((opp) => (
-            <tr key={opp.id} className="border-b border-[#f3f4f6] hover:bg-[#f9fafb]">
-              <td className="px-3 py-2 font-mono text-[12px] text-[#2563eb]">{opp.id}</td>
-              <td className="px-3 py-2 text-[13px] text-[#111827]">{opp.serviceTypeLabel}</td>
-              <td className="px-3 py-2">
-                <span className="inline-flex rounded-sm bg-[#e0e7ff] px-1.5 py-0.5 text-[11px] font-medium text-[#4f46e5]">{opp.stageId}</span>
-              </td>
-              <td className="px-3 py-2 text-right font-mono text-[13px] text-[#111827]">¥{opp.estimatedAmount?.toLocaleString()}</td>
-              <td className="px-3 py-2 text-[13px] text-[#6b7280]">{opp.assignee}</td>
-              <td className="px-3 py-2">
-                <span className={`inline-flex rounded-sm px-1.5 py-0.5 text-[11px] font-medium ${
-                  opp.status === 'active' ? 'bg-[#dcfce7] text-[#16a34a]' :
-                  opp.status === 'won'    ? 'bg-[#dbeafe] text-[#0284c7]' :
-                  'bg-[#fee2e2] text-[#dc2626]'
-                }`}>
-                  {opp.status === 'active' ? '活跃' : opp.status === 'won' ? '成交' : '丢失'}
-                </span>
-              </td>
+      {opportunities.length === 0 ? (
+        <div className="flex h-40 items-center justify-center text-[13px] text-[#9ca3af]">暂无关联商机</div>
+      ) : (
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-[#e5e7eb] bg-[#f9fafb]">
+              {['商机编号', '产品/服务', '阶段', '金额', '状态', '创建日期'].map((h) => (
+                <th key={h} className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">{h}</th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {opportunities.map((opp) => (
+              <tr key={opp.id} className="border-b border-[#f3f4f6] hover:bg-[#f9fafb]">
+                <td className="px-3 py-2 font-mono text-[12px] text-[#2563eb]">{opp.opportunityCode}</td>
+                <td className="px-3 py-2 text-[13px] text-[#111827]">{opp.serviceTypeLabel}</td>
+                <td className="px-3 py-2">
+                  <span className="inline-flex rounded-sm bg-[#e0e7ff] px-1.5 py-0.5 text-[11px] font-medium text-[#4f46e5]">{opp.stageId}</span>
+                </td>
+                <td className="px-3 py-2 text-right font-mono text-[13px] text-[#111827]">
+                  {opp.currency} {opp.estimatedAmount?.toLocaleString()}
+                </td>
+                <td className="px-3 py-2">
+                  <span className={`inline-flex rounded-sm px-1.5 py-0.5 text-[11px] font-medium ${
+                    opp.status === 'active' ? 'bg-[#dcfce7] text-[#16a34a]' :
+                    opp.status === 'won'    ? 'bg-[#dbeafe] text-[#0284c7]' :
+                    'bg-[#fee2e2] text-[#dc2626]'
+                  }`}>
+                    {opp.status === 'active' ? '活跃' : opp.status === 'won' ? '成交' : '丢失'}
+                  </span>
+                </td>
+                <td className="px-3 py-2 font-mono text-[11px] text-[#9ca3af]">
+                  {new Date(opp.createdAt).toLocaleDateString('zh-CN')}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   )
 }
@@ -633,49 +596,32 @@ function LeadsTab({ leads }: { leads: Lead[] }) {
 }
 
 // ─── Actions Tab ─────────────────────────────────────────────────────────────
-function ActionsTab({ actions, newNote, onNewNoteChange, onAddNote }: {
-  actions: ConsolidatedAction[]
-  newNote: string
-  onNewNoteChange: (v: string) => void
-  onAddNote: () => void
-}) {
+function ActionsTab({ actions }: { actions: CustomerActionLogRow[] }) {
   return (
-    <div className="flex flex-col h-full">
-      <div className="border-b border-[#e5e7eb] p-4">
-        <div className="flex gap-2">
-          <textarea
-            value={newNote}
-            onChange={(e) => onNewNoteChange(e.target.value)}
-            placeholder="添加客户级备注..."
-            rows={2}
-            className="flex-1 resize-none rounded-sm border border-[#e5e7eb] p-2 text-[12px] placeholder-[#9ca3af] outline-none focus:border-[#2563eb]"
-          />
-          <button onClick={onAddNote} className="h-16 rounded-sm bg-[#2563eb] px-3 text-[12px] font-medium text-white hover:bg-[#1d4ed8]">添加</button>
-        </div>
-      </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {actions.length === 0 ? (
-          <div className="flex h-40 items-center justify-center text-[13px] text-[#9ca3af]">暂无跟进记录</div>
-        ) : actions.map((action, idx) => (
-          <div key={action.id} className="relative pb-4">
-            <div className="absolute left-[5px] top-2 h-3 w-3 rounded-full bg-[#2563eb]" />
-            {idx < actions.length - 1 && <div className="absolute left-[14px] top-5 bottom-0 w-px bg-[#e5e7eb]" />}
-            <div className="ml-8">
-              <div className="flex items-baseline gap-2">
-                <span className="text-[12px] font-medium text-[#111827]">{action.operatorName}</span>
-                <span className="text-[11px] text-[#6b7280]">{action.actionLabel}</span>
-                {action.opportunityId && (
-                  <span className="inline-flex rounded-sm bg-[#f3f4f6] px-1 py-0.5 font-mono text-[10px] text-[#2563eb]">
-                    {action.opportunityId} / {action.opportunityStage}
-                  </span>
-                )}
-              </div>
-              <div className="mt-1 text-[12px] text-[#6b7280]">{action.remark}</div>
-              <div className="mt-1 text-[11px] text-[#9ca3af]">{new Date(action.timestamp).toLocaleString('zh-CN')}</div>
+    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      {actions.length === 0 ? (
+        <div className="flex h-40 items-center justify-center text-[13px] text-[#9ca3af]">暂无跟进记录</div>
+      ) : actions.map((action, idx) => (
+        <div key={action.id} className="relative pb-4">
+          <div className="absolute left-[5px] top-2 h-3 w-3 rounded-full bg-[#2563eb]" />
+          {idx < actions.length - 1 && <div className="absolute left-[14px] top-5 bottom-0 w-px bg-[#e5e7eb]" />}
+          <div className="ml-8">
+            <div className="flex items-baseline gap-2">
+              <span className="text-[12px] font-medium text-[#111827]">{action.operatorName}</span>
+              <span className="text-[11px] text-[#6b7280]">{action.actionLabel}</span>
+              {action.opportunityId && (
+                <span className="inline-flex rounded-sm bg-[#f3f4f6] px-1 py-0.5 font-mono text-[10px] text-[#2563eb]">
+                  {action.opportunityId}
+                </span>
+              )}
             </div>
+            {action.remark && (
+              <div className="mt-1 text-[12px] text-[#374151] whitespace-pre-wrap">{action.remark}</div>
+            )}
+            <div className="mt-1 text-[11px] text-[#9ca3af]">{new Date(action.timestamp).toLocaleString('zh-CN')}</div>
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
   )
 }

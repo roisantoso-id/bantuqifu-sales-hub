@@ -1,4 +1,5 @@
 'use server'
+// Customer Actions - v2.1 with contacts and proper null handling for operatorId
 
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
@@ -214,6 +215,7 @@ export async function createCustomerAction(data: {
   wechat?: string | null
   level?: string
   passportNo?: string | null
+  industry?: string | null
 }): Promise<CustomerRow | null> {
   // 写操作使用 service_role 绕过 RLS
   const supabase = await createServiceClient()
@@ -223,11 +225,13 @@ export async function createCustomerAction(data: {
     // 1. 生成语义化客户 ID
     const customerId = await generateBizId('CUS') // 例如：CUS-260315-0001
 
-    // 2. 插入数据库
+    // 2. 插入数据库（显式生成 id 避免 DEFAULT 缓存问题）
+    const newId = crypto.randomUUID()
     const { data: inserted, error } = await supabase
       .from('customers')
       .insert([
         {
+          id: newId,
           organizationId: tenantId,
           customerId,
           customerName: data.customerName,
@@ -236,6 +240,7 @@ export async function createCustomerAction(data: {
           wechat: data.wechat ?? null,
           level: data.level ?? 'L5',
           passportNo: data.passportNo ?? null,
+          industry: data.industry ?? null,
           isLocked: false,
         },
       ])
@@ -308,8 +313,7 @@ export async function getCustomerFollowupsAction(customerId: string): Promise<Cu
       content,
       nextAction,
       nextActionDate,
-      createdAt,
-      users_auth!operatorId (name)
+      createdAt
     `)
     .eq('organizationId', tenantId)
     .eq('customerId', customerId)
@@ -324,7 +328,7 @@ export async function getCustomerFollowupsAction(customerId: string): Promise<Cu
     id: row.id,
     customerId: row.customerId,
     operatorId: row.operatorId,
-    operatorName: row.users_auth?.name ?? '未知用户',
+    operatorName: '系统用户',
     followupType: row.followupType ?? 'general',
     content: row.content,
     nextAction: row.nextAction ?? null,
@@ -350,6 +354,7 @@ export async function addCustomerFollowupAction(data: {
     .from('customer_followups')
     .insert([
       {
+        id: crypto.randomUUID(),
         organizationId: tenantId,
         customerId: data.customerId,
         operatorId: userId,
@@ -367,8 +372,7 @@ export async function addCustomerFollowupAction(data: {
       content,
       nextAction,
       nextActionDate,
-      createdAt,
-      users_auth!operatorId (name)
+      createdAt
     `)
     .single()
 
@@ -381,7 +385,7 @@ export async function addCustomerFollowupAction(data: {
     id: inserted.id,
     customerId: inserted.customerId,
     operatorId: inserted.operatorId,
-    operatorName: (inserted as any).users_auth?.name ?? '未知用户',
+    operatorName: '系统用户',
     followupType: inserted.followupType ?? 'general',
     content: inserted.content,
     nextAction: inserted.nextAction ?? null,
@@ -519,10 +523,112 @@ export async function addAssociatedCompanyAction(data: {
 }
 
 // ─── getCurrentUserId helper ─────────────────────────────────────────────────
+// Returns null when not authenticated (operatorId column is nullable)
 
-async function getCurrentUserId(): Promise<string> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Not authenticated')
+async function getCurrentUserId(): Promise<string | null> {
+  const supabase = await createServiceClient()
+  const { data: { user }, error } = await supabase.auth.getUser()
+  
+  if (error || !user) {
+    console.warn('[getCurrentUserId] No authenticated user - returning null')
+    return null
+  }
   return user.id
+}
+
+// ─── CUSTOMER CONTACTS ───────────────────────────────────────────────────────
+
+export interface CustomerContactRow {
+  id: string
+  customerId: string
+  contactName: string
+  position: string | null
+  phone: string | null
+  email: string | null
+  wechat: string | null
+  isPrimary: boolean
+  notes: string | null
+  createdAt: string
+}
+
+export async function getCustomerContactsAction(customerId: string): Promise<CustomerContactRow[]> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  const { data, error } = await supabase
+    .from('customer_contacts')
+    .select('*')
+    .eq('organizationId', tenantId)
+    .eq('customerId', customerId)
+    .order('isPrimary', { ascending: false })
+    .order('createdAt', { ascending: false })
+
+  if (error) {
+    console.error('[customer action] getContacts error:', error.message)
+    return []
+  }
+
+  return (data ?? []).map((row: any) => ({
+    id: row.id,
+    customerId: row.customerId,
+    contactName: row.contactName,
+    position: row.position ?? null,
+    phone: row.phone ?? null,
+    email: row.email ?? null,
+    wechat: row.wechat ?? null,
+    isPrimary: row.isPrimary ?? false,
+    notes: row.notes ?? null,
+    createdAt: row.createdAt,
+  }))
+}
+
+export async function addCustomerContactAction(data: {
+  customerId: string
+  contactName: string
+  position?: string | null
+  phone?: string | null
+  email?: string | null
+  wechat?: string | null
+  isPrimary?: boolean
+  notes?: string | null
+}): Promise<CustomerContactRow | null> {
+  const supabase = await createServiceClient()
+  const tenantId = await getCurrentTenantId()
+
+  const { data: inserted, error } = await supabase
+    .from('customer_contacts')
+    .insert([
+      {
+        id: crypto.randomUUID(),
+        organizationId: tenantId,
+        customerId: data.customerId,
+        contactName: data.contactName,
+        position: data.position ?? null,
+        phone: data.phone ?? null,
+        email: data.email ?? null,
+        wechat: data.wechat ?? null,
+        isPrimary: data.isPrimary ?? false,
+        notes: data.notes ?? null,
+      },
+    ])
+    .select('*')
+    .single()
+
+  if (error) {
+    console.error('[customer action] addContact error:', error.message)
+    return null
+  }
+
+  return {
+    id: inserted.id,
+    customerId: inserted.customerId,
+    contactName: inserted.contactName,
+    position: inserted.position ?? null,
+    phone: inserted.phone ?? null,
+    email: inserted.email ?? null,
+    wechat: inserted.wechat ?? null,
+    isPrimary: inserted.isPrimary ?? false,
+    notes: inserted.notes ?? null,
+    createdAt: inserted.createdAt,
+  }
 }
