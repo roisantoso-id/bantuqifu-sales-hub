@@ -2,7 +2,7 @@
 export type NavSection = 'leads' | 'opportunities' | 'customers' | 'analytics'
 
 // ─── Pipeline Stages ─────────────────────────────────────────────────────────
-export type StageId = 'P1' | 'P2' | 'P3'
+export type StageId = 'P1' | 'P2' | 'P3' | 'P4' | 'P5' | 'P6' | 'P7'
 
 // ─── Customer / Applicant ────────────────────────────────────────────────────
 export interface Customer {
@@ -28,6 +28,54 @@ export interface OpportunityP3Data {
   currency: Currency // IDR or CNY
 }
 
+// ─── Stage P4-P7 Data ────────────────────────────────────────────────────────
+export interface OpportunityP4Data {
+  contractFileUrl?: string // 合同PDF文件URL
+  contractStatus: 'pending' | 'returned' | 'archived' // 待签署 | 已回传 | 归档中
+  uploadedAt?: string
+  notes?: string
+}
+
+export interface OpportunityP5Data {
+  bankAccount?: string
+  dueAmount: number
+  receivedAmount: number
+  receiptFileUrl?: string
+  paymentStatus: 'pending' | 'verified' | 'rejected' // 待收款 | 已确认 | 驳回
+  rejectionReason?: string
+  confirmedAt?: string
+}
+
+export interface MaterialItem {
+  id: string
+  name: string // e.g., 护照首页、Kitap扫描件
+  status: 'missing' | 'pending_review' | 'approved' | 'rejected'
+  fileUrl?: string
+  ocrStatus?: 'pending' | 'completed' | 'failed'
+  rejectionReason?: string
+  uploadedAt?: string
+}
+
+export interface OpportunityP6Data {
+  materials: MaterialItem[]
+  lastUpdatedAt?: string
+}
+
+export interface ProgressPoint {
+  id: string
+  label: string // e.g., 移民局接收、正在审理、贴纸完成
+  status: 'pending' | 'in_progress' | 'completed'
+  timestamp?: string
+}
+
+export interface OpportunityP7Data {
+  progressPoints: ProgressPoint[]
+  finalDocumentUrl?: string
+  deliveryStatus: 'in_transit' | 'delivered'
+  deliveredAt?: string
+  notes?: string
+}
+
 export interface Opportunity {
   id: string
   customerId: string
@@ -45,6 +93,10 @@ export interface Opportunity {
   assignee: string
   p2Data?: OpportunityP2Data[] // P2阶段选中的产品
   p3Data?: OpportunityP3Data[] // P3阶段的报价数据
+  p4Data?: OpportunityP4Data // P4: 合同签署
+  p5Data?: OpportunityP5Data // P5: 财务确认
+  p6Data?: OpportunityP6Data // P6: 材料提交
+  p7Data?: OpportunityP7Data // P7: 交付完成
   createdAt: string
   updatedAt: string
 }

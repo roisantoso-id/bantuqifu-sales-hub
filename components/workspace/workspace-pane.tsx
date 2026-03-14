@@ -1,10 +1,14 @@
 'use client'
 
-import type { Opportunity, Product, StageId, OpportunityP2Data, OpportunityP3Data } from '@/lib/types'
+import type { Opportunity, Product, StageId, OpportunityP2Data, OpportunityP3Data, OpportunityP4Data, OpportunityP5Data, OpportunityP6Data, OpportunityP7Data } from '@/lib/types'
 import { BreadcrumbStepper } from './breadcrumb-stepper'
 import { P1RequirementForm } from './p1-requirement-form'
 import { P2ProductMatcher } from './p2-product-matcher'
 import { P3QuoteView } from './p3-quote-view'
+import { P4Contract } from './p4-contract'
+import { P5Finance } from './p5-finance'
+import { P6Materials } from './p6-materials'
+import { P7Delivery } from './p7-delivery'
 import { ChevronRight, Save } from 'lucide-react'
 
 interface WorkspaceProps {
@@ -18,11 +22,15 @@ interface WorkspaceProps {
   onQuoteSent: () => void
 }
 
-const STAGE_ORDER: Record<StageId, number> = { P1: 0, P2: 1, P3: 2 }
+const STAGE_ORDER: Record<StageId, number> = { P1: 0, P2: 1, P3: 2, P4: 3, P5: 4, P6: 5, P7: 6 }
 const STAGE_NEXT_LABEL: Record<StageId, string> = {
   P1: '保存并推进至 P2',
   P2: '保存并推进至 P3',
-  P3: '完成并赢单',
+  P3: '推进至 P4',
+  P4: '推进至 P5',
+  P5: '推进至 P6',
+  P6: '推进至 P7',
+  P7: '完成交付',
 }
 
 export function WorkspacePane({
@@ -39,14 +47,6 @@ export function WorkspacePane({
   const currentIdx = STAGE_ORDER[opportunity.stageId]
   const viewingIdx = STAGE_ORDER[viewingStage]
   const isHistorical = viewingIdx < currentIdx
-
-  const handleP2DataChange = (data: OpportunityP2Data[]) => {
-    onOpportunityUpdate({ p2Data: data })
-  }
-
-  const handleP3DataChange = (data: OpportunityP3Data[]) => {
-    onOpportunityUpdate({ p3Data: data })
-  }
 
   return (
     <div className="flex h-full flex-1 flex-col overflow-hidden bg-white">
@@ -97,7 +97,7 @@ export function WorkspacePane({
           <P2ProductMatcher
             allProducts={allProducts}
             selectedData={opportunity.p2Data || []}
-            onDataChange={handleP2DataChange}
+            onDataChange={(data) => onOpportunityUpdate({ p2Data: data })}
           />
         )}
         {viewingStage === 'P3' && (
@@ -105,14 +105,39 @@ export function WorkspacePane({
             opportunity={opportunity}
             allProducts={allProducts}
             p3Data={opportunity.p3Data || []}
-            onP3DataChange={handleP3DataChange}
+            onP3DataChange={(data) => onOpportunityUpdate({ p3Data: data })}
             onQuoteSent={onQuoteSent}
+          />
+        )}
+        {viewingStage === 'P4' && (
+          <P4Contract
+            p4Data={opportunity.p4Data}
+            onDataChange={(data) => onOpportunityUpdate({ p4Data: data })}
+          />
+        )}
+        {viewingStage === 'P5' && (
+          <P5Finance
+            p5Data={opportunity.p5Data}
+            onDataChange={(data) => onOpportunityUpdate({ p5Data: data })}
+          />
+        )}
+        {viewingStage === 'P6' && (
+          <P6Materials
+            p6Data={opportunity.p6Data}
+            onDataChange={(data) => onOpportunityUpdate({ p6Data: data })}
+          />
+        )}
+        {viewingStage === 'P7' && (
+          <P7Delivery
+            p7Data={opportunity.p7Data}
+            onDataChange={(data) => onOpportunityUpdate({ p7Data: data })}
+            onCompleteDelivery={onAdvanceStage}
           />
         )}
       </div>
 
       {/* Footer action bar */}
-      {!isHistorical && viewingStage !== 'P3' && (
+      {!isHistorical && !['P4', 'P5', 'P6', 'P7'].includes(viewingStage) && (
         <div className="flex items-center justify-between border-t border-[#e5e7eb] bg-[#f9fafb] px-5 py-2">
           <button
             onClick={onSave}
