@@ -1,11 +1,11 @@
 'use server'
-// Lead Actions - 线索模块 with public pool logic and tenant isolation
+// Lead Actions - v1.0 using Supabase direct (matches leads table schema)
 
-import { prisma } from '@/lib/prisma'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { generateBizId } from '@/lib/utils/id-generator'
 import { cookies } from 'next/headers'
-import { revalidatePath } from 'next/cache'
 
-// ─── 租户隔离与上下文 ─────────────────────────────────────────────────────────────
+// ─── 租户隔离辅助 ─────────────────────────────────────────────────────────────
 
 async function getCurrentTenantId(): Promise<string> {
   const cookieStore = await cookies()
@@ -13,278 +13,352 @@ async function getCurrentTenantId(): Promise<string> {
 }
 
 async function getCurrentUserId(): Promise<string | null> {
-  const cookieStore = await cookies()
-  return cookieStore.get('userId')?.value ?? null
+  const supabase = await createServiceClient()
+  const { data: { user }, error } = await supabase.auth.getUser()
+  if (error || !user) return null
+  return user.id
 }
 
-// ─── 返回类型定义 ─────────────────────────────────────────────────────────────
+// ─── 类型定义 ─────────────────────────────────────────────────────────────────
 
 export interface LeadRow {
   id: string
-  leadCode: string
   organizationId: string
-  wechatName: string
+  leadCode: string
+  personName: string
+  company: string | null
+  position: string | null
   phone: string | null
-  source: string // 'wechat' | 'referral' | 'facebook' | 'website' | 'cold_outreach'
-  category: string | null // 'VISA' | 'COMPANY_REGISTRATION' | ...
-  budgetMin: number | null
-  budgetMax: number | null
-  budgetCurrency: string
-  urgency: string // 'HIGH' | 'MEDIUM' | 'LOW'
-  initialIntent: string
-  assigneeId: string | null
-  assigneeName?: string | null
-  nextFollowDate: Date | null
-  lastActionAt: Date | null
-  status: string // 'new' | 'contacted' | 'no_interest' | 'ready_for_opportunity' | 'discarded'
-  discardedAt: Date | null
+  email: string | null
+  wechat: string | null
+  source: string
+  sourceDetail: string | null
+  category: string
+  urgency: string
+  status: string
+  assignedToId: string | null
+  nextFollowDate: string | null
   discardReason: string | null
+  discardedAt: string | null
   discardedById: string | null
-  createdAt: Date
-  updatedAt: Date
   notes: string | null
-  convertedOpportunityId: string | null
+  createdById: string | null
+  createdAt: string
+  updatedAt: string
 }
 
-// ─── 1. 获取线索列表 (包含公海逻辑) ──────────────────────────────────────────
+export interface LeadFollowUpRow {
+  id: string
+  leadId: string
+  followupType: string
+  content: string
+  nextAction: string | null
+  nextActionDate: string | null
+  createdById: string | null
+  createdAt: string
+}
 
-export async function getLeadsAction(viewMode: 'my_leads' | 'public_pool' = 'my_leads') {
-  try {
-    const tenantId = await getCurrentTenantId()
-    const userId = await getCurrentUserId()
+// ─── 枚举常量 ─────────────────────────────────────────────────────────────────
 
-    // 动态构建查询条件
-    let whereClause: any = {
+export const LEAD_SOURCES = [
+  { value: 'INBOUND',      label: '主动来访' },
+  { value: 'REFERRAL',     label: '转介绍' },
+  { value: 'CUSTOMER_REF', label: '老客户推荐' },
+  { value: 'EXHIBITION',   label: '展会' },
+  { value: 'WEBSITE',      label: '官网询盘' },
+  { value: 'SOCIAL_MEDIA', label: '社交媒体' },
+  { value: 'OTHER',        label: '其他' },
+]
+
+export const LEAD_CATEGORIES = [
+  { value: 'PRODUCT_INQUIRY',  label: '产品咨询' },
+  { value: 'PRICE_INQUIRY',    label: '价格咨询' },
+  { value: 'SERVICE_INQUIRY',  label: '服务咨询' },
+  { value: 'COOPERATION',      label: '合作洽谈' },
+  { value: 'OTHER',            label: '其他' },
+]
+
+export const LEAD_URGENCY = [
+  { value: 'HOT',  label: '热', color: 'bg-red-100 text-red-700' },
+  { value: 'WARM', label: '温', color: 'bg-amber-100 text-amber-700' },
+  { value: 'COLD', label: '冷', color: 'bg-sky-100 text-sky-700' },
+]
+
+export const LEAD_STATUSES = [
+  { value: 'NEW',         label: '新线索',   color: 'bg-slate-100 text-slate-600' },
+  { value: 'CONTACTED',   label: '已联系',   color: 'bg-blue-100 text-blue-700' },
+  { value: 'INTERESTED',  label: '有意向',   color: 'bg-violet-100 text-violet-700' },
+  { value: 'QUALIFIED',   label: '已确认',   color: 'bg-indigo-100 text-indigo-700' },
+  { value: 'PROPOSAL',    label: '已报价',   color: 'bg-amber-100 text-amber-700' },
+  { value: 'NEGOTIATION', label: '谈判中',   color: 'bg-orange-100 text-orange-700' },
+  { value: 'CONVERTED',   label: '已转化',   color: 'bg-green-100 text-green-700' },
+  { value: 'DISCARDED',   label: '已废弃',   color: 'bg-red-100 text-red-500' },
+]
+
+export const DISCARD_REASONS = [
+  { value: 'INVALID_INFO',   label: '信息无效' },
+  { value: 'NOT_INTERESTED', label: '无意向' },
+  { value: 'POOR_MATCH',     label: '需求不匹配' },
+  { value: 'COMPETITOR',     label: '选择竞争对手' },
+  { value: 'DUPLICATE',      label: '重复线索' },
+  { value: 'OTHER',          label: '其他' },
+]
+
+// ─── 1. 获取线索列表 ──────────────────────────────────────────────────────────
+
+export async function getLeadsAction(
+  viewMode: 'my_leads' | 'public_pool' = 'my_leads'
+): Promise<LeadRow[]> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+  const userId = await getCurrentUserId()
+
+  let query = supabase
+    .from('leads')
+    .select('*')
+    .eq('organizationId', tenantId)
+    .order('createdAt', { ascending: false })
+
+  if (viewMode === 'my_leads') {
+    if (userId) {
+      query = query.eq('assignedToId', userId).neq('status', 'DISCARDED')
+    } else {
+      query = query.neq('status', 'DISCARDED').is('assignedToId', null)
+    }
+  } else {
+    // 公海：无负责人 或 已废弃
+    query = query.or('assignedToId.is.null,status.eq.DISCARDED')
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error('[lead action] getLeads error:', error.message)
+    return []
+  }
+
+  return (data ?? []) as LeadRow[]
+}
+
+// ─── 2. 新建线索 ──────────────────────────────────────────────────────────────
+
+export async function createLeadAction(input: {
+  personName: string
+  company?: string | null
+  position?: string | null
+  phone?: string | null
+  email?: string | null
+  wechat?: string | null
+  source: string
+  sourceDetail?: string | null
+  category: string
+  urgency: string
+  notes?: string | null
+}): Promise<LeadRow | null> {
+  const supabase = await createServiceClient()
+  const tenantId = await getCurrentTenantId()
+  const userId = await getCurrentUserId()
+
+  const leadCode = await generateBizId('LED')
+
+  const { data, error } = await supabase
+    .from('leads')
+    .insert([{
+      id: crypto.randomUUID(),
       organizationId: tenantId,
-    }
+      leadCode,
+      personName: input.personName,
+      company: input.company ?? null,
+      position: input.position ?? null,
+      phone: input.phone ?? null,
+      email: input.email ?? null,
+      wechat: input.wechat ?? null,
+      source: input.source,
+      sourceDetail: input.sourceDetail ?? null,
+      category: input.category,
+      urgency: input.urgency,
+      status: 'NEW',
+      assignedToId: userId,
+      notes: input.notes ?? null,
+      createdById: userId,
+    }])
+    .select('*')
+    .single()
 
-    if (viewMode === 'my_leads') {
-      // 我的线索：分配给我，且状态不是已废弃或公海
-      whereClause.assigneeId = userId
-      whereClause.status = { notIn: ['discarded'] }
-    } else if (viewMode === 'public_pool') {
-      // 公海线索：状态为已废弃，或者没有负责人的新线索
-      whereClause.OR = [
-        { status: 'discarded', assigneeId: null },
-        { assigneeId: null, status: 'new' }
-      ]
-    }
-
-    const leads = await prisma.lead.findMany({
-      where: whereClause,
-      include: {
-        assignee: { select: { name: true, id: true } } // 关联查询负责人的名字
-      },
-      orderBy: { createdAt: 'desc' }
-    })
-
-    // 映射到前端格式
-    const leadRows = leads.map((lead: any) => ({
-      ...lead,
-      assigneeName: lead.assignee?.name ?? null,
-    }))
-
-    return { success: true, data: leadRows }
-  } catch (error: any) {
-    console.error('[lead action] getLeads error:', error)
-    return { success: false, error: error.message }
+  if (error) {
+    console.error('[lead action] createLead error:', error.message)
+    return null
   }
+
+  return data as LeadRow
 }
 
-// ─── 2. 新建线索 (核心录入) ──────────────────────────────────────────────────
-
-export async function createLeadAction(data: {
-  wechatName: string
-  phone?: string
-  source: 'wechat' | 'referral' | 'facebook' | 'website' | 'cold_outreach'
-  category?: 'VISA' | 'COMPANY_REGISTRATION' | 'FINANCIAL_SERVICES' | 'PERMIT_SERVICES' | 'TAX_SERVICES'
-  budgetMin?: number
-  budgetMax?: number
-  urgency?: 'HIGH' | 'MEDIUM' | 'LOW'
-  initialIntent: string
-  notes?: string
-}) {
-  try {
-    const tenantId = await getCurrentTenantId()
-    const userId = await getCurrentUserId()
-    
-    if (!userId) throw new Error('登录已失效，请重新登录')
-
-    // 生成语义化业务 ID (如 LED-260315-0001)
-    const leadCode = `LED-${Date.now().toString().slice(-9)}`
-
-    // 写入数据库
-    const newLead = await prisma.lead.create({
-      data: {
-        leadCode,
-        organizationId: tenantId,
-        wechatName: data.wechatName,
-        phone: data.phone ?? null,
-        source: data.source,
-        category: data.category ?? null,
-        budgetMin: data.budgetMin ?? null,
-        budgetMax: data.budgetMax ?? null,
-        urgency: data.urgency ?? 'MEDIUM',
-        initialIntent: data.initialIntent,
-        notes: data.notes ?? null,
-        status: 'new', // 默认状态
-        assigneeId: userId, // 默认分配给录入人自己
-        lastActionAt: new Date(), // 初始化最后跟进时间
-      },
-      include: {
-        assignee: { select: { name: true, id: true } }
-      }
-    })
-
-    // 刷新缓存，确保前端列表立即更新
-    revalidatePath('/leads', 'layout')
-    return { success: true, data: newLead }
-  } catch (error: any) {
-    console.error('[lead action] createLead error:', error)
-    return { success: false, error: error.message }
-  }
-}
-
-// ─── 3. 将线索退回公海 / 废弃 ─────────────────────────────────────────────────
-
-export async function discardLeadAction(
-  leadId: string, 
-  reason: 'NO_CONTACT' | 'MISMATCH_NEEDS' | 'LIMITED_SALES_CAPABILITY' | 'OTHER'
-) {
-  try {
-    const tenantId = await getCurrentTenantId()
-    const userId = await getCurrentUserId()
-
-    if (!userId) throw new Error('登录已失效，请重新登录')
-
-    const updatedLead = await prisma.lead.update({
-      where: { 
-        id: leadId,
-      },
-      data: {
-        status: 'discarded', // 状态改为废弃
-        assigneeId: null,    // 清空负责人，供别人从公海抢单
-        discardReason: reason,
-        discardedAt: new Date(),
-        discardedById: userId
-      },
-      include: {
-        assignee: { select: { name: true, id: true } }
-      }
-    })
-
-    revalidatePath('/leads', 'layout')
-    return { success: true, data: updatedLead }
-  } catch (error: any) {
-    console.error('[lead action] discardLead error:', error)
-    return { success: false, error: error.message }
-  }
-}
-
-// ─── 4. 更新线索状态 ─────────────────────────────────────────────────────────
+// ─── 3. 更新线索状态 ──────────────────────────────────────────────────────────
 
 export async function updateLeadStatusAction(
   leadId: string,
-  status: 'new' | 'contacted' | 'no_interest' | 'ready_for_opportunity' | 'discarded'
-) {
-  try {
-    const tenantId = await getCurrentTenantId()
+  status: string
+): Promise<LeadRow | null> {
+  const supabase = await createServiceClient()
+  const userId = await getCurrentUserId()
 
-    const updatedLead = await prisma.lead.update({
-      where: { id: leadId },
-      data: {
-        status,
-        lastActionAt: new Date(),
-      },
-      include: {
-        assignee: { select: { name: true, id: true } }
-      }
-    })
+  const { data, error } = await supabase
+    .from('leads')
+    .update({ status, updatedById: userId, updatedAt: new Date().toISOString() })
+    .eq('id', leadId)
+    .select('*')
+    .single()
 
-    revalidatePath('/leads', 'layout')
-    return { success: true, data: updatedLead }
-  } catch (error: any) {
-    console.error('[lead action] updateLeadStatus error:', error)
-    return { success: false, error: error.message }
+  if (error) {
+    console.error('[lead action] updateLeadStatus error:', error.message)
+    return null
   }
+
+  return data as LeadRow
 }
 
-// ─── 5. 设置下次跟进时间 ─────────────────────────────────────────────────────
+// ─── 4. 废弃线索 / 退回公海 ───────────────────────────────────────────────────
 
-export async function setNextFollowDateAction(leadId: string, nextFollowDate: Date) {
-  try {
-    const updatedLead = await prisma.lead.update({
-      where: { id: leadId },
-      data: {
-        nextFollowDate,
-        lastActionAt: new Date(),
-      },
-      include: {
-        assignee: { select: { name: true, id: true } }
-      }
+export async function discardLeadAction(
+  leadId: string,
+  discardReason: string
+): Promise<LeadRow | null> {
+  const supabase = await createServiceClient()
+  const userId = await getCurrentUserId()
+
+  const { data, error } = await supabase
+    .from('leads')
+    .update({
+      status: 'DISCARDED',
+      assignedToId: null,
+      discardReason,
+      discardedAt: new Date().toISOString(),
+      discardedById: userId,
+      updatedById: userId,
+      updatedAt: new Date().toISOString(),
     })
+    .eq('id', leadId)
+    .select('*')
+    .single()
 
-    revalidatePath('/leads', 'layout')
-    return { success: true, data: updatedLead }
-  } catch (error: any) {
-    console.error('[lead action] setNextFollowDate error:', error)
-    return { success: false, error: error.message }
+  if (error) {
+    console.error('[lead action] discardLead error:', error.message)
+    return null
   }
+
+  return data as LeadRow
 }
 
-// ─── 6. 从公海抢单 ─────────────────────────────────────────────────────────
+// ─── 5. 从公海认领线索 ────────────────────────────────────────────────────────
 
-export async function claimLeadFromPoolAction(leadId: string) {
-  try {
-    const userId = await getCurrentUserId()
+export async function claimLeadAction(leadId: string): Promise<LeadRow | null> {
+  const supabase = await createServiceClient()
+  const userId = await getCurrentUserId()
 
-    if (!userId) throw new Error('登录已失效，请重新登录')
+  if (!userId) return null
 
-    const updatedLead = await prisma.lead.update({
-      where: { id: leadId },
-      data: {
-        assigneeId: userId,
-        status: 'new', // 抢单后状态重置为新线索
-        lastActionAt: new Date(),
-      },
-      include: {
-        assignee: { select: { name: true, id: true } }
-      }
+  const { data, error } = await supabase
+    .from('leads')
+    .update({
+      assignedToId: userId,
+      status: 'NEW',
+      discardReason: null,
+      discardedAt: null,
+      discardedById: null,
+      updatedById: userId,
+      updatedAt: new Date().toISOString(),
     })
+    .eq('id', leadId)
+    .select('*')
+    .single()
 
-    revalidatePath('/leads', 'layout')
-    return { success: true, data: updatedLead }
-  } catch (error: any) {
-    console.error('[lead action] claimLeadFromPool error:', error)
-    return { success: false, error: error.message }
+  if (error) {
+    console.error('[lead action] claimLead error:', error.message)
+    return null
   }
+
+  return data as LeadRow
 }
 
-// ─── 7. 获取单个线索详情 ─────────────────────────────────────────────────────
+// ─── 6. 设置下次跟进日期 ──────────────────────────────────────────────────────
 
-export async function getLeadDetailAction(leadId: string) {
-  try {
-    const lead = await prisma.lead.findUnique({
-      where: { id: leadId },
-      include: {
-        assignee: { select: { name: true, id: true, email: true } },
-        convertedOpportunity: {
-          select: {
-            id: true,
-            opportunityCode: true,
-            status: true
-          }
-        }
-      }
+export async function setNextFollowDateAction(
+  leadId: string,
+  nextFollowDate: string
+): Promise<LeadRow | null> {
+  const supabase = await createServiceClient()
+  const userId = await getCurrentUserId()
+
+  const { data, error } = await supabase
+    .from('leads')
+    .update({
+      nextFollowDate,
+      updatedById: userId,
+      updatedAt: new Date().toISOString(),
     })
+    .eq('id', leadId)
+    .select('*')
+    .single()
 
-    if (!lead) {
-      return { success: false, error: '线索不存在' }
-    }
-
-    return { success: true, data: lead }
-  } catch (error: any) {
-    console.error('[lead action] getLeadDetail error:', error)
-    return { success: false, error: error.message }
+  if (error) {
+    console.error('[lead action] setNextFollowDate error:', error.message)
+    return null
   }
+
+  return data as LeadRow
+}
+
+// ─── 7. 添加跟进记录 ──────────────────────────────────────────────────────────
+
+export async function addLeadFollowUpAction(input: {
+  leadId: string
+  followupType: string
+  content: string
+  nextAction?: string | null
+  nextActionDate?: string | null
+}): Promise<LeadFollowUpRow | null> {
+  const supabase = await createServiceClient()
+  const tenantId = await getCurrentTenantId()
+  const userId = await getCurrentUserId()
+
+  const { data, error } = await supabase
+    .from('lead_follow_ups')
+    .insert([{
+      id: crypto.randomUUID(),
+      organizationId: tenantId,
+      leadId: input.leadId,
+      followupType: input.followupType,
+      content: input.content,
+      nextAction: input.nextAction ?? null,
+      nextActionDate: input.nextActionDate ?? null,
+      createdById: userId,
+    }])
+    .select('*')
+    .single()
+
+  if (error) {
+    console.error('[lead action] addFollowUp error:', error.message)
+    return null
+  }
+
+  return data as LeadFollowUpRow
+}
+
+// ─── 8. 获取线索跟进记录 ──────────────────────────────────────────────────────
+
+export async function getLeadFollowUpsAction(leadId: string): Promise<LeadFollowUpRow[]> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('lead_follow_ups')
+    .select('*')
+    .eq('leadId', leadId)
+    .order('createdAt', { ascending: false })
+
+  if (error) {
+    console.error('[lead action] getFollowUps error:', error.message)
+    return []
+  }
+
+  return (data ?? []) as LeadFollowUpRow[]
 }
