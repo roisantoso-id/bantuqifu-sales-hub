@@ -5,6 +5,7 @@ import { PrimarySidebar } from '@/components/layout/primary-sidebar'
 import { SecondarySidebar } from '@/components/layout/secondary-sidebar'
 import { WorkspacePane } from '@/components/workspace/workspace-pane'
 import { CustomerManagement } from '@/components/customers/customer-management'
+import { CustomerProfile } from '@/components/customers/customer-profile'
 import { LeadManagement } from '@/components/leads/lead-management'
 import { AuditRail } from '@/components/audit-rail/audit-panel'
 import { mockOpportunities, mockProducts, mockActionLogs, mockUser, mockLeads } from '@/lib/mock-data'
@@ -17,6 +18,7 @@ export default function SalesHub() {
   const [opportunities, setOpportunities] = useState<Opportunity[]>(mockOpportunities)
   const [leads, setLeads] = useState<Lead[]>(mockLeads)
   const [selectedId, setSelectedId] = useState<string>(mockOpportunities[0].id)
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const [viewingStage, setViewingStage] = useState<StageId>(mockOpportunities[0].stageId)
   const [actionLogs, setActionLogs] = useState<Record<string, ActionLog[]>>(mockActionLogs)
   const [showAuditRail, setShowAuditRail] = useState(true)
@@ -344,7 +346,28 @@ export default function SalesHub() {
         </>
       ) : activeNav === 'customers' ? (
         <div className="flex-1">
-          <CustomerManagement opportunities={opportunities} onCustomerCreate={handleCreateCustomer} />
+          {selectedCustomerId ? (
+            <CustomerProfile
+              customerId={selectedCustomerId}
+              customerName={opportunities.find((o) => o.customerId === selectedCustomerId)?.customer.name || selectedCustomerId}
+              opportunities={opportunities}
+              leads={leads}
+              actionLogs={actionLogs}
+              onBack={() => setSelectedCustomerId(null)}
+              onCreateOpportunity={() => {
+                // TODO: Create new opportunity for this customer
+              }}
+              onAddNote={(note) => {
+                // TODO: Add customer-level note
+              }}
+            />
+          ) : (
+            <CustomerManagement 
+              opportunities={opportunities} 
+              onCustomerCreate={handleCreateCustomer}
+              onSelectCustomer={setSelectedCustomerId}
+            />
+          )}
         </div>
       ) : (
         <div className="flex-1 flex items-center justify-center text-[#9ca3af]">

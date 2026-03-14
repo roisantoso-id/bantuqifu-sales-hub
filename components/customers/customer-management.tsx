@@ -21,9 +21,10 @@ interface CustomerManagementProps {
   opportunities: Opportunity[]
   onCustomerCreate?: (customerData: any) => void
   onCustomerUpdate?: (customerId: string, data: any) => void
+  onSelectCustomer?: (customerId: string) => void
 }
 
-export function CustomerManagement({ opportunities, onCustomerCreate, onCustomerUpdate }: CustomerManagementProps) {
+export function CustomerManagement({ opportunities, onCustomerCreate, onCustomerUpdate, onSelectCustomer }: CustomerManagementProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedIndustry, setSelectedIndustry] = useState<string | null>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -184,7 +185,8 @@ export function CustomerManagement({ opportunities, onCustomerCreate, onCustomer
             {filtered.map((customer) => (
               <div
                 key={customer.customerId}
-                className="group grid grid-cols-[120px_150px_120px_120px_180px_120px_80px] gap-0 hover:bg-[#f9fafb] text-[12px]"
+                className="group grid grid-cols-[120px_150px_120px_120px_180px_120px_80px] gap-0 hover:bg-[#f9fafb] text-[12px] cursor-pointer"
+                onClick={() => onSelectCustomer?.(customer.customerId)}
               >
                 <div className="px-3 py-2 font-mono text-[#2563eb] truncate">{customer.customerId}</div>
                 <div className="px-3 py-2 text-[#111827] truncate font-medium">{customer.customerName}</div>
