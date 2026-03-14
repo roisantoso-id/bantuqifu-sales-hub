@@ -24,8 +24,14 @@ export interface OpportunityP2Data {
 
 export interface OpportunityP3Data {
   productId: string
-  lockedPrice: number // 固定单价（财务阶段不可改）
+  lockedPrice: number // 当前售价（可编辑）
   currency: Currency // IDR or CNY
+  recommendedPrice?: number // 推荐价格（取自 Product.recommendedPrice）
+  costFloor?: number // 成本底线（取自 Product.costPrice）
+  profitMargin?: number // 利润率 = (lockedPrice - costFloor) / costFloor * 100
+  approvalStatus: 'auto-approved' | 'admin-required' | 'pending' // 自动审批 | 需管理员审核 | 待审批
+  approvedAt?: string
+  approvedBy?: string
 }
 
 // ─── Stage P4-P7 Data ────────────────────────────────────────────────────────
