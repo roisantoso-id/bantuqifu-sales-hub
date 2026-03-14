@@ -73,7 +73,8 @@ export default function SalesHub() {
       P4: 'P5',
       P5: 'P6',
       P6: 'P7',
-      P7: null,
+      P7: 'P8',
+      P8: null,
     }
     const next = stageMap[selectedOpportunity.stageId]
     if (!next) return

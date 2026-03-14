@@ -1,6 +1,6 @@
 'use client'
 
-import type { Opportunity, Product, StageId, OpportunityP2Data, OpportunityP3Data, OpportunityP4Data, OpportunityP5Data, OpportunityP6Data, OpportunityP7Data } from '@/lib/types'
+import type { Opportunity, Product, StageId, OpportunityP2Data, OpportunityP3Data, OpportunityP4Data, OpportunityP5Data, OpportunityP6Data, OpportunityP7Data, OpportunityP8Data } from '@/lib/types'
 import { BreadcrumbStepper } from './breadcrumb-stepper'
 import { P1RequirementForm } from './p1-requirement-form'
 import { P2ProductMatcher } from './p2-product-matcher'
@@ -9,6 +9,7 @@ import { P4Contract } from './p4-contract'
 import { P5Finance } from './p5-finance'
 import { P6Materials } from './p6-materials'
 import { P7Delivery } from './p7-delivery'
+import { P8Settlement } from './p8-settlement'
 import { ChevronRight, Save } from 'lucide-react'
 
 interface WorkspaceProps {
@@ -22,7 +23,7 @@ interface WorkspaceProps {
   onQuoteSent: () => void
 }
 
-const STAGE_ORDER: Record<StageId, number> = { P1: 0, P2: 1, P3: 2, P4: 3, P5: 4, P6: 5, P7: 6 }
+const STAGE_ORDER: Record<StageId, number> = { P1: 0, P2: 1, P3: 2, P4: 3, P5: 4, P6: 5, P7: 6, P8: 7 }
 const STAGE_NEXT_LABEL: Record<StageId, string> = {
   P1: '保存并推进至 P2',
   P2: '保存并推进至 P3',
@@ -30,7 +31,8 @@ const STAGE_NEXT_LABEL: Record<StageId, string> = {
   P4: '确认合同，推进至 P5',
   P5: '确认收款，推进至 P6',
   P6: '材料完成，推进至 P7',
-  P7: '完成交付',
+  P7: '交付完成，推进至 P8',
+  P8: '结算完成',
 }
 
 export function WorkspacePane({
@@ -141,6 +143,14 @@ export function WorkspacePane({
             onCompleteDelivery={onAdvanceStage}
           />
         )}
+        {viewingStage === 'P8' && (
+          <P8Settlement
+            opportunity={opportunity}
+            p8Data={opportunity.p8Data}
+            onDataChange={(data) => onOpportunityUpdate({ p8Data: data })}
+            onCompleteSettlement={onAdvanceStage}
+          />
+        )}
       </div>
 
       {/* Footer action bar */}
@@ -166,10 +176,15 @@ export function WorkspacePane({
               )}
             </>
           )}
-          {['P4', 'P5', 'P6'].includes(viewingStage) && isOnCurrentStage && (
+          {['P4', 'P5', 'P6', 'P7'].includes(viewingStage) && isOnCurrentStage && (
             <button
               onClick={onAdvanceStage}
               className="ml-auto flex h-8 items-center gap-1.5 rounded-sm bg-[#2563eb] px-3 text-[13px] font-medium text-white hover:bg-[#1d4ed8]"
+              >
+              {STAGE_NEXT_LABEL[opportunity.stageId]}
+              <ChevronRight size={13} />
+            </button>
+          )}
             >
               {STAGE_NEXT_LABEL[opportunity.stageId]}
               <ChevronRight size={13} />

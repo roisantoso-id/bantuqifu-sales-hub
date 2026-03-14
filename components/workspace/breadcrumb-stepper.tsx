@@ -17,9 +17,10 @@ const STAGES: { id: StageId; label: string; desc: string }[] = [
   { id: 'P5', label: 'P5', desc: '财务确认' },
   { id: 'P6', label: 'P6', desc: '材料提交' },
   { id: 'P7', label: 'P7', desc: '交付完成' },
+  { id: 'P8', label: 'P8', desc: '财务结算' },
 ]
 
-const STAGE_ORDER: Record<StageId, number> = { P1: 0, P2: 1, P3: 2, P4: 3, P5: 4, P6: 5, P7: 6 }
+const STAGE_ORDER: Record<StageId, number> = { P1: 0, P2: 1, P3: 2, P4: 3, P5: 4, P6: 5, P7: 6, P8: 7 }
 
 export function BreadcrumbStepper({ currentStage, onStageClick, viewingStage }: BreadcrumbStepperProps) {
   const currentIdx = STAGE_ORDER[currentStage]

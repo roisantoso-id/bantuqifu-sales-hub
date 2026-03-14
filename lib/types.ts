@@ -2,7 +2,7 @@
 export type NavSection = 'leads' | 'opportunities' | 'customers' | 'analytics'
 
 // ─── Pipeline Stages ─────────────────────────────────────────────────────────
-export type StageId = 'P1' | 'P2' | 'P3' | 'P4' | 'P5' | 'P6' | 'P7'
+export type StageId = 'P1' | 'P2' | 'P3' | 'P4' | 'P5' | 'P6' | 'P7' | 'P8'
 
 // ─── Customer / Applicant ────────────────────────────────────────────────────
 export interface Customer {
@@ -108,6 +108,51 @@ export interface OpportunityP7Data {
   completedAt?: string
 }
 
+// ─── Stage P8 Data ──────────────────────────────────────────────────────────
+export interface RefundItem {
+  id: string
+  serviceId: string // 失败的服务项 ID
+  serviceName: string // 服务名称
+  originalAmount: number // P3 中的报价金额
+  refundedAmount: number // 实际退款金额
+  reason: string // 失败原因
+  refundedAt?: string
+  refundedBy?: string
+  receiptUrl?: string
+}
+
+export interface ExpenseItem {
+  id: string
+  description: string // 事由（如："政府规费"、"加急费"、"差旅费"）
+  amount: number
+  category: 'gov-fee' | 'expedite' | 'travel' | 'other' // 分类
+  receiptUrl?: string
+  receiptFileName?: string
+  createdBy: string
+  createdAt: string
+  approvedBy?: string
+  approvedAt?: string
+}
+
+export interface OpportunityP8Data {
+  totalAmount: number // P3 总合同金额
+  paidAmount: number // P5 已收首款
+  balanceDue: number // 应收尾款 = totalAmount - paidAmount
+  balanceReceiptUrl?: string // 尾款凭证
+  balanceReceivedAt?: string
+  balanceStatus: 'pending' | 'received' | 'partial' // 尾款状态
+  refunds: RefundItem[] // 退款项
+  totalRefund: number // 总退款金额（自动累加）
+  expenses: ExpenseItem[] // 报销项
+  totalExpense: number // 总报销金额（自动累加）
+  netBalance: number // 最终应收 = balanceDue + totalExpense - totalRefund
+  profitMargin?: number // 利润率
+  settledAt?: string
+  settledBy?: string
+  archived: boolean
+  notes?: string
+}
+
 export interface Opportunity {
   id: string
   customerId: string
@@ -129,6 +174,7 @@ export interface Opportunity {
   p5Data?: OpportunityP5Data // P5: 财务确认
   p6Data?: OpportunityP6Data // P6: 材料提交
   p7Data?: OpportunityP7Data // P7: 交付完成
+  p8Data?: OpportunityP8Data // P8: 财务结算
   createdAt: string
   updatedAt: string
 }
