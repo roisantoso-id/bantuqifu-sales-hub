@@ -596,49 +596,32 @@ function LeadsTab({ leads }: { leads: Lead[] }) {
 }
 
 // ─── Actions Tab ─────────────────────────────────────────────────────────────
-function ActionsTab({ actions, newNote, onNewNoteChange, onAddNote }: {
-  actions: ConsolidatedAction[]
-  newNote: string
-  onNewNoteChange: (v: string) => void
-  onAddNote: () => void
-}) {
+function ActionsTab({ actions }: { actions: CustomerActionLogRow[] }) {
   return (
-    <div className="flex flex-col h-full">
-      <div className="border-b border-[#e5e7eb] p-4">
-        <div className="flex gap-2">
-          <textarea
-            value={newNote}
-            onChange={(e) => onNewNoteChange(e.target.value)}
-            placeholder="添加客户级备注..."
-            rows={2}
-            className="flex-1 resize-none rounded-sm border border-[#e5e7eb] p-2 text-[12px] placeholder-[#9ca3af] outline-none focus:border-[#2563eb]"
-          />
-          <button onClick={onAddNote} className="h-16 rounded-sm bg-[#2563eb] px-3 text-[12px] font-medium text-white hover:bg-[#1d4ed8]">添加</button>
-        </div>
-      </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {actions.length === 0 ? (
-          <div className="flex h-40 items-center justify-center text-[13px] text-[#9ca3af]">暂无跟进记录</div>
-        ) : actions.map((action, idx) => (
-          <div key={action.id} className="relative pb-4">
-            <div className="absolute left-[5px] top-2 h-3 w-3 rounded-full bg-[#2563eb]" />
-            {idx < actions.length - 1 && <div className="absolute left-[14px] top-5 bottom-0 w-px bg-[#e5e7eb]" />}
-            <div className="ml-8">
-              <div className="flex items-baseline gap-2">
-                <span className="text-[12px] font-medium text-[#111827]">{action.operatorName}</span>
-                <span className="text-[11px] text-[#6b7280]">{action.actionLabel}</span>
-                {action.opportunityId && (
-                  <span className="inline-flex rounded-sm bg-[#f3f4f6] px-1 py-0.5 font-mono text-[10px] text-[#2563eb]">
-                    {action.opportunityId} / {action.opportunityStage}
-                  </span>
-                )}
-              </div>
-              <div className="mt-1 text-[12px] text-[#6b7280]">{action.remark}</div>
-              <div className="mt-1 text-[11px] text-[#9ca3af]">{new Date(action.timestamp).toLocaleString('zh-CN')}</div>
+    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      {actions.length === 0 ? (
+        <div className="flex h-40 items-center justify-center text-[13px] text-[#9ca3af]">暂无跟进记录</div>
+      ) : actions.map((action, idx) => (
+        <div key={action.id} className="relative pb-4">
+          <div className="absolute left-[5px] top-2 h-3 w-3 rounded-full bg-[#2563eb]" />
+          {idx < actions.length - 1 && <div className="absolute left-[14px] top-5 bottom-0 w-px bg-[#e5e7eb]" />}
+          <div className="ml-8">
+            <div className="flex items-baseline gap-2">
+              <span className="text-[12px] font-medium text-[#111827]">{action.operatorName}</span>
+              <span className="text-[11px] text-[#6b7280]">{action.actionLabel}</span>
+              {action.opportunityId && (
+                <span className="inline-flex rounded-sm bg-[#f3f4f6] px-1 py-0.5 font-mono text-[10px] text-[#2563eb]">
+                  {action.opportunityId}
+                </span>
+              )}
             </div>
+            {action.remark && (
+              <div className="mt-1 text-[12px] text-[#374151] whitespace-pre-wrap">{action.remark}</div>
+            )}
+            <div className="mt-1 text-[11px] text-[#9ca3af]">{new Date(action.timestamp).toLocaleString('zh-CN')}</div>
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
   )
 }

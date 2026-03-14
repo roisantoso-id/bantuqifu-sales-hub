@@ -521,16 +521,15 @@ export async function addAssociatedCompanyAction(data: {
   }
 }
 
-// ─── getCurrentUserId helper ───────────────────�����─────────────────────────────
+// ─── getCurrentUserId helper ─────────────────────────────────────────────────
+// Returns null when not authenticated (operatorId column is nullable)
 
 async function getCurrentUserId(): Promise<string | null> {
-  // 使用 service client 获取当前会话用户
   const supabase = await createServiceClient()
   const { data: { user }, error } = await supabase.auth.getUser()
   
   if (error || !user) {
-    // 如果没有认证用户，返回 null（operatorId 已设为可空）
-    console.warn('[getCurrentUserId] No authenticated user')
+    console.warn('[getCurrentUserId] No authenticated user - returning null')
     return null
   }
   return user.id
