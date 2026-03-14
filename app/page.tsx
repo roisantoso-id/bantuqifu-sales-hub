@@ -11,7 +11,6 @@ import { AuditRail } from '@/components/audit-rail/audit-panel'
 import { mockOpportunities, mockProducts, mockActionLogs, mockUser, mockLeads } from '@/lib/mock-data'
 import { addAuditNote } from '@/app/actions/audit'
 import type { Opportunity, NavSection, StageId, ActionLog, Customer, Lead } from '@/lib/types'
-import { ClipboardList } from 'lucide-react'
 
 export default function SalesHub() {
   const [activeNav, setActiveNav] = useState<NavSection>('opportunities')
