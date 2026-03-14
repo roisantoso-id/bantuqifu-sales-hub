@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback } from 'react'
 import { PrimarySidebar } from '@/components/layout/primary-sidebar'
 import { SecondarySidebar } from '@/components/layout/secondary-sidebar'
 import { WorkspacePane } from '@/components/workspace/workspace-pane'
+import { CustomerManagement } from '@/components/customers/customer-management'
 import { AuditRail } from '@/components/audit-rail/audit-panel'
 import { mockOpportunities, mockProducts, mockActionLogs, mockUser } from '@/lib/mock-data'
 import { addAuditNote } from '@/app/actions/audit'
@@ -124,45 +125,61 @@ export default function SalesHub() {
         userName={mockUser.name}
       />
 
-      {/* Pane 2 — opportunity list (280px) */}
-      <SecondarySidebar
-        opportunities={opportunities}
-        selectedId={selectedId}
-        onSelect={handleSelectOpportunity}
-      />
+      {/* Pane 2 — conditional content based on activeNav */}
+      {activeNav === 'opportunities' ? (
+        <>
+          {/* Opportunity list (280px) */}
+          <SecondarySidebar
+            opportunities={opportunities}
+            selectedId={selectedId}
+            onSelect={handleSelectOpportunity}
+          />
 
-      {/* Pane 3 — workspace (flex-1) */}
-      <WorkspacePane
-        opportunity={selectedOpportunity}
-        allProducts={mockProducts}
-        viewingStage={viewingStage}
-        onViewingStageChange={setViewingStage}
-        onOpportunityUpdate={handleOpportunityUpdate}
-        onSave={handleSave}
-        onAdvanceStage={handleAdvanceStage}
-        onQuoteSent={handleQuoteSent}
-      />
+          {/* Pane 3 — workspace (flex-1) */}
+          <WorkspacePane
+            opportunity={selectedOpportunity}
+            allProducts={mockProducts}
+            viewingStage={viewingStage}
+            onViewingStageChange={setViewingStage}
+            onOpportunityUpdate={handleOpportunityUpdate}
+            onSave={handleSave}
+            onAdvanceStage={handleAdvanceStage}
+            onQuoteSent={handleQuoteSent}
+          />
 
-      {/* Audit rail toggle button (shown when rail is hidden) */}
-      {!showAuditRail && (
-        <button
-          onClick={() => setShowAuditRail(true)}
-          title="查看操作记录"
-          aria-label="打开操作记录面板"
-          className="flex h-8 w-8 shrink-0 items-center justify-center self-start border-l border-[#e5e7eb] text-[#9ca3af] hover:bg-[#f3f4f6] hover:text-[#374151] mt-[52px]"
-        >
-          <ClipboardList size={14} />
-        </button>
-      )}
+          {/* Audit rail toggle button (shown when rail is hidden) */}
+          {!showAuditRail && (
+            <button
+              onClick={() => setShowAuditRail(true)}
+              title="查看操作记录"
+              aria-label="打开操作记录面板"
+              className="flex h-8 w-8 shrink-0 items-center justify-center self-start border-l border-[#e5e7eb] text-[#9ca3af] hover:bg-[#f3f4f6] hover:text-[#374151] mt-[52px]"
+            >
+              <ClipboardList size={14} />
+            </button>
+          )}
 
-      {/* Pane 4 — audit rail (256px, toggleable) */}
-      {showAuditRail && (
-        <AuditRail
-          logs={currentLogs}
-          opportunityId={selectedId}
-          onClose={() => setShowAuditRail(false)}
-          onAddNote={handleAddNote}
-        />
+          {/* Pane 4 — audit rail (256px, toggleable) */}
+          {showAuditRail && (
+            <AuditRail
+              logs={currentLogs}
+              opportunityId={selectedId}
+              onClose={() => setShowAuditRail(false)}
+              onAddNote={handleAddNote}
+            />
+          )}
+        </>
+      ) : activeNav === 'customers' ? (
+        <div className="flex-1">
+          <CustomerManagement opportunities={opportunities} />
+        </div>
+      ) : (
+        <div className="flex-1 flex items-center justify-center text-[#9ca3af]">
+          <div className="text-center">
+            <div className="text-[14px] font-medium mb-2">此模块在建设中</div>
+            <div className="text-[12px]">敬请期待</div>
+          </div>
+        </div>
       )}
     </div>
   )
