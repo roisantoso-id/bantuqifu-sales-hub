@@ -518,7 +518,7 @@ export async function addAssociatedCompanyAction(data: {
   }
 }
 
-// ─── getCurrentUserId helper ─────────────────────────────────────────────────
+// ─── getCurrentUserId helper ───────────────────���─────────────────────────────
 
 async function getCurrentUserId(): Promise<string | null> {
   // 使用 service client 获取当前会话用户
@@ -531,4 +531,100 @@ async function getCurrentUserId(): Promise<string | null> {
     return null
   }
   return user.id
+}
+
+// ─── CUSTOMER CONTACTS ───────────────────────────────────────────────────────
+
+export interface CustomerContactRow {
+  id: string
+  customerId: string
+  contactName: string
+  position: string | null
+  phone: string | null
+  email: string | null
+  wechat: string | null
+  isPrimary: boolean
+  notes: string | null
+  createdAt: string
+}
+
+export async function getCustomerContactsAction(customerId: string): Promise<CustomerContactRow[]> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  const { data, error } = await supabase
+    .from('customer_contacts')
+    .select('*')
+    .eq('organizationId', tenantId)
+    .eq('customerId', customerId)
+    .order('isPrimary', { ascending: false })
+    .order('createdAt', { ascending: false })
+
+  if (error) {
+    console.error('[customer action] getContacts error:', error.message)
+    return []
+  }
+
+  return (data ?? []).map((row: any) => ({
+    id: row.id,
+    customerId: row.customerId,
+    contactName: row.contactName,
+    position: row.position ?? null,
+    phone: row.phone ?? null,
+    email: row.email ?? null,
+    wechat: row.wechat ?? null,
+    isPrimary: row.isPrimary ?? false,
+    notes: row.notes ?? null,
+    createdAt: row.createdAt,
+  }))
+}
+
+export async function addCustomerContactAction(data: {
+  customerId: string
+  contactName: string
+  position?: string | null
+  phone?: string | null
+  email?: string | null
+  wechat?: string | null
+  isPrimary?: boolean
+  notes?: string | null
+}): Promise<CustomerContactRow | null> {
+  const supabase = await createServiceClient()
+  const tenantId = await getCurrentTenantId()
+
+  const { data: inserted, error } = await supabase
+    .from('customer_contacts')
+    .insert([
+      {
+        organizationId: tenantId,
+        customerId: data.customerId,
+        contactName: data.contactName,
+        position: data.position ?? null,
+        phone: data.phone ?? null,
+        email: data.email ?? null,
+        wechat: data.wechat ?? null,
+        isPrimary: data.isPrimary ?? false,
+        notes: data.notes ?? null,
+      },
+    ])
+    .select('*')
+    .single()
+
+  if (error) {
+    console.error('[customer action] addContact error:', error.message)
+    return null
+  }
+
+  return {
+    id: inserted.id,
+    customerId: inserted.customerId,
+    contactName: inserted.contactName,
+    position: inserted.position ?? null,
+    phone: inserted.phone ?? null,
+    email: inserted.email ?? null,
+    wechat: inserted.wechat ?? null,
+    isPrimary: inserted.isPrimary ?? false,
+    notes: inserted.notes ?? null,
+    createdAt: inserted.createdAt,
+  }
 }

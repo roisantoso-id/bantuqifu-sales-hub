@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { Search, Plus, Edit2, Archive, ChevronRight, Lock, Users, RefreshCw, X, Building2, Calendar, Globe } from 'lucide-react'
+import { Search, Plus, Edit2, Archive, ChevronRight, Lock, Users, RefreshCw, X, Building2, Calendar, Globe, User, Phone, Mail, MessageCircle } from 'lucide-react'
 import { CUSTOMER_LEVELS } from '@/lib/types'
 import {
   getCustomersAction,
@@ -11,11 +11,14 @@ import {
   addCustomerFollowupAction,
   getAssociatedCompaniesAction,
   addAssociatedCompanyAction,
+  getCustomerContactsAction,
+  addCustomerContactAction,
   type CustomerRow,
   type CustomerOpportunityRow,
   type CustomerActionLogRow,
   type CustomerFollowupRow,
   type AssociatedCompanyRow,
+  type CustomerContactRow,
 } from '@/app/actions/customer'
 
 interface CustomerManagementProps {
@@ -96,7 +99,7 @@ export function CustomerManagement({ onSelectCustomer }: CustomerManagementProps
   const [detailLoading, setDetailLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedLevel, setSelectedLevel] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'opportunities' | 'followups' | 'companies'>('opportunities')
+  const [activeTab, setActiveTab] = useState<'opportunities' | 'followups' | 'companies' | 'contacts'>('opportunities')
 
   // Followups state
   const [followups, setFollowups] = useState<CustomerFollowupRow[]>([])
@@ -111,6 +114,13 @@ export function CustomerManagement({ onSelectCustomer }: CustomerManagementProps
   const [showAddCompany, setShowAddCompany] = useState(false)
   const [newCompanyForm, setNewCompanyForm] = useState({ companyName: '', companyType: 'foreign' as 'domestic' | 'foreign', registrationNo: '', country: 'ID' })
   const [addingCompany, setAddingCompany] = useState(false)
+
+  // Contacts state
+  const [contacts, setContacts] = useState<CustomerContactRow[]>([])
+  const [contactsLoading, setContactsLoading] = useState(false)
+  const [showAddContact, setShowAddContact] = useState(false)
+  const [newContactForm, setNewContactForm] = useState({ contactName: '', position: '', phone: '', email: '', wechat: '', isPrimary: false, notes: '' })
+  const [addingContact, setAddingContact] = useState(false)
 
   // Create customer modal
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -131,6 +141,7 @@ export function CustomerManagement({ onSelectCustomer }: CustomerManagementProps
     setDetailLoading(true)
     setFollowups([])
     setCompanies([])
+    setContacts([])
     try {
       const detail = await getCustomerDetailAction(customer.id)
       if (detail) {
@@ -170,10 +181,24 @@ export function CustomerManagement({ onSelectCustomer }: CustomerManagementProps
     }
   }
 
-  const handleTabChange = (tab: 'opportunities' | 'followups' | 'companies') => {
+  const loadContacts = async () => {
+    if (!selectedCustomer) return
+    setContactsLoading(true)
+    try {
+      const data = await getCustomerContactsAction(selectedCustomer.id)
+      setContacts(data)
+    } catch (err) {
+      console.error('[v0] load contacts error:', err)
+    } finally {
+      setContactsLoading(false)
+    }
+  }
+
+  const handleTabChange = (tab: 'opportunities' | 'followups' | 'companies' | 'contacts') => {
     setActiveTab(tab)
     if (tab === 'followups' && followups.length === 0) loadFollowups()
     if (tab === 'companies' && companies.length === 0) loadCompanies()
+    if (tab === 'contacts' && contacts.length === 0) loadContacts()
   }
 
   const handleAddFollowup = async () => {
@@ -219,6 +244,32 @@ export function CustomerManagement({ onSelectCustomer }: CustomerManagementProps
       console.error('[v0] add company error:', err)
     } finally {
       setAddingCompany(false)
+    }
+  }
+
+  const handleAddContact = async () => {
+    if (!selectedCustomer || !newContactForm.contactName.trim()) return
+    setAddingContact(true)
+    try {
+      const result = await addCustomerContactAction({
+        customerId: selectedCustomer.id,
+        contactName: newContactForm.contactName.trim(),
+        position: newContactForm.position || null,
+        phone: newContactForm.phone || null,
+        email: newContactForm.email || null,
+        wechat: newContactForm.wechat || null,
+        isPrimary: newContactForm.isPrimary,
+        notes: newContactForm.notes || null,
+      })
+      if (result) {
+        setContacts((prev) => [result, ...prev])
+        setNewContactForm({ contactName: '', position: '', phone: '', email: '', wechat: '', isPrimary: false, notes: '' })
+        setShowAddContact(false)
+      }
+    } catch (err) {
+      console.error('[v0] add contact error:', err)
+    } finally {
+      setAddingContact(false)
     }
   }
 
@@ -401,10 +452,11 @@ const result = await createCustomerAction({
             {/* Tabs */}
             <div className="h-10 border-b border-[#e5e7eb] flex">
               {[
-                { id: 'opportunities' as const, label: '关联商机', count: detailOpportunities.length },
-                { id: 'followups' as const, label: '跟进记录', count: followups.length },
-                { id: 'companies' as const, label: '关联公司', count: companies.length },
-              ].map((tab) => (
+{ id: 'opportunities' as const, label: '关联商机', count: detailOpportunities.length },
+  { id: 'followups' as const, label: '跟进记录', count: followups.length },
+  { id: 'companies' as const, label: '关联公司', count: companies.length },
+  { id: 'contacts' as const, label: '关联联系人', count: contacts.length },
+  ].map((tab) => (
                 <button key={tab.id} onClick={() => handleTabChange(tab.id)} className={`px-4 h-full text-[12px] font-medium border-b-2 transition-colors ${activeTab === tab.id ? 'text-[#2563eb] border-[#2563eb]' : 'text-[#6b7280] border-transparent hover:text-[#111827]'}`}>{tab.label} ({tab.count})</button>
               ))}
             </div>
@@ -477,6 +529,34 @@ const result = await createCustomerAction({
                         ))}
                       </tbody>
                     </table>
+                  )}
+                </div>
+              ) : activeTab === 'contacts' ? (
+                <div className="p-4">
+                  <div className="flex justify-end mb-3">
+                    <button onClick={() => setShowAddContact(true)} className="flex items-center gap-1 h-7 px-3 rounded-sm bg-[#2563eb] text-[11px] font-medium text-white hover:bg-[#1d4ed8]"><Plus size={12} /> 添加联系人</button>
+                  </div>
+                  {contactsLoading ? <DetailSkeleton /> : contacts.length === 0 ? <div className="py-8 text-center text-[12px] text-[#9ca3af]">暂无联系人，点击上方按钮添加</div> : (
+                    <div className="grid gap-3">
+                      {contacts.map((contact) => (
+                        <div key={contact.id} className="border border-[#e5e7eb] rounded-sm p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <User size={16} className="text-[#6b7280]" />
+                              <span className="text-[13px] font-semibold text-[#111827]">{contact.contactName}</span>
+                              {contact.isPrimary && <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-amber-100 text-amber-700">主要联系人</span>}
+                              {contact.position && <span className="text-[11px] text-[#6b7280]">{contact.position}</span>}
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-4 text-[11px] text-[#6b7280]">
+                            {contact.phone && <div className="flex items-center gap-1"><Phone size={11} />{contact.phone}</div>}
+                            {contact.email && <div className="flex items-center gap-1"><Mail size={11} />{contact.email}</div>}
+                            {contact.wechat && <div className="flex items-center gap-1"><MessageCircle size={11} />{contact.wechat}</div>}
+                          </div>
+                          {contact.notes && <p className="mt-2 text-[11px] text-[#9ca3af]">{contact.notes}</p>}
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               ) : null}
@@ -623,6 +703,56 @@ const result = await createCustomerAction({
             <div className="flex justify-end gap-2 px-4 py-3 border-t border-[#e5e7eb]">
               <button onClick={() => setShowCreateModal(false)} className="h-8 px-3 text-[12px] text-[#6b7280] hover:text-[#111827]">取消</button>
               <button onClick={handleCreateCustomer} disabled={!createForm.customerName.trim() || creating} className="h-8 px-4 rounded-sm bg-[#2563eb] text-[12px] font-medium text-white hover:bg-[#1d4ed8] disabled:bg-[#d1d5db] disabled:cursor-not-allowed">{creating ? '创建中...' : '创建客户'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Contact Modal */}
+      {showAddContact && selectedCustomer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-[420px] bg-white rounded-sm shadow-lg">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[#e5e7eb]">
+              <h3 className="text-[14px] font-semibold text-[#111827]">添加联系人</h3>
+              <button onClick={() => setShowAddContact(false)} className="text-[#9ca3af] hover:text-[#111827]"><X size={16} /></button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[12px] text-[#6b7280] mb-1">姓名 *</label>
+                  <input type="text" value={newContactForm.contactName} onChange={(e) => setNewContactForm((f) => ({ ...f, contactName: e.target.value }))} className="w-full h-8 px-2 text-[12px] border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb]" placeholder="联系人姓名" />
+                </div>
+                <div>
+                  <label className="block text-[12px] text-[#6b7280] mb-1">职位</label>
+                  <input type="text" value={newContactForm.position} onChange={(e) => setNewContactForm((f) => ({ ...f, position: e.target.value }))} className="w-full h-8 px-2 text-[12px] border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb]" placeholder="例如：总经理" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[12px] text-[#6b7280] mb-1">电话</label>
+                  <input type="text" value={newContactForm.phone} onChange={(e) => setNewContactForm((f) => ({ ...f, phone: e.target.value }))} className="w-full h-8 px-2 text-[12px] font-mono border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb]" placeholder="手机号" />
+                </div>
+                <div>
+                  <label className="block text-[12px] text-[#6b7280] mb-1">微信</label>
+                  <input type="text" value={newContactForm.wechat} onChange={(e) => setNewContactForm((f) => ({ ...f, wechat: e.target.value }))} className="w-full h-8 px-2 text-[12px] font-mono border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb]" placeholder="微信号" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[12px] text-[#6b7280] mb-1">邮箱</label>
+                <input type="text" value={newContactForm.email} onChange={(e) => setNewContactForm((f) => ({ ...f, email: e.target.value }))} className="w-full h-8 px-2 text-[12px] border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb]" placeholder="email@example.com" />
+              </div>
+              <div>
+                <label className="block text-[12px] text-[#6b7280] mb-1">备注</label>
+                <textarea value={newContactForm.notes} onChange={(e) => setNewContactForm((f) => ({ ...f, notes: e.target.value }))} rows={2} className="w-full px-2 py-1.5 text-[12px] border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb] resize-none" placeholder="可选备注信息" />
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="isPrimary" checked={newContactForm.isPrimary} onChange={(e) => setNewContactForm((f) => ({ ...f, isPrimary: e.target.checked }))} className="w-4 h-4 rounded border-[#e5e7eb]" />
+                <label htmlFor="isPrimary" className="text-[12px] text-[#6b7280]">设为主要联系人</label>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 px-4 py-3 border-t border-[#e5e7eb]">
+              <button onClick={() => setShowAddContact(false)} className="h-8 px-3 text-[12px] text-[#6b7280] hover:text-[#111827]">取消</button>
+              <button onClick={handleAddContact} disabled={!newContactForm.contactName.trim() || addingContact} className="h-8 px-4 rounded-sm bg-[#2563eb] text-[12px] font-medium text-white hover:bg-[#1d4ed8] disabled:bg-[#d1d5db] disabled:cursor-not-allowed">{addingContact ? '保存中...' : '保存'}</button>
             </div>
           </div>
         </div>

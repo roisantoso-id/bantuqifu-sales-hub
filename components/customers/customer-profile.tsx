@@ -2,7 +2,8 @@
 
 import { useState, useMemo } from 'react'
 import { ChevronLeft, Plus, Edit2, Archive, ExternalLink, X, Search, Building2, Globe } from 'lucide-react'
-import type { Opportunity, ActionLog, Lead, ChinaEntity } from '@/lib/types'
+import type { ChinaEntity } from '@/lib/types'
+import type { CustomerOpportunityRow, CustomerActionLogRow } from '@/app/actions/customer'
 import { ChinaEntitySearchDialog } from './china-entity-search-dialog'
 import { DomesticEntityCard } from './domestic-entity-card'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -10,27 +11,16 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 interface CustomerProfileProps {
   customerId: string
   customerName: string
-  opportunities: Opportunity[]
-  leads: Lead[]
-  actionLogs: Record<string, ActionLog[]>
+  level?: string
+  phone?: string | null
+  email?: string | null
+  opportunities: CustomerOpportunityRow[]
+  actionLogs: CustomerActionLogRow[]
   onBack: () => void
   onCreateOpportunity?: () => void
-  onAddNote?: (note: string) => void
 }
 
-type TabId = 'opportunities' | 'leads' | 'actions' | 'companies'
-
-interface ConsolidatedAction {
-  id: string
-  timestamp: string
-  operatorName: string
-  actionType: string
-  actionLabel: string
-  opportunityId?: string
-  opportunityStage?: string
-  remark: string
-  files?: any[]
-}
+type TabId = 'opportunities' | 'actions' | 'companies'
 
 interface ForeignEntity {
   id: string
@@ -39,22 +29,20 @@ interface ForeignEntity {
   registrationNumber?: string
   legalPerson?: string
   regCapital?: string
-  businessScope?: string
-  notes?: string
 }
 
 export function CustomerProfile({
   customerId,
   customerName,
+  level,
+  phone,
+  email,
   opportunities,
-  leads,
   actionLogs,
   onBack,
   onCreateOpportunity,
-  onAddNote,
 }: CustomerProfileProps) {
   const [activeTab, setActiveTab] = useState<TabId>('opportunities')
-  const [newNote, setNewNote] = useState('')
   const [chinaEntityDialogOpen, setChinaEntityDialogOpen] = useState(false)
   const [chinaEntities, setChinaEntities] = useState<ChinaEntity[]>([])
   const [foreignEntities, setForeignEntities] = useState<ForeignEntity[]>([])

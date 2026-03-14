@@ -1,5 +1,4 @@
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 /**
@@ -7,8 +6,7 @@ import { NextResponse } from 'next/server'
  * 登陆成功后调用此 API 设置当前租户
  */
 export async function POST(request: Request) {
-  const cookieStore = cookies()
-  const supabase = createServerComponentClient({ cookies: () => cookieStore })
+  const supabase = await createClient()
 
   try {
     const { tenantId } = await request.json()
@@ -55,12 +53,11 @@ export async function POST(request: Request) {
 }
 
 /**
- * POST /api/auth/logout
+ * PUT /api/auth/logout
  * 登出用户
  */
 export async function PUT(request: Request) {
-  const cookieStore = cookies()
-  const supabase = createServerComponentClient({ cookies: () => cookieStore })
+  const supabase = await createClient()
 
   const response = NextResponse.json({ success: true })
   
