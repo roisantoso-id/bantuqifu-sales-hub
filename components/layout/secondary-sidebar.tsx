@@ -10,16 +10,16 @@ interface SecondarySidebarProps {
   onSelect: (opp: Opportunity) => void
 }
 
-// 阶段颜色分组: P1-P4=黄, P5-P6=浅绿, P7=绿, P8=蓝
+// 阶段颜色分组: 使用单一灰色方案
 const STAGE_COLOR: Record<StageId, { bg: string; text: string; dot: string }> = {
-  P1: { bg: '#fef9c3', text: '#854d0e', dot: '#eab308' },
-  P2: { bg: '#fef9c3', text: '#854d0e', dot: '#eab308' },
-  P3: { bg: '#fef9c3', text: '#854d0e', dot: '#eab308' },
-  P4: { bg: '#fef9c3', text: '#854d0e', dot: '#eab308' },
-  P5: { bg: '#dcfce7', text: '#14532d', dot: '#4ade80' },
-  P6: { bg: '#dcfce7', text: '#14532d', dot: '#4ade80' },
-  P7: { bg: '#bbf7d0', text: '#14532d', dot: '#16a34a' },
-  P8: { bg: '#dbeafe', text: '#1e3a8a', dot: '#2563eb' },
+  P1: { bg: '#f3f4f6', text: '#374151', dot: '#9ca3af' },
+  P2: { bg: '#f3f4f6', text: '#374151', dot: '#9ca3af' },
+  P3: { bg: '#f3f4f6', text: '#374151', dot: '#9ca3af' },
+  P4: { bg: '#f3f4f6', text: '#374151', dot: '#9ca3af' },
+  P5: { bg: '#f3f4f6', text: '#374151', dot: '#9ca3af' },
+  P6: { bg: '#f3f4f6', text: '#374151', dot: '#9ca3af' },
+  P7: { bg: '#f3f4f6', text: '#374151', dot: '#9ca3af' },
+  P8: { bg: '#f3f4f6', text: '#374151', dot: '#9ca3af' },
 }
 
 const STAGE_GROUPS: { label: string; stages: StageId[]; activeColor: string; activeBg: string; inactiveBg: string; inactiveText: string }[] = [
@@ -148,7 +148,7 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect }: Second
       </div>
 
       {/* List */}
-      <ul className="flex-1 overflow-y-auto">
+      <ul className="scrollable-container high-density-list flex-1 overflow-y-auto">
         {sorted.map((opp, idx) => {
           const isSelected = opp.id === selectedId
           const isPinned = pinnedIds.has(opp.id)
@@ -157,7 +157,7 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect }: Second
           // Divider between pinned and unpinned sections
           const showDivider = isPinned && idx === pinned.length - 1 && unpinned.length > 0
           return (
-            <li key={opp.id}>
+            <li key={opp.id} className="list-item">
               <button
                 onClick={() => onSelect(opp)}
                 onMouseEnter={() => setHoveredId(opp.id)}

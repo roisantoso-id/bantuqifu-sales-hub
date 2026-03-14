@@ -11,7 +11,6 @@ import { AuditRail } from '@/components/audit-rail/audit-panel'
 import { mockOpportunities, mockProducts, mockActionLogs, mockUser, mockLeads } from '@/lib/mock-data'
 import { addAuditNote } from '@/app/actions/audit'
 import type { Opportunity, NavSection, StageId, ActionLog, Customer, Lead } from '@/lib/types'
-import { ClipboardList } from 'lucide-react'
 
 export default function SalesHub() {
   const [activeNav, setActiveNav] = useState<NavSection>('opportunities')
@@ -280,79 +279,86 @@ export default function SalesHub() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-white">
-      {/* Pane 1 — primary nav (64px) */}
+      {/* Pane 1 — 主导航栏 (56px) */}
       <PrimarySidebar
         activeNav={activeNav}
         onNavChange={setActiveNav}
         userName={mockUser.name}
       />
 
-      {/* Pane 2+ — conditional content based on activeNav */}
+      {/* Pane 2+ — 根据 activeNav 显示不同内容 */}
       {activeNav === 'leads' ? (
         <div className="flex-1 overflow-hidden">
           <LeadManagement
             leads={leads}
+            opportunities={opportunities}
+            onCreateCustomer={handleCreateCustomer}
+            onConvertLeadToOpportunity={handleConvertLeadToOpportunity}
             onLeadStatusChange={handleLeadStatusChange}
-            onLeadDelete={handleDeleteLead}
-            onConvertToOpportunity={handleConvertLeadToOpportunity}
             onAddLead={handleAddLead}
+            onDeleteLead={handleDeleteLead}
             onDiscardLead={handleDiscardLead}
             onClaimLead={handleClaimLead}
           />
         </div>
       ) : activeNav === 'opportunities' ? (
         <>
-          {/* Opportunity list (280px) */}
+          {/* 商机列表 (280px) */}
           <SecondarySidebar
+            activeNav={activeNav}
             opportunities={opportunities}
             selectedId={selectedId}
             onSelect={handleSelectOpportunity}
           />
 
-          {/* Pane 3 — workspace (flex-1) */}
+          {/* 工作区 (flex-1) */}
           <WorkspacePane
             opportunity={selectedOpportunity}
             allProducts={mockProducts}
             viewingStage={viewingStage}
-            onViewingStageChange={setViewingStage}
             onOpportunityUpdate={handleOpportunityUpdate}
             onSave={handleSave}
             onAdvanceStage={handleAdvanceStage}
             onQuoteSent={handleQuoteSent}
+            logs={currentLogs}
+            onAddNote={handleAddNote}
           />
 
-          {/* Audit rail toggle button (shown when rail is hidden) */}
-          {!showAuditRail && (
-            <button
-              onClick={() => setShowAuditRail(true)}
-              title="查看操作记录"
-              aria-label="打开操作记录面板"
-              className="flex h-8 w-8 shrink-0 items-center justify-center self-start border-l border-[#e5e7eb] text-[#9ca3af] hover:bg-[#f3f4f6] hover:text-[#374151] mt-[52px]"
-            >
-              <ClipboardList size={14} />
-            </button>
-          )}
-
-          {/* Pane 4 — audit rail (256px, toggleable) */}
-          {showAuditRail && (
-            <AuditRail
-              logs={currentLogs}
-              opportunityId={selectedId}
-              onClose={() => setShowAuditRail(false)}
-              onAddNote={handleAddNote}
-            />
-          )}
+          {/* 审计栏 (256px) */}
+          <AuditRail
+            visible={showAuditRail}
+            onToggle={setShowAuditRail}
+            opportunity={selectedOpportunity}
+            logs={currentLogs}
+          />
         </>
       ) : activeNav === 'customers' ? (
-        <div className="flex-1 overflow-hidden">
-          <CustomerManagement 
+        <>
+          <SecondarySidebar
+            activeNav={activeNav}
             opportunities={opportunities}
-            actionLogs={actionLogs}
-            onCustomerCreate={handleCreateCustomer}
+            selectedId={selectedId}
+            onSelect={handleSelectOpportunity}
           />
-        </div>
+          <div className="flex-1 overflow-hidden">
+            <CustomerManagement
+              customers={opportunities.map((o) => ({
+                customerId: o.customerId,
+                customerName: o.customer.name,
+                contactName: mockUser.name,
+                phone: o.customer.phone,
+                email: o.customer.email,
+                level: 'A',
+                isLocked: false,
+              }))}
+              opportunities={opportunities}
+              leads={leads}
+              actionLogs={actionLogs}
+            />
+          </div>
+        </>
       ) : activeNav === 'analytics' ? (
-        <div className="flex-1">
+        <div className="flex-1 overflow-hidden">
           <MyDashboard
             opportunities={opportunities}
             leads={leads}
