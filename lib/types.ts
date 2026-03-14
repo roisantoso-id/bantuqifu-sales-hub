@@ -127,15 +127,25 @@ export interface SelectedProduct {
 // ─── Action Log ──────────────────────────────────────────────────────────────
 export type ActionType = 'FORM' | 'MATCH' | 'STAGE_CHANGE' | 'NOTE' | 'QUOTE' | 'CREATE'
 
+export interface ActionLogAttachment {
+  id: string
+  fileName: string
+  fileSize: number // bytes
+  fileUrl: string // 文件URL (OSS)
+  uploadedAt: string
+}
+
 export interface ActionLog {
   id: string
   opportunityId: string
   operatorId: string
   operatorName: string
+  stageId?: StageId // 所属阶段（可选）
   actionType: ActionType
   actionLabel: string
   timestamp: string
   remark?: string
+  attachments?: ActionLogAttachment[] // 附件清单
 }
 
 // ─── User ────────────────────────────────────────────────────────────────────

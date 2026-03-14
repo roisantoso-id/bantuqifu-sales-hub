@@ -6,6 +6,7 @@ import { SecondarySidebar } from '@/components/layout/secondary-sidebar'
 import { WorkspacePane } from '@/components/workspace/workspace-pane'
 import { AuditRail } from '@/components/audit-rail/audit-panel'
 import { mockOpportunities, mockProducts, mockActionLogs, mockUser } from '@/lib/mock-data'
+import { addAuditNote } from '@/app/actions/audit'
 import type { Opportunity, NavSection, StageId, ActionLog } from '@/lib/types'
 import { ClipboardList } from 'lucide-react'
 
@@ -97,6 +98,22 @@ export default function SalesHub() {
     })
   }
 
+  const handleAddNote = useCallback(
+    async (remark: string, files: File[]) => {
+      try {
+        const newLog = await addAuditNote(selectedId, remark, files)
+        setActionLogs((prev) => ({
+          ...prev,
+          [selectedId]: [...(prev[selectedId] ?? []), newLog],
+        }))
+      } catch (err) {
+        console.error('[v0] Error adding note:', err)
+        throw err
+      }
+    },
+    [selectedId]
+  )
+
   return (
     <div className="flex h-screen overflow-hidden bg-white">
       {/* Pane 1 — primary nav (64px) */}
@@ -139,7 +156,12 @@ export default function SalesHub() {
 
       {/* Pane 4 — audit rail (256px, toggleable) */}
       {showAuditRail && (
-        <AuditRail logs={currentLogs} onClose={() => setShowAuditRail(false)} />
+        <AuditRail
+          logs={currentLogs}
+          opportunityId={selectedId}
+          onClose={() => setShowAuditRail(false)}
+          onAddNote={handleAddNote}
+        />
       )}
     </div>
   )

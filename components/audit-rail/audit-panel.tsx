@@ -1,11 +1,14 @@
 'use client'
 
-import { X, ClipboardList } from 'lucide-react'
-import type { ActionLog, ActionType } from '@/lib/types'
+import { X, ClipboardList, Upload, FileText, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
+import { useState, useRef } from 'react'
+import type { ActionLog, ActionType, StageId } from '@/lib/types'
 
 interface AuditRailProps {
   logs: ActionLog[]
+  opportunityId: string
   onClose: () => void
+  onAddNote?: (remark: string, files: File[]) => Promise<void>
 }
 
 const ACTION_META: Record<ActionType, { label: string; color: string; bg: string }> = {
@@ -17,6 +20,16 @@ const ACTION_META: Record<ActionType, { label: string; color: string; bg: string
   NOTE:         { label: '备注',   color: '#374151', bg: '#f9fafb' },
 }
 
+const STAGE_BADGE: Record<StageId, { label: string; bg: string; color: string }> = {
+  P1: { label: 'P1', bg: '#eff6ff', color: '#1d4ed8' },
+  P2: { label: 'P2', bg: '#eff6ff', color: '#1d4ed8' },
+  P3: { label: 'P3', bg: '#eff6ff', color: '#1d4ed8' },
+  P4: { label: 'P4', bg: '#f0fdf4', color: '#065f46' },
+  P5: { label: 'P5', bg: '#fff7ed', color: '#b45309' },
+  P6: { label: 'P6', bg: '#f3e8ff', color: '#6d28d9' },
+  P7: { label: 'P7', bg: '#fdf2f8', color: '#be185d' },
+}
+
 function formatTimestamp(iso: string) {
   const d = new Date(iso)
   const date = d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
@@ -24,14 +37,66 @@ function formatTimestamp(iso: string) {
   return { date, time }
 }
 
-export function AuditRail({ logs, onClose }: AuditRailProps) {
-  // Sort newest first
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes}B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
+}
+
+function countLines(text: string): number {
+  return text.split('\n').length
+}
+
+export function AuditRail({ logs, opportunityId, onClose, onAddNote }: AuditRailProps) {
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [inputValue, setInputValue] = useState('')
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const sorted = [...logs].sort(
     (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   )
 
+  const toggleExpand = (id: string) => {
+    const newSet = new Set(expandedIds)
+    if (newSet.has(id)) {
+      newSet.delete(id)
+    } else {
+      newSet.add(id)
+    }
+    setExpandedIds(newSet)
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    setUploadedFiles((prev) => [...prev, ...files])
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const removeFile = (index: number) => {
+    setUploadedFiles((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const handleSubmit = async () => {
+    if (!inputValue.trim() && uploadedFiles.length === 0) return
+
+    setIsSubmitting(true)
+    try {
+      if (onAddNote) {
+        await onAddNote(inputValue, uploadedFiles)
+      }
+      setInputValue('')
+      setUploadedFiles([])
+    } catch (err) {
+      console.error('[v0] Failed to add note:', err)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
-    <aside className="flex h-full w-[256px] shrink-0 flex-col border-l border-[#e5e7eb] bg-white">
+    <aside className="flex h-full w-64 shrink-0 flex-col border-l border-[#e5e7eb] bg-white">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[#e5e7eb] px-3 py-2">
         <div className="flex items-center gap-1.5">
@@ -50,58 +115,194 @@ export function AuditRail({ logs, onClose }: AuditRailProps) {
         </button>
       </div>
 
-      {/* Log entries */}
-      <ul className="flex-1 overflow-y-auto px-3 py-2">
-        {sorted.length === 0 && (
-          <li className="mt-6 text-center text-[12px] text-[#9ca3af]">暂无操作记录</li>
+      {/* Timeline entries */}
+      <div className="flex-1 overflow-y-auto px-3 py-2">
+        {sorted.length === 0 ? (
+          <div className="mt-6 text-center text-[12px] text-[#9ca3af]">暂无操作记录</div>
+        ) : (
+          <ul className="space-y-0">
+            {sorted.map((log, i) => {
+              const meta = ACTION_META[log.actionType] ?? ACTION_META.NOTE
+              const { date, time } = formatTimestamp(log.timestamp)
+              const isLast = i === sorted.length - 1
+              const isExpanded = expandedIds.has(log.id)
+              const remarkLines = log.remark ? countLines(log.remark) : 0
+              const shouldShowCollapse = remarkLines > 3
+
+              return (
+                <li key={log.id} className="flex gap-2.5">
+                  {/* Timeline spine */}
+                  <div className="flex flex-col items-center pt-0.5">
+                    <div
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: meta.color }}
+                    />
+                    {!isLast && <div className="mt-0.5 w-px flex-1 bg-[#e5e7eb]" />}
+                  </div>
+
+                  {/* Content */}
+                  <div className="pb-2 flex-1 min-w-0">
+                    {/* First line: Badge + Label + Time */}
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className="inline-block rounded-sm px-1 py-0.5 text-[10px] font-semibold shrink-0"
+                        style={{ color: meta.color, backgroundColor: meta.bg }}
+                      >
+                        {meta.label}
+                      </span>
+                      {log.stageId && (
+                        <span
+                          className="inline-block rounded-sm px-1 py-0.5 text-[10px] font-medium shrink-0"
+                          style={{
+                            color: STAGE_BADGE[log.stageId].color,
+                            backgroundColor: STAGE_BADGE[log.stageId].bg,
+                          }}
+                        >
+                          {log.stageId}
+                        </span>
+                      )}
+                      <span className="text-[12px] font-medium text-[#111827] truncate">
+                        {log.actionLabel}
+                      </span>
+                      <span className="font-mono text-[10px] text-[#9ca3af] shrink-0 ml-auto">
+                        {date}
+                      </span>
+                    </div>
+
+                    {/* Operator + time */}
+                    <div className="mt-0.5 flex items-center gap-1.5 text-[11px]">
+                      <span className="text-[#6b7280] font-medium">{log.operatorName}</span>
+                      <span className="text-[#d1d5db]">·</span>
+                      <span className="font-mono text-[#9ca3af]">{time}</span>
+                    </div>
+
+                    {/* Remark (with collapse/expand) */}
+                    {log.remark && (
+                      <div className="mt-1">
+                        <p
+                          className={`text-[11px] leading-relaxed text-[#6b7280] break-words ${
+                            shouldShowCollapse && !isExpanded ? 'line-clamp-3' : ''
+                          }`}
+                        >
+                          {log.remark}
+                        </p>
+                        {shouldShowCollapse && (
+                          <button
+                            onClick={() => toggleExpand(log.id)}
+                            className="mt-1 flex items-center gap-0.5 text-[10px] text-[#2563eb] hover:underline"
+                          >
+                            {isExpanded ? (
+                              <>
+                                <ChevronUp size={12} /> 收起
+                              </>
+                            ) : (
+                              <>
+                                <ChevronDown size={12} /> 展开
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Attachments */}
+                    {log.attachments && log.attachments.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {log.attachments.map((att) => (
+                          <a
+                            key={att.id}
+                            href={att.fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-0.5 rounded-sm bg-[#f3f4f6] px-1.5 py-0.5 text-[10px] text-[#374151] hover:bg-[#e5e7eb] transition-colors"
+                            title={att.fileName}
+                          >
+                            <FileText size={11} />
+                            <span className="truncate max-w-16">{att.fileName}</span>
+                            <span className="text-[#9ca3af] text-[9px]">
+                              ({formatFileSize(att.fileSize)})
+                            </span>
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-[#e5e7eb]" />
+
+      {/* Input area */}
+      <div className="flex flex-col gap-2 p-2">
+        {/* Remark textarea */}
+        <textarea
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          placeholder="添加备注..."
+          disabled={isSubmitting}
+          className="h-16 w-full resize-none rounded-sm border border-[#e5e7eb] bg-white px-2 py-1.5 text-[12px] text-[#111827] placeholder:text-[#9ca3af] outline-none focus:border-[#2563eb] disabled:bg-[#f9fafb] disabled:text-[#9ca3af]"
+        />
+
+        {/* File preview */}
+        {uploadedFiles.length > 0 && (
+          <div className="flex flex-col gap-1">
+            {uploadedFiles.map((file, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between gap-2 rounded-sm bg-[#f3f4f6] px-1.5 py-1 text-[11px]"
+              >
+                <div className="flex items-center gap-1 min-w-0">
+                  <FileText size={12} className="text-[#6b7280] shrink-0" />
+                  <span className="truncate text-[#374151] font-medium">{file.name}</span>
+                  <span className="text-[#9ca3af] text-[10px] shrink-0">
+                    ({formatFileSize(file.size)})
+                  </span>
+                </div>
+                <button
+                  onClick={() => removeFile(i)}
+                  className="flex h-5 w-5 items-center justify-center rounded-sm text-[#9ca3af] hover:bg-[#e5e7eb] hover:text-[#dc2626] transition-colors shrink-0"
+                  aria-label="删除文件"
+                >
+                  <Trash2 size={11} />
+                </button>
+              </div>
+            ))}
+          </div>
         )}
 
-        {sorted.map((log, i) => {
-          const meta = ACTION_META[log.actionType] ?? ACTION_META.NOTE
-          const { date, time } = formatTimestamp(log.timestamp)
-          const isLast = i === sorted.length - 1
-
-          return (
-            <li key={log.id} className="flex gap-2.5">
-              {/* Timeline spine */}
-              <div className="flex flex-col items-center">
-                <div
-                  className="mt-1 h-2 w-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: meta.color }}
-                />
-                {!isLast && <div className="mt-0.5 w-px flex-1 bg-[#e5e7eb]" />}
-              </div>
-
-              {/* Content */}
-              <div className={['pb-3', isLast ? '' : ''].join(' ')}>
-                <div className="flex items-baseline gap-1.5">
-                  <span
-                    className="rounded-sm px-1 py-0.5 text-[10px] font-semibold"
-                    style={{ color: meta.color, backgroundColor: meta.bg }}
-                  >
-                    {meta.label}
-                  </span>
-                  <span className="text-[12px] font-medium text-[#111827]">{log.actionLabel}</span>
-                </div>
-
-                <div className="mt-0.5 flex items-center gap-1.5">
-                  <span className="text-[11px] text-[#9ca3af]">{log.operatorName}</span>
-                  <span className="text-[10px] text-[#d1d5db]">·</span>
-                  <span className="font-mono text-[10px] text-[#9ca3af]">
-                    {date} {time}
-                  </span>
-                </div>
-
-                {log.remark && (
-                  <p className="mt-0.5 text-[11px] leading-relaxed text-[#6b7280]">
-                    {log.remark}
-                  </p>
-                )}
-              </div>
-            </li>
-          )
-        })}
-      </ul>
+        {/* Action buttons */}
+        <div className="flex items-center gap-1">
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            onChange={handleFileSelect}
+            className="hidden"
+            disabled={isSubmitting}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isSubmitting}
+            className="flex h-7 items-center gap-1 rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#374151] hover:bg-[#f9fafb] disabled:bg-[#f9fafb] disabled:text-[#9ca3af] transition-colors"
+            aria-label="上传文件"
+          >
+            <Upload size={12} />
+            上传
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting || (!inputValue.trim() && uploadedFiles.length === 0)}
+            className="flex-1 h-7 rounded-sm bg-[#2563eb] text-white text-[12px] font-medium hover:bg-[#1d4ed8] disabled:bg-[#d1d5db] disabled:text-[#9ca3af] transition-colors"
+          >
+            {isSubmitting ? '提交中...' : '提交'}
+          </button>
+        </div>
+      </div>
     </aside>
   )
 }
