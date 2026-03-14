@@ -12,29 +12,107 @@ datasource db {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// ── USER & PROFILE ────────────────────────────────────────────────────────────
+// ── MULTI-TENANT & RBAC CORE ──────────────────────────────────────────────────
 // ════════════════════════════════════════════════════════════════════════════════
 
-model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String?  @unique
-  role      String   @default("User") // "Admin", "Sales Manager", "Finance", etc.
-  company   String
-  avatar    String?
+// 1. 租户模型 (Organization/Tenant)
+model Organization {
+  id        String             @id @default(cuid())
+  code      String             @unique // BANTU_ID 或 BANTU_CN
+  name      String             // 班兔印尼 或 班兔中国
+  site      String             @default("ID") // ID or CN
   
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  leads          Lead[]
-  opportunities  Opportunity[]
-  actionLogs     ActionLog[]
-  leadsAssigned  Lead[]         @relation("LeadAssignee")
-  oppAssigned    Opportunity[]  @relation("OpportunityAssignee")
+  // 业务数据隔离关联
+  leads         Lead[]
+  opportunities Opportunity[]
+  customers     Customer[]
+  actionLogs    ActionLog[]
+  products      Product[]
+  users         UserOrganization[]
   
-  @@map("users")
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  
+  @@map("organizations")
 }
+
+// 2. 角色与权限模型 (RBAC Core)
+model Role {
+  id          String             @id @default(cuid())
+  code        String             @unique // ADMIN, SALES, FINANCE, MANAGER
+  name        String             // 管理员, 销售专员, 财务专员
+  
+  permissions RolePermission[]
+  users       UserOrganization[]
+  
+  createdAt   DateTime           @default(now())
+  
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(cuid())
+  code        String           @unique // 如: 'leads:view', 'quotes:approve'
+  name        String           // 权限名称
+  module      String           // 所属模块 (CRM, FINANCE)
+  description String?
+  
+  roles       RolePermission[]
+  
+  createdAt   DateTime         @default(now())
+  
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// 3. 用户模型 - Supabase Auth 桥接
+model User {
+  id            String             @id // 必须与 Supabase auth.users.id 一致
+  email         String             @unique
+  name          String
+  isActive      Boolean            @default(true)
+  
+  // 关联多个租户
+  organizations UserOrganization[]
+  
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  
+  @@map("users_auth")
+}
+
+// 4. 用户-租户-角色映射表 (核心隔离点)
+// 定义一个用户在特定租户下的具体角色与权限
+model UserOrganization {
+  userId         String
+  organizationId String
+  roleId         String
+  
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role           Role         @relation(fields: [roleId], references: [id])
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  
+  @@id([userId, organizationId])
+  @@map("user_organizations")
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// ── USER & PROFILE ────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════────────────
+
 
 // ════════════════════════════════════════════════════════════════════════════════
 // ── LEAD ──────────────────────────────────────────────────────────────────────
@@ -80,6 +158,9 @@ enum DiscardReason {
 
 model Lead {
   id                    String   @id @default(cuid())
+  organizationId        String   // 强制租户隔离
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
   leadCode              String   @unique @default(cuid()) // LEAD-系列ID
   wechatName            String   // 微信名/称呼
   phone                 String?
@@ -113,9 +194,11 @@ model Lead {
   convertedOpportunityId String?
   convertedOpportunity   Opportunity? @relation("LeadToOpportunity")
   
+  @@index([organizationId])
   @@index([status])
   @@index([assigneeId])
   @@index([discardedAt])
+  @@unique([organizationId, leadCode])
   @@map("leads")
 }
 
@@ -133,6 +216,9 @@ enum CustomerLevel {
 
 model Customer {
   id              String   @id @default(cuid())
+  organizationId  String   // 强制租户隔离
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
   customerId      String   @unique // 客户编号
   customerName    String
   passportNo      String?
@@ -151,6 +237,8 @@ model Customer {
   foreignEntities ForeignCompanyEntity[]
   contacts        CustomerContact[]
   
+  @@index([organizationId])
+  @@unique([organizationId, customerId])
   @@map("customers")
 }
 
@@ -251,6 +339,9 @@ model ForeignCompanyEntity {
 
 model Product {
   id              String   @id @default(cuid())
+  organizationId  String   // 强制租户隔离
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
   productCode     String   @unique // zcrm_6302359000000489135
   name            String
   category        String   // "签证服务", "公司开办服务", etc.
@@ -269,6 +360,8 @@ model Product {
   materials       MaterialItem[]
   progressPoints  ProgressPoint[]
   
+  @@index([organizationId])
+  @@unique([organizationId, productCode])
   @@map("products")
 }
 
@@ -291,6 +384,9 @@ enum OpportunityStatus {
 
 model Opportunity {
   id                      String   @id @default(cuid())
+  organizationId          String   // 强制租户隔离
+  organization            Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
   opportunityCode         String   @unique @default(cuid())
   
   customerId              String
@@ -330,9 +426,11 @@ model Opportunity {
   // Relations
   actionLogs              ActionLog[]
   
+  @@index([organizationId])
   @@index([customerId])
   @@index([stageId])
   @@index([assigneeId])
+  @@unique([organizationId, opportunityCode])
   @@map("opportunities")
 }
 
@@ -566,6 +664,9 @@ enum ActionType {
 
 model ActionLog {
   id                String   @id @default(cuid())
+  organizationId    String   // 强制租户隔离
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
   opportunityId     String
   opportunity       Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   
@@ -580,6 +681,7 @@ model ActionLog {
   
   attachments       ActionLogAttachment[]
   
+  @@index([organizationId])
   @@index([opportunityId])
   @@index([operatorId])
   @@index([timestamp])

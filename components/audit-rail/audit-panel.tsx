@@ -32,8 +32,12 @@ const STAGE_BADGE: Record<StageId, { label: string; bg: string; color: string }>
 
 function formatTimestamp(iso: string) {
   const d = new Date(iso)
-  const date = d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
-  const time = d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  // 使用 UTC 格式避免时区导致的 hydration 不匹配
+  const date = d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit', timeZone: 'UTC' })
+  // 固定格式：HH:MM
+  const hours = String(d.getUTCHours()).padStart(2, '0')
+  const minutes = String(d.getUTCMinutes()).padStart(2, '0')
+  const time = `${hours}:${minutes}`
   return { date, time }
 }
 
