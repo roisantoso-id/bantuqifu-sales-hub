@@ -68,7 +68,7 @@ export function LeadEntryForm({ open, onOpenChange, onSubmit, initialData }: Lea
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-[480px] max-h-screen overflow-y-auto">
+      <SheetContent side="right" className="w-[480px] max-h-screen overflow-y-auto" aria-describedby={undefined}>
         <SheetHeader>
           <SheetTitle className="text-[14px] font-semibold">录入新线索</SheetTitle>
         </SheetHeader>

@@ -240,7 +240,7 @@ export function CustomerManagement({ opportunities, onCustomerCreate, onCustomer
 
       {/* Edit Modal */}
       <Sheet open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <SheetContent side="right" className="w-[400px]">
+        <SheetContent side="right" className="w-[400px]" aria-describedby={undefined}>
           <SheetHeader>
             <SheetTitle className="text-[14px] font-semibold">编辑客户</SheetTitle>
           </SheetHeader>
@@ -281,7 +281,7 @@ export function CustomerManagement({ opportunities, onCustomerCreate, onCustomer
 
       {/* Create Customer Modal */}
       <Sheet open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-        <SheetContent side="right" className="w-[400px]">
+        <SheetContent side="right" className="w-[400px]" aria-describedby={undefined}>
           <SheetHeader>
             <SheetTitle className="text-[14px] font-semibold">新增客户</SheetTitle>
           </SheetHeader>

@@ -271,7 +271,7 @@ export function LeadManagement({
 
       {/* 丢弃至公海 Modal */}
       <Sheet open={isDiscardModalOpen} onOpenChange={setIsDiscardModalOpen}>
-        <SheetContent side="right" className="w-[400px]">
+        <SheetContent side="right" className="w-[400px]" aria-describedby={undefined}>
           <SheetHeader>
             <SheetTitle className="text-[14px] font-semibold">丢弃至公海</SheetTitle>
           </SheetHeader>
