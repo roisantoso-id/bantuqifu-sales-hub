@@ -137,7 +137,7 @@ export function WorkspacePane({
       </div>
 
       {/* Footer action bar */}
-      {!isHistorical && !['P4', 'P5', 'P6', 'P7'].includes(viewingStage) && (
+      {!isHistorical && ['P1', 'P2', 'P3'].includes(viewingStage) && (
         <div className="flex items-center justify-between border-t border-[#e5e7eb] bg-[#f9fafb] px-5 py-2">
           <button
             onClick={onSave}
