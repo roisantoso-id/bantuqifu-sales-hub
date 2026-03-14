@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, Claim } from 'lucide-react'
+import { Search, UserPlus } from 'lucide-react'
 import type { Lead } from '@/lib/types'
 
 interface PublicPoolProps {
@@ -116,7 +116,7 @@ export function PublicPool({ leads, onClaimLead, currentUser }: PublicPoolProps)
                         onClick={() => onClaimLead(lead)}
                         className="flex items-center gap-1 h-6 px-2 rounded-sm bg-[#10b981] text-white hover:bg-[#059669] text-[11px] font-medium transition-colors"
                       >
-                        <Claim size={12} />
+                        <UserPlus size={12} />
                         领取
                       </button>
                     </div>
