@@ -27,9 +27,9 @@ const STAGE_NEXT_LABEL: Record<StageId, string> = {
   P1: '保存并推进至 P2',
   P2: '保存并推进至 P3',
   P3: '推进至 P4',
-  P4: '推进至 P5',
-  P5: '推进至 P6',
-  P6: '推进至 P7',
+  P4: '确认合同，推进至 P5',
+  P5: '确认收款，推进至 P6',
+  P6: '材料完成，推进至 P7',
   P7: '完成交付',
 }
 
@@ -137,19 +137,32 @@ export function WorkspacePane({
       </div>
 
       {/* Footer action bar */}
-      {!isHistorical && ['P1', 'P2', 'P3'].includes(viewingStage) && (
+      {!isHistorical && (
         <div className="flex items-center justify-between border-t border-[#e5e7eb] bg-[#f9fafb] px-5 py-2">
-          <button
-            onClick={onSave}
-            className="flex h-8 items-center gap-1.5 rounded-sm border border-[#e5e7eb] bg-white px-3 text-[13px] text-[#374151] hover:bg-white hover:border-[#d1d5db]"
-          >
-            <Save size={13} />
-            保存草稿
-          </button>
-          {isOnCurrentStage && (
+          {['P1', 'P2', 'P3'].includes(viewingStage) && (
+            <>
+              <button
+                onClick={onSave}
+                className="flex h-8 items-center gap-1.5 rounded-sm border border-[#e5e7eb] bg-white px-3 text-[13px] text-[#374151] hover:bg-white hover:border-[#d1d5db]"
+              >
+                <Save size={13} />
+                保存草稿
+              </button>
+              {isOnCurrentStage && (
+                <button
+                  onClick={onAdvanceStage}
+                  className="flex h-8 items-center gap-1.5 rounded-sm bg-[#2563eb] px-3 text-[13px] font-medium text-white hover:bg-[#1d4ed8]"
+                >
+                  {STAGE_NEXT_LABEL[opportunity.stageId]}
+                  <ChevronRight size={13} />
+                </button>
+              )}
+            </>
+          )}
+          {['P4', 'P5', 'P6'].includes(viewingStage) && isOnCurrentStage && (
             <button
               onClick={onAdvanceStage}
-              className="flex h-8 items-center gap-1.5 rounded-sm bg-[#2563eb] px-3 text-[13px] font-medium text-white hover:bg-[#1d4ed8]"
+              className="ml-auto flex h-8 items-center gap-1.5 rounded-sm bg-[#2563eb] px-3 text-[13px] font-medium text-white hover:bg-[#1d4ed8]"
             >
               {STAGE_NEXT_LABEL[opportunity.stageId]}
               <ChevronRight size={13} />
