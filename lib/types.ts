@@ -1,3 +1,20 @@
+// ─── Lead ────────────────────────────────────────────────────────────────────
+export type LeadSource = 'wechat' | 'referral' | 'cold_outreach'
+export type LeadStatus = 'new' | 'contacted' | 'no_interest' | 'ready_for_opportunity'
+
+export interface Lead {
+  id: string // LEAD-系列ID
+  wechatName: string // 微信名/称呼
+  initialIntent: string // 初步意向（如：想办 B1 签证）
+  source: LeadSource // 来源：微信群、转介绍、冷拉
+  status: LeadStatus // 跟进状态：新线索、沟通中、无意向、待转商机
+  assignee?: string // 负责人
+  createdAt: string
+  updatedAt: string
+  notes?: string // 备注
+  convertedOpportunityId?: string // 转化后的商机ID
+}
+
 // ─── Navigation ──────────────────────────────────────────────────────────────
 export type NavSection = 'leads' | 'opportunities' | 'customers' | 'analytics'
 

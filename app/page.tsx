@@ -5,15 +5,18 @@ import { PrimarySidebar } from '@/components/layout/primary-sidebar'
 import { SecondarySidebar } from '@/components/layout/secondary-sidebar'
 import { WorkspacePane } from '@/components/workspace/workspace-pane'
 import { CustomerManagement } from '@/components/customers/customer-management'
+import { LeadManagement } from '@/components/leads/lead-management'
+import { LeadListSidebar } from '@/components/leads/lead-list-sidebar'
 import { AuditRail } from '@/components/audit-rail/audit-panel'
-import { mockOpportunities, mockProducts, mockActionLogs, mockUser } from '@/lib/mock-data'
+import { mockOpportunities, mockProducts, mockActionLogs, mockUser, mockLeads } from '@/lib/mock-data'
 import { addAuditNote } from '@/app/actions/audit'
-import type { Opportunity, NavSection, StageId, ActionLog, Customer } from '@/lib/types'
+import type { Opportunity, NavSection, StageId, ActionLog, Customer, Lead } from '@/lib/types'
 import { ClipboardList } from 'lucide-react'
 
 export default function SalesHub() {
   const [activeNav, setActiveNav] = useState<NavSection>('opportunities')
   const [opportunities, setOpportunities] = useState<Opportunity[]>(mockOpportunities)
+  const [leads, setLeads] = useState<Lead[]>(mockLeads)
   const [selectedId, setSelectedId] = useState<string>(mockOpportunities[0].id)
   const [viewingStage, setViewingStage] = useState<StageId>(mockOpportunities[0].stageId)
   const [actionLogs, setActionLogs] = useState<Record<string, ActionLog[]>>(mockActionLogs)
@@ -167,6 +170,81 @@ export default function SalesHub() {
     alert('客户已创建，并自动生成了一个新商机')
   }
 
+  const handleConvertLeadToOpportunity = (lead: Lead, opportunityData: Partial<Opportunity>) => {
+    // 生成商机ID（从线索ID派生）
+    const newOpportunityId = `${lead.id.replace('LEAD-', '21231231')}`
+    
+    // 创建新商机
+    const newOpportunity: Opportunity = {
+      id: newOpportunityId,
+      customerId: opportunityData.customer?.id || `CUST-${Date.now()}`,
+      customer: opportunityData.customer || { id: '', name: '', passportNo: '', phone: '', email: '' },
+      stageId: 'P1',
+      status: 'active',
+      serviceType: 'VISA',
+      serviceTypeLabel: '需求收集中',
+      estimatedAmount: 0,
+      currency: 'CNY',
+      requirements: opportunityData.requirements || '',
+      notes: opportunityData.notes || `[线索转化] ${lead.id}`,
+      destination: '',
+      travelDate: '',
+      assignee: mockUser.name,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    // 更新线索状态为待转商机，然后标记为已转化
+    setLeads((prev) =>
+      prev.map((l) =>
+        l.id === lead.id
+          ? {
+              ...l,
+              status: 'ready_for_opportunity',
+              convertedOpportunityId: newOpportunityId,
+              updatedAt: new Date().toISOString(),
+            }
+          : l
+      )
+    )
+
+    // 添加新商机
+    setOpportunities((prev) => [newOpportunity, ...prev])
+    setActionLogs((prev) => ({
+      ...prev,
+      [newOpportunityId]: [
+        {
+          id: `log-${Date.now()}`,
+          opportunityId: newOpportunityId,
+          operatorId: mockUser.id,
+          operatorName: mockUser.name,
+          actionType: 'CREATE',
+          actionLabel: '线索转商机',
+          remark: `从线索 ${lead.id} (${lead.wechatName}) 转化而来`,
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    }))
+
+    alert('线索已转为商机，商机ID：' + newOpportunityId)
+  }
+
+  const handleLeadStatusChange = (leadId: string, status: Lead['status']) => {
+    setLeads((prev) =>
+      prev.map((lead) =>
+        lead.id === leadId ? { ...lead, status, updatedAt: new Date().toISOString() } : lead
+      )
+    )
+  }
+
+  const handleAddLead = (lead: Lead) => {
+    setLeads((prev) => [lead, ...prev])
+  }
+
+  const handleDeleteLead = (leadId: string) => {
+    setLeads((prev) => prev.filter((lead) => lead.id !== leadId))
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-white">
       {/* Pane 1 — primary nav (64px) */}
@@ -176,8 +254,29 @@ export default function SalesHub() {
         userName={mockUser.name}
       />
 
-      {/* Pane 2 — conditional content based on activeNav */}
-      {activeNav === 'opportunities' ? (
+      {/* Pane 2+ — conditional content based on activeNav */}
+      {activeNav === 'leads' ? (
+        <>
+          {/* Lead list (320px) */}
+          <LeadListSidebar
+            leads={leads}
+            selectedId={leads[0]?.id ?? null}
+            onSelect={(lead) => {
+              // Lead selection in sidebar (visual only)
+            }}
+            onDelete={handleDeleteLead}
+          />
+
+          {/* Lead management (flex-1) */}
+          <LeadManagement
+            leads={leads}
+            onLeadStatusChange={handleLeadStatusChange}
+            onLeadDelete={handleDeleteLead}
+            onConvertToOpportunity={handleConvertLeadToOpportunity}
+            onAddLead={handleAddLead}
+          />
+        </>
+      ) : activeNav === 'opportunities' ? (
         <>
           {/* Opportunity list (280px) */}
           <SecondarySidebar

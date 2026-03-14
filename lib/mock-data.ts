@@ -1,4 +1,4 @@
-import type { Opportunity, Product, ActionLog, UserProfile, Currency } from './types'
+import type { Opportunity, Product, ActionLog, UserProfile, Currency, Lead } from './types'
 
 // ─── Exchange Rate (Fixed for demo) ─────────────────────────────────────────
 // Value represents how many units of currency = 1 CNY
@@ -281,6 +281,65 @@ export const mockOpportunities: Opportunity[] = [
     assignee: 'Sales_Manager',
     createdAt: '2026-02-22T15:54:08Z',
     updatedAt: '2026-02-22T15:54:08Z',
+  },
+]
+
+// ─── Mock Leads ──────────────────────────────────────────────────────────────
+export const mockLeads: Lead[] = [
+  {
+    id: 'LEAD-1001',
+    wechatName: '21231231山海图-王总',
+    initialIntent: '想办 B1 签证',
+    source: 'wechat',
+    status: 'new',
+    assignee: '销售经理',
+    createdAt: '2026-03-15T08:30:00Z',
+    updatedAt: '2026-03-15T08:30:00Z',
+    notes: '客户来自微信群，对B1签证很感兴趣',
+  },
+  {
+    id: 'LEAD-1002',
+    wechatName: '极兔物流-李总',
+    initialIntent: '需要办理商务签C211',
+    source: 'referral',
+    status: 'contacted',
+    assignee: '销售经理',
+    createdAt: '2026-03-14T10:15:00Z',
+    updatedAt: '2026-03-14T15:45:00Z',
+    notes: '已进行初步沟通，客户了解需求，待后续跟进',
+  },
+  {
+    id: 'LEAD-1003',
+    wechatName: '创业园-张女士',
+    initialIntent: '想了解公司注册服务',
+    source: 'cold_outreach',
+    status: 'contacted',
+    assignee: '销售经理',
+    createdAt: '2026-03-13T14:20:00Z',
+    updatedAt: '2026-03-13T16:00:00Z',
+    notes: '初步介绍了产品，等待反馈',
+  },
+  {
+    id: 'LEAD-1004',
+    wechatName: '东南亚投资-陈先生',
+    initialIntent: '咨询工作签办理',
+    source: 'referral',
+    status: 'ready_for_opportunity',
+    assignee: '销售经理',
+    createdAt: '2026-03-12T09:00:00Z',
+    updatedAt: '2026-03-15T11:00:00Z',
+    notes: '客户已确认需求，随时可转商机',
+  },
+  {
+    id: 'LEAD-1005',
+    wechatName: '某某公司-HR',
+    initialIntent: '办理员工陪同签证',
+    source: 'wechat',
+    status: 'no_interest',
+    assignee: '销售经理',
+    createdAt: '2026-03-11T13:30:00Z',
+    updatedAt: '2026-03-12T17:00:00Z',
+    notes: '客户最终选择了其他服务商',
   },
 ]
 
