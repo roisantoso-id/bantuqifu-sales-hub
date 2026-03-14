@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, Plus, Edit2, Archive, Trash2, ChevronRight, Lock, Users, Building2, Globe, ExternalLink, X } from 'lucide-react'
+import { Search, Plus, Edit2, Archive, Trash2, ChevronRight, Lock, Users, Building2, Globe, ExternalLink, X, Paperclip, FileText, Image as ImageIcon } from 'lucide-react'
 import type { Opportunity, ActionLog, ChinaEntity } from '@/lib/types'
 import { ChinaEntitySearchDialog } from './china-entity-search-dialog'
 
@@ -58,8 +58,9 @@ export function CustomerManagement({ opportunities, actionLogs = {}, onCustomerC
   const [newContact, setNewContact] = useState({ name: '', title: '', phone: '', email: '', wechat: '' })
 
   // 跟进记录
-  const [localFollowups, setLocalFollowups] = useState<{ id: string; operatorName: string; remark: string; timestamp: string }[]>([])
+  const [localFollowups, setLocalFollowups] = useState<{ id: string; operatorName: string; remark: string; timestamp: string; files?: { name: string; url: string; type: string }[] }[]>([])
   const [newFollowup, setNewFollowup] = useState('')
+  const [newFollowupFiles, setNewFollowupFiles] = useState<File[]>([])
   const [newCustomerForm, setNewCustomerForm] = useState({
     customerName: '',
     passportNo: '',
@@ -355,51 +356,142 @@ export function CustomerManagement({ opportunities, actionLogs = {}, onCustomerC
                 <div className="flex flex-col h-full">
                   {/* 新增跟进记录输入框 */}
                   <div className="p-4 border-b border-[#e5e7eb] bg-[#fafbfc]">
-                    <div className="flex gap-2">
+                    <div className="space-y-2">
                       <textarea
                         value={newFollowup}
                         onChange={(e) => setNewFollowup(e.target.value)}
                         placeholder="记录本次跟进内容，如：客户态度积极，计划下周签合同..."
-                        rows={2}
-                        className="flex-1 resize-none rounded-sm border border-[#e5e7eb] bg-white p-2 text-[12px] placeholder-[#9ca3af] outline-none focus:border-[#2563eb]"
+                        rows={3}
+                        className="w-full resize-none rounded-sm border border-[#e5e7eb] bg-white p-2 text-[12px] placeholder-[#9ca3af] outline-none focus:border-[#2563eb]"
                       />
-                      <button
-                        onClick={() => {
-                          if (!newFollowup.trim()) return
-                          setLocalFollowups(prev => [{
-                            id: `fu-${Date.now()}`,
-                            operatorName: '系统管理员',
-                            remark: newFollowup.trim(),
-                            timestamp: new Date().toISOString(),
-                          }, ...prev])
-                          setNewFollowup('')
-                        }}
-                        disabled={!newFollowup.trim()}
-                        className="h-[60px] px-3 rounded-sm bg-[#2563eb] text-[12px] font-medium text-white hover:bg-[#1d4ed8] disabled:bg-[#d1d5db] disabled:cursor-not-allowed whitespace-nowrap"
-                      >
-                        添加记录
-                      </button>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <label className="flex h-7 cursor-pointer items-center gap-1 rounded-sm border border-[#e5e7eb] bg-white px-2 text-[11px] text-[#6b7280] hover:border-[#2563eb] hover:text-[#2563eb]">
+                            <Paperclip size={12} />
+                            上传附件
+                            <input
+                              type="file"
+                              multiple
+                              className="hidden"
+                              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                              onChange={(e) => {
+                                if (e.target.files) {
+                                  setNewFollowupFiles(prev => [...prev, ...Array.from(e.target.files!)])
+                                }
+                              }}
+                            />
+                          </label>
+                          {newFollowupFiles.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1">
+                              {newFollowupFiles.map((file, idx) => (
+                                <span key={idx} className="flex items-center gap-1 rounded-sm bg-[#eff6ff] px-1.5 py-0.5 text-[10px] text-[#2563eb]">
+                                  {file.type.startsWith('image/') ? <ImageIcon size={10} /> : <FileText size={10} />}
+                                  {file.name.length > 15 ? file.name.slice(0, 12) + '...' : file.name}
+                                  <button
+                                    onClick={() => setNewFollowupFiles(prev => prev.filter((_, i) => i !== idx))}
+                                    className="hover:text-[#dc2626]"
+                                  >
+                                    <X size={10} />
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (!newFollowup.trim() && newFollowupFiles.length === 0) return
+                            const files = newFollowupFiles.map(f => ({
+                              name: f.name,
+                              url: URL.createObjectURL(f),
+                              type: f.type,
+                            }))
+                            setLocalFollowups(prev => [{
+                              id: `fu-${Date.now()}`,
+                              operatorName: '系统管理员',
+                              remark: newFollowup.trim(),
+                              timestamp: new Date().toISOString(),
+                              files: files.length > 0 ? files : undefined,
+                            }, ...prev])
+                            setNewFollowup('')
+                            setNewFollowupFiles([])
+                          }}
+                          disabled={!newFollowup.trim() && newFollowupFiles.length === 0}
+                          className="h-7 px-3 rounded-sm bg-[#2563eb] text-[11px] font-medium text-white hover:bg-[#1d4ed8] disabled:bg-[#d1d5db] disabled:cursor-not-allowed"
+                        >
+                          添加记录
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  {/* 记录列表 */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-2">
+
+                  {/* 垂直时间轴 */}
+                  <div className="flex-1 overflow-y-auto px-4 py-4">
                     {[...localFollowups, ...customerFollowups].length === 0 ? (
-                      <div className="py-10 text-center text-[12px] text-[#9ca3af]">暂无跟进记录，在上方输入框添加第一条</div>
+                      <div className="py-12 text-center text-[12px] text-[#9ca3af]">暂无跟进记录，在上方输入框添加第一条</div>
                     ) : (
-                      [...localFollowups, ...customerFollowups].map((log) => (
-                        <div key={log.id} className="flex gap-3 p-3 border border-[#e5e7eb] rounded-sm hover:bg-[#fafbfc]">
-                          <div className="mt-1 w-2 h-2 rounded-full bg-[#2563eb] shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-[12px] font-medium text-[#111827]">{log.operatorName}</span>
-                              <span className="font-mono text-[11px] text-[#9ca3af] shrink-0">
-                                {new Date(log.timestamp).toLocaleString('zh-CN')}
-                              </span>
+                      <div className="relative pl-6">
+                        {/* 时间轴竖线 */}
+                        <div className="absolute left-[7px] top-2 bottom-2 w-px bg-[#e5e7eb]" />
+
+                        {[...localFollowups, ...customerFollowups].map((log, idx) => {
+                          const logFiles = (log as any).files as { name: string; url: string; type: string }[] | undefined
+                          return (
+                            <div key={log.id} className="relative pb-6 last:pb-0">
+                              {/* 时间轴圆点 */}
+                              <div className="absolute left-[-20px] top-1 w-3 h-3 rounded-full bg-[#2563eb] border-2 border-white shadow-sm" />
+
+                              {/* 时间标签 */}
+                              <div className="mb-1 font-mono text-[10px] text-[#9ca3af]">
+                                {new Date(log.timestamp).toLocaleString('zh-CN', {
+                                  month: '2-digit',
+                                  day: '2-digit',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </div>
+
+                              {/* 内容卡片 */}
+                              <div className="rounded-sm border border-[#e5e7eb] bg-white p-3 hover:shadow-sm transition-shadow">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-[12px] font-semibold text-[#111827]">{log.operatorName}</span>
+                                  {idx === 0 && (
+                                    <span className="px-1 py-0.5 rounded-sm bg-[#dcfce7] text-[#16a34a] text-[9px] font-semibold">最新</span>
+                                  )}
+                                </div>
+                                {log.remark && (
+                                  <p className="text-[12px] text-[#374151] leading-relaxed whitespace-pre-wrap">{log.remark}</p>
+                                )}
+                                {!log.remark && (log as any).actionLabel && (
+                                  <p className="text-[12px] text-[#6b7280]">{(log as any).actionLabel}</p>
+                                )}
+
+                                {/* 附件展示 */}
+                                {logFiles && logFiles.length > 0 && (
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {logFiles.map((file, fidx) => (
+                                      <a
+                                        key={fidx}
+                                        href={file.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-1 rounded-sm border border-[#e5e7eb] bg-[#f9fafb] px-2 py-1 text-[11px] text-[#6b7280] hover:border-[#2563eb] hover:text-[#2563eb]"
+                                      >
+                                        {file.type.startsWith('image/') ? (
+                                          <ImageIcon size={12} />
+                                        ) : (
+                                          <FileText size={12} />
+                                        )}
+                                        {file.name.length > 20 ? file.name.slice(0, 17) + '...' : file.name}
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                            <p className="mt-1 text-[12px] text-[#6b7280] break-words">{log.remark || (log as any).actionLabel}</p>
-                          </div>
-                        </div>
-                      ))
+                          )
+                        })}
+                      </div>
                     )}
                   </div>
                 </div>
