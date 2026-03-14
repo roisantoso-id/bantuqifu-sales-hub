@@ -78,8 +78,10 @@ export function LeadListSidebar({ leads, selectedId, onSelect, onDelete }: LeadL
             contacted: { bg: '#e0e7ff', text: '#4f46e5' },
             no_interest: { bg: '#f3f4f6', text: '#6b7280' },
             ready_for_opportunity: { bg: '#fef3c7', text: '#9a3412' },
+            discarded: { bg: '#f3f4f6', text: '#9ca3af' },
+            public_pool: { bg: '#fecaca', text: '#991b1b' },
           }
-          const statusColor = statusColors[lead.status]
+          const statusColor = statusColors[lead.status] || { bg: '#f3f4f6', text: '#6b7280' }
 
           return (
             <li key={lead.id}>
