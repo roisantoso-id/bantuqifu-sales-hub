@@ -23,12 +23,13 @@ model Organization {
   site      String             @default("ID") // ID or CN
   
   // 业务数据隔离关联
-  leads         Lead[]
-  opportunities Opportunity[]
-  customers     Customer[]
-  actionLogs    ActionLog[]
-  products      Product[]
-  users         UserOrganization[]
+  leads             Lead[]
+  opportunities     Opportunity[]
+  customers         Customer[]
+  actionLogs        ActionLog[]
+  products          Product[]
+  users             UserOrganization[]
+  customerFollowups CustomerFollowup[]
   
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
@@ -84,6 +85,9 @@ model User {
   
   // 关联多个租户
   organizations UserOrganization[]
+  
+  // Relations
+  followups     CustomerFollowup[] @relation("FollowupOperator")
   
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
@@ -207,7 +211,7 @@ model Lead {
 // ════════════════════════════════════════════════════════════════════════════════
 
 enum CustomerLevel {
-  L2 // 央企总部和龙头企业
+  L2 // 央企总部和龙头企��
   L3 // 国有企业和上市公司
   L4 // 非上市品牌公司
   L5 // 中小型企业
@@ -244,6 +248,7 @@ model Customer {
   chinaEntities   DomesticEntityAssociation[]
   foreignEntities ForeignCompanyEntity[]
   contacts        CustomerContact[]
+  followups       CustomerFollowup[]
   
   @@index([organizationId])
   @@index([levelDictId])
@@ -271,6 +276,50 @@ model CustomerContact {
   updatedAt     DateTime @updatedAt
   
   @@map("customer_contacts")
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// ── CUSTOMER FOLLOWUP (客户跟进记录) ────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════════
+
+model CustomerFollowup {
+  id              String   @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  operatorId      String   // 记录人
+  operator        User     @relation("FollowupOperator", fields: [operatorId], references: [id])
+  
+  followupType    String   @default("general") // "general", "call", "visit", "meeting", "email"
+  content         String   // 跟进内容
+  nextAction      String?  // 下一步计划
+  nextActionDate  DateTime? // 下次跟进时间
+  
+  attachments     CustomerFollowupAttachment[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([organizationId])
+  @@index([customerId])
+  @@index([operatorId])
+  @@map("customer_followups")
+}
+
+model CustomerFollowupAttachment {
+  id              String   @id @default(cuid())
+  followupId      String
+  followup        CustomerFollowup @relation(fields: [followupId], references: [id], onDelete: Cascade)
+  
+  fileName        String
+  fileSize        Int      // bytes
+  fileUrl         String
+  uploadedAt      DateTime @default(now())
+  
+  @@map("customer_followup_attachments")
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -377,7 +426,7 @@ model Product {
 
 // ════════════════════════════════════════════════════════════════════════════════
 // ── OPPORTUNITY ───────────────────────────────────────────────────────────────
-// ════════════════════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════���══════════════════════════════════════
 
 enum ServiceType {
   VISA
