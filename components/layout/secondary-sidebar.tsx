@@ -23,10 +23,10 @@ const STAGE_COLOR: Record<StageId, { bg: string; text: string; dot: string }> = 
 }
 
 const STAGE_GROUPS: { label: string; stages: StageId[]; activeColor: string; activeBg: string; inactiveBg: string; inactiveText: string }[] = [
-  { label: 'P1–P4', stages: ['P1', 'P2', 'P3', 'P4'], activeColor: '#ffffff', activeBg: '#6b7280', inactiveBg: '#f3f4f6', inactiveText: '#6b7280' },
-  { label: 'P5–P6', stages: ['P5', 'P6'],              activeColor: '#ffffff', activeBg: '#6b7280', inactiveBg: '#f3f4f6', inactiveText: '#6b7280' },
-  { label: 'P7',    stages: ['P7'],                    activeColor: '#ffffff', activeBg: '#6b7280', inactiveBg: '#f3f4f6', inactiveText: '#6b7280' },
-  { label: 'P8',    stages: ['P8'],                    activeColor: '#ffffff', activeBg: '#6b7280', inactiveBg: '#f3f4f6', inactiveText: '#6b7280' },
+  { label: 'P1–P4', stages: ['P1', 'P2', 'P3', 'P4'], activeColor: '#ffffff', activeBg: '#d97706', inactiveBg: '#fef9c3', inactiveText: '#92400e' },
+  { label: 'P5–P6', stages: ['P5', 'P6'],              activeColor: '#ffffff', activeBg: '#16a34a', inactiveBg: '#dcfce7', inactiveText: '#14532d' },
+  { label: 'P7',    stages: ['P7'],                    activeColor: '#ffffff', activeBg: '#15803d', inactiveBg: '#bbf7d0', inactiveText: '#14532d' },
+  { label: 'P8',    stages: ['P8'],                    activeColor: '#ffffff', activeBg: '#2563eb', inactiveBg: '#dbeafe', inactiveText: '#1e3a8a' },
 ]
 
 const SERVICE_BADGES: Record<string, string> = {
