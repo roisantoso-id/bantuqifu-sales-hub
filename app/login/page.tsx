@@ -2,9 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { MessageCircle } from 'lucide-react'
+import { Eye, EyeOff, ArrowRight, ChevronDown, MessageCircle } from 'lucide-react'
 import Image from 'next/image'
-import { AdaptiveLoginCard } from '@/components/login/adaptive-login-card'
 
 const TENANTS = [
   { id: '00000000-0000-0000-0000-000000000001', name: 'Bantu', code: 'ORG_ID: 00000001' },
@@ -48,118 +47,8 @@ export default function LoginPage() {
     }
   }
 
-  // 根据站点选择背景
-  const backgroundImage = site === 'ID' 
-    ? 'linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%)'
-    : 'linear-gradient(135deg, #dc2626 0%, #b91c1c 50%, #991b1b 100%)'
-
   return (
-    <div 
-      className="min-h-screen flex items-center justify-center p-4 lg:p-0 transition-all duration-300"
-      style={{ background: backgroundImage }}
-    >
-      {/* 顶部语言切换 - 所有屏幕 */}
-      <div className="absolute top-4 right-4 flex gap-2">
-        {LANGUAGES.map((lang) => (
-          <button
-            key={lang.code}
-            onClick={() => setLanguage(lang.code)}
-            className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
-              language === lang.code
-                ? 'bg-white text-[#1e3a8a]'
-                : 'bg-white/20 text-white hover:bg-white/30'
-            }`}
-          >
-            {lang.label}
-          </button>
-        ))}
-      </div>
-
-      {/* 左侧品牌展示区 - 宽屏只显示 */}
-      <div className="hidden lg:flex flex-1 flex-col items-center justify-center lg:px-12">
-        <div className="mb-8 text-white">
-          <Image
-            src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/bantu_logo_yuan-2L5IX7MXM9VF7K8Owk5CLW4mryzl89.png"
-            alt="Bantu Logo"
-            width={120}
-            height={120}
-            className="mb-6"
-          />
-          <h1 className="text-4xl font-bold mb-2">简化销售</h1>
-          <h2 className="text-4xl font-bold mb-6">加速成交</h2>
-          <p className="text-lg text-white/80">
-            {site === 'ID' ? 'Bantu Indonesia Site' : 'Bantu 中国分站'}
-          </p>
-        </div>
-
-        {/* 特性标签 */}
-        <div className="grid grid-cols-2 gap-3 text-sm text-white/80">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">📋</span>
-            <span>线索管理</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xl">📈</span>
-            <span>商机追踪</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xl">👥</span>
-            <span>客户360</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xl">📊</span>
-            <span>数据分析</span>
-          </div>
-        </div>
-
-        {/* 统计数据 */}
-        <div className="mt-12 grid grid-cols-3 gap-6 text-center text-white/80 border-t border-white/20 pt-8">
-          <div>
-            <div className="text-2xl font-bold text-white">500+</div>
-            <div className="text-sm">企业用户</div>
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-white">10万+</div>
-            <div className="text-sm">管理商机</div>
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-white">98%</div>
-            <div className="text-sm">满意度</div>
-          </div>
-        </div>
-      </div>
-
-      {/* 右侧登录卡片 - 宽屏右侧，窄屏中间 */}
-      <div className="flex flex-1 lg:flex-none items-center justify-center lg:px-12">
-        <div onKeyPress={handleKeyPress}>
-          <AdaptiveLoginCard
-            site={site}
-            onSiteChange={setSite}
-            selectedTenant={selectedTenant}
-            onTenantChange={setSelectedTenant}
-            tenants={TENANTS}
-            tenantOpen={tenantOpen}
-            onTenantOpenChange={setTenantOpen}
-            email={email}
-            onEmailChange={setEmail}
-            password={password}
-            onPasswordChange={setPassword}
-            showPassword={showPassword}
-            onShowPasswordChange={setShowPassword}
-            onSubmit={handleLogin}
-            isLoading={isLoading}
-          />
-        </div>
-      </div>
-
-      {/* 底部企业微信联系 - 仅宽屏 */}
-      <div className="absolute bottom-4 left-4 hidden lg:flex items-center gap-2 text-white/60 text-[12px]">
-        <MessageCircle size={14} />
-        <span>企业微信服务</span>
-      </div>
-    </div>
-  )
-}
+    <div className="min-h-screen flex bg-[#fafbfc]">
       {/* 左侧品牌展示区 */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#0033cc] via-[#0044dd] to-[#0066ff] relative overflow-hidden">
         {/* 背景装饰 */}
@@ -196,7 +85,7 @@ export default function LoginPage() {
 
             {/* 特性标签 */}
             <div className="mt-8 flex flex-wrap gap-2">
-              {['线索管理', '商机追踪', '客户360°', '数据分析'].map((tag) => (
+              {['线索管理', '商机追踪', '客户360', '数据分析'].map((tag) => (
                 <span
                   key={tag}
                   className="px-3 py-1.5 bg-white/10 backdrop-blur-sm rounded-full text-white/90 text-sm"
@@ -226,7 +115,7 @@ export default function LoginPage() {
       </div>
 
       {/* 右侧登录表单区 */}
-      <div className="flex-1 flex flex-col bg-[#fafbfc]">
+      <div className="flex-1 flex flex-col">
         {/* 顶部导航 */}
         <div className="flex items-center justify-between px-8 py-4">
           {/* 移动端 Logo */}
@@ -348,7 +237,7 @@ export default function LoginPage() {
             <div className="mb-6">
               <div className="flex items-center justify-between mb-2">
                 <label className="text-[12px] font-medium text-[#6b7280]">密码</label>
-                <button className="text-[12px] text-[#0044dd] hover:underline">忘记密码？</button>
+                <button className="text-[12px] text-[#0044dd] hover:underline">忘记密码?</button>
               </div>
               <div className="relative">
                 <input
