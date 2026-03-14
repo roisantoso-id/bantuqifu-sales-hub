@@ -37,7 +37,7 @@ export function BreadcrumbStepper({ currentStage, onStageClick, viewingStage }: 
         return (
           <div key={stage.id} className="flex items-center gap-0.5">
             <button
-              onClick={() => isReachable && onStageClick(stage.id)}
+              onClick={() => isReachable && onStageClick?.(stage.id)}
               disabled={!isReachable}
               className={[
                 'flex items-center gap-1 rounded-sm px-2 py-1 text-[12px] font-medium transition-colors',
