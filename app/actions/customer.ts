@@ -310,8 +310,7 @@ export async function getCustomerFollowupsAction(customerId: string): Promise<Cu
       content,
       nextAction,
       nextActionDate,
-      createdAt,
-      users_auth!operatorId (name)
+      createdAt
     `)
     .eq('organizationId', tenantId)
     .eq('customerId', customerId)
@@ -326,7 +325,7 @@ export async function getCustomerFollowupsAction(customerId: string): Promise<Cu
     id: row.id,
     customerId: row.customerId,
     operatorId: row.operatorId,
-    operatorName: row.users_auth?.name ?? '未知用户',
+    operatorName: '系统用户',
     followupType: row.followupType ?? 'general',
     content: row.content,
     nextAction: row.nextAction ?? null,
@@ -369,8 +368,7 @@ export async function addCustomerFollowupAction(data: {
       content,
       nextAction,
       nextActionDate,
-      createdAt,
-      users_auth!operatorId (name)
+      createdAt
     `)
     .single()
 
@@ -383,7 +381,7 @@ export async function addCustomerFollowupAction(data: {
     id: inserted.id,
     customerId: inserted.customerId,
     operatorId: inserted.operatorId,
-    operatorName: (inserted as any).users_auth?.name ?? '未知用户',
+    operatorName: '系统用户',
     followupType: inserted.followupType ?? 'general',
     content: inserted.content,
     nextAction: inserted.nextAction ?? null,
