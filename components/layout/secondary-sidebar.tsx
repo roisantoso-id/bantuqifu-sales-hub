@@ -10,10 +10,23 @@ interface SecondarySidebarProps {
   onSelect: (opp: Opportunity) => void
 }
 
-const STAGES: { id: StageId; label: string; color: string }[] = [
-  { id: 'P1', label: 'P1', color: '#6b7280' },
-  { id: 'P2', label: 'P2', color: '#d97706' },
-  { id: 'P3', label: 'P3', color: '#16a34a' },
+// 阶段颜色分组: P1-P4=黄, P5-P6=浅绿, P7=绿, P8=蓝
+const STAGE_COLOR: Record<StageId, { bg: string; text: string; dot: string }> = {
+  P1: { bg: '#fef9c3', text: '#854d0e', dot: '#eab308' },
+  P2: { bg: '#fef9c3', text: '#854d0e', dot: '#eab308' },
+  P3: { bg: '#fef9c3', text: '#854d0e', dot: '#eab308' },
+  P4: { bg: '#fef9c3', text: '#854d0e', dot: '#eab308' },
+  P5: { bg: '#dcfce7', text: '#14532d', dot: '#4ade80' },
+  P6: { bg: '#dcfce7', text: '#14532d', dot: '#4ade80' },
+  P7: { bg: '#bbf7d0', text: '#14532d', dot: '#16a34a' },
+  P8: { bg: '#dbeafe', text: '#1e3a8a', dot: '#2563eb' },
+}
+
+const STAGE_GROUPS: { label: string; stages: StageId[]; activeColor: string; dotColor: string }[] = [
+  { label: 'P1–P4', stages: ['P1', 'P2', 'P3', 'P4'], activeColor: '#d97706', dotColor: '#eab308' },
+  { label: 'P5–P6', stages: ['P5', 'P6'],              activeColor: '#16a34a', dotColor: '#4ade80' },
+  { label: 'P7',    stages: ['P7'],                    activeColor: '#15803d', dotColor: '#16a34a' },
+  { label: 'P8',    stages: ['P8'],                    activeColor: '#2563eb', dotColor: '#2563eb' },
 ]
 
 const SERVICE_BADGES: Record<string, string> = {
@@ -34,7 +47,9 @@ function formatAmount(amount: number, currency: string) {
 
 export function SecondarySidebar({ opportunities, selectedId, onSelect }: SecondarySidebarProps) {
   const [query, setQuery] = useState('')
-  const [stageFilter, setStageFilter] = useState<StageId | null>(null)
+  const [groupFilter, setGroupFilter] = useState<string | null>(null)
+
+  const activeGroup = STAGE_GROUPS.find((g) => g.label === groupFilter)
 
   const filtered = opportunities.filter((opp) => {
     const matchesQuery =
@@ -43,7 +58,7 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect }: Second
       opp.customer.passportNo.toLowerCase().includes(query.toLowerCase()) ||
       opp.serviceTypeLabel.includes(query) ||
       (opp.destination?.includes(query) ?? false)
-    const matchesStage = !stageFilter || opp.stageId === stageFilter
+    const matchesStage = !activeGroup || activeGroup.stages.includes(opp.stageId)
     return matchesQuery && matchesStage
   })
 
@@ -73,31 +88,31 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect }: Second
           />
         </div>
 
-        {/* Stage filter tabs */}
+        {/* Stage group filter tabs */}
         <div className="mt-2 flex gap-1">
           <button
-            onClick={() => setStageFilter(null)}
+            onClick={() => setGroupFilter(null)}
             className={[
               'h-5 rounded-sm px-1.5 text-[11px] font-medium transition-colors',
-              stageFilter === null
-                ? 'bg-[#2563eb] text-white'
+              groupFilter === null
+                ? 'bg-[#374151] text-white'
                 : 'bg-[#f3f4f6] text-[#6b7280] hover:text-[#111827]',
             ].join(' ')}
           >
             全部
           </button>
-          {STAGES.map((s) => (
+          {STAGE_GROUPS.map((g) => (
             <button
-              key={s.id}
-              onClick={() => setStageFilter(stageFilter === s.id ? null : s.id)}
-              className={[
-                'h-5 rounded-sm px-1.5 text-[11px] font-medium transition-colors',
-                stageFilter === s.id
-                  ? 'bg-[#2563eb] text-white'
-                  : 'bg-[#f3f4f6] text-[#6b7280] hover:text-[#111827]',
-              ].join(' ')}
+              key={g.label}
+              onClick={() => setGroupFilter(groupFilter === g.label ? null : g.label)}
+              className="h-5 rounded-sm px-1.5 text-[11px] font-medium transition-colors"
+              style={
+                groupFilter === g.label
+                  ? { backgroundColor: g.activeColor, color: '#fff' }
+                  : { backgroundColor: '#f3f4f6', color: '#6b7280' }
+              }
             >
-              {s.label}
+              {g.label}
             </button>
           ))}
         </div>
@@ -112,16 +127,14 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect }: Second
       <ul className="flex-1 overflow-y-auto">
         {filtered.map((opp) => {
           const isSelected = opp.id === selectedId
-          const stageInfo = STAGES.find((s) => s.id === opp.stageId)
+          const stageColor = STAGE_COLOR[opp.stageId] ?? STAGE_COLOR.P1
           return (
             <li key={opp.id}>
               <button
                 onClick={() => onSelect(opp)}
                 className={[
                   'relative w-full border-b border-[#e5e7eb] px-3 py-2.5 text-left transition-colors',
-                  isSelected
-                    ? 'bg-white'
-                    : 'hover:bg-white',
+                  isSelected ? 'bg-white' : 'hover:bg-white',
                 ].join(' ')}
               >
                 {/* Active indicator bar */}
@@ -149,15 +162,19 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect }: Second
                   </span>
                 </div>
 
-                {/* Row 3: service badge + stage pill */}
+                {/* Row 3: service badge + stage pill + assignee */}
                 <div className="mt-1 flex items-center gap-1.5">
                   <span className="rounded-sm bg-[#f3f4f6] px-1 py-0.5 text-[10px] font-medium text-[#374151]">
                     {SERVICE_BADGES[opp.serviceType] ?? opp.serviceTypeLabel}
                   </span>
                   <span
-                    className="rounded-sm px-1 py-0.5 text-[10px] font-semibold"
-                    style={{ color: stageInfo?.color, backgroundColor: `${stageInfo?.color}18` }}
+                    className="inline-flex items-center gap-0.5 rounded-sm px-1 py-0.5 text-[10px] font-semibold"
+                    style={{ backgroundColor: stageColor.bg, color: stageColor.text }}
                   >
+                    <span
+                      className="h-1.5 w-1.5 rounded-full"
+                      style={{ backgroundColor: stageColor.dot }}
+                    />
                     {opp.stageId}
                   </span>
                   <span className="text-[10px] text-[#9ca3af]">{opp.assignee}</span>
