@@ -279,21 +279,91 @@ export default function SalesHub() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-white">
-      {/* Pane 1 — primary nav (64px) */}
+    <div className="flex h-screen w-screen overflow-hidden bg-white">
+      {/* ── 左侧：主导航栏（固定宽度 56px）────────────────────────────────────── */}
       <PrimarySidebar
         activeNav={activeNav}
         onNavChange={setActiveNav}
         userName={mockUser.name}
       />
 
-      {/* Pane 2+ — conditional content based on activeNav */}
-      {activeNav === 'leads' ? (
-        <div className="flex-1 overflow-hidden">
-          <LeadManagement
-            leads={leads}
-            onLeadStatusChange={handleLeadStatusChange}
-            onLeadDelete={handleDeleteLead}
+      {/* ── 三段式自适应布局 ────────────────────────────────────────────────────────── */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* 左侧二级边栏：宽屏固定320px，窄屏自动收缩为隐藏/抽屉 */}
+        <div className="hidden lg:flex lg:w-80 xl:w-96 flex-col border-r border-[#e5e7eb] bg-white transition-all duration-300">
+          {activeNav === 'leads' ? (
+            <div className="flex-1 overflow-hidden" />
+          ) : activeNav === 'opportunities' || activeNav === 'customers' ? (
+            <SecondarySidebar
+              activeNav={activeNav}
+              opportunities={opportunities}
+              selectedId={selectedId}
+              onSelect={handleSelectOpportunity}
+            />
+          ) : null}
+        </div>
+
+        {/* 中间主作业区：使用 flex-1 自动填满剩余空间 */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {activeNav === 'leads' ? (
+            <LeadManagement
+              leads={leads}
+              opportunities={opportunities}
+              onCreateCustomer={handleCreateCustomer}
+              onConvertLeadToOpportunity={handleConvertLeadToOpportunity}
+              onLeadStatusChange={handleLeadStatusChange}
+              onAddLead={handleAddLead}
+              onDeleteLead={handleDeleteLead}
+              onDiscardLead={handleDiscardLead}
+              onClaimLead={handleClaimLead}
+            />
+          ) : activeNav === 'opportunities' ? (
+            <WorkspacePane
+              opportunity={selectedOpportunity}
+              allProducts={mockProducts}
+              viewingStage={viewingStage}
+              onOpportunityUpdate={handleOpportunityUpdate}
+              onSave={handleSave}
+              onAdvanceStage={handleAdvanceStage}
+              onQuoteSent={handleQuoteSent}
+              logs={currentLogs}
+              onAddNote={handleAddNote}
+            />
+          ) : activeNav === 'customers' ? (
+            <CustomerManagement
+              customers={opportunities.map((o) => ({
+                customerId: o.customerId,
+                customerName: o.customer.name,
+                contactName: mockUser.name,
+                phone: o.customer.phone,
+                email: o.customer.email,
+                level: 'A',
+                isLocked: false,
+              }))}
+              opportunities={opportunities}
+              leads={leads}
+              actionLogs={actionLogs}
+            />
+          ) : activeNav === 'analytics' ? (
+            <MyDashboard />
+          ) : null}
+        </div>
+
+        {/* 右侧审计栏：宽屏显示（lg:w-64），窄屏隐藏 */}
+        <div className="hidden lg:flex lg:w-64 xl:w-80 flex-col border-l border-[#e5e7eb] bg-white transition-all duration-300">
+          {activeNav === 'opportunities' && (
+            <AuditRail
+              visible={showAuditRail}
+              onToggle={setShowAuditRail}
+              opportunity={selectedOpportunity}
+              logs={currentLogs}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
             onConvertToOpportunity={handleConvertLeadToOpportunity}
             onAddLead={handleAddLead}
             onDiscardLead={handleDiscardLead}
