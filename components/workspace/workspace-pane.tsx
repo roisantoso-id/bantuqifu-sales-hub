@@ -180,11 +180,6 @@ export function WorkspacePane({
             <button
               onClick={onAdvanceStage}
               className="ml-auto flex h-8 items-center gap-1.5 rounded-sm bg-[#2563eb] px-3 text-[13px] font-medium text-white hover:bg-[#1d4ed8]"
-              >
-              {STAGE_NEXT_LABEL[opportunity.stageId]}
-              <ChevronRight size={13} />
-            </button>
-          )}
             >
               {STAGE_NEXT_LABEL[opportunity.stageId]}
               <ChevronRight size={13} />
