@@ -1,169 +1,150 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { OpportunityList } from '@/components/sales-hub/opportunity-list'
-import { OperationPane } from '@/components/sales-hub/operation-pane'
-import { ActionTimeline } from '@/components/sales-hub/action-timeline'
-import { UserProfileBar } from '@/components/sales-hub/user-profile'
-import {
-  mockOpportunities,
-  mockProducts,
-  mockActionLogs,
-  mockUser,
-} from '@/lib/mock-data'
-import type { Opportunity, StageId, SelectedProduct, ActionLog } from '@/lib/types'
+import { useState, useMemo, useCallback } from 'react'
+import { PrimarySidebar } from '@/components/layout/primary-sidebar'
+import { SecondarySidebar } from '@/components/layout/secondary-sidebar'
+import { WorkspacePane } from '@/components/workspace/workspace-pane'
+import { AuditRail } from '@/components/audit-rail/audit-panel'
+import { mockOpportunities, mockProducts, mockActionLogs, mockUser } from '@/lib/mock-data'
+import type { Opportunity, NavSection, StageId, SelectedProduct, ActionLog } from '@/lib/types'
+import { ClipboardList } from 'lucide-react'
 
 export default function SalesHub() {
-  // State
+  const [activeNav, setActiveNav] = useState<NavSection>('opportunities')
   const [opportunities, setOpportunities] = useState<Opportunity[]>(mockOpportunities)
-  const [selectedOpportunityId, setSelectedOpportunityId] = useState<string | null>(
-    mockOpportunities[0]?.id || null
-  )
-  const [searchQuery, setSearchQuery] = useState('')
-  const [stageFilter, setStageFilter] = useState<StageId | null>(null)
-  const [selectedProducts, setSelectedProducts] = useState<
-    Record<string, SelectedProduct[]>
-  >({})
+  const [selectedId, setSelectedId] = useState<string>(mockOpportunities[0].id)
+  const [viewingStage, setViewingStage] = useState<StageId>(mockOpportunities[0].stageId)
+  const [selectedProducts, setSelectedProducts] = useState<Record<string, SelectedProduct[]>>({})
   const [actionLogs, setActionLogs] = useState<Record<string, ActionLog[]>>(mockActionLogs)
+  const [showAuditRail, setShowAuditRail] = useState(true)
 
-  // Derived state
-  const selectedOpportunity = useMemo(() => {
-    return opportunities.find((opp) => opp.id === selectedOpportunityId) || null
-  }, [opportunities, selectedOpportunityId])
+  // ── Derived ──────────────────────────────────────────────────────────────────
+  const selectedOpportunity = useMemo(
+    () => opportunities.find((o) => o.id === selectedId) ?? opportunities[0],
+    [opportunities, selectedId]
+  )
 
-  const currentProducts = useMemo(() => {
-    return selectedOpportunityId ? selectedProducts[selectedOpportunityId] || [] : []
-  }, [selectedProducts, selectedOpportunityId])
+  const currentProducts = useMemo(
+    () => selectedProducts[selectedId] ?? [],
+    [selectedProducts, selectedId]
+  )
 
-  const currentLogs = useMemo(() => {
-    return selectedOpportunityId ? actionLogs[selectedOpportunityId] || [] : []
-  }, [actionLogs, selectedOpportunityId])
+  const currentLogs = useMemo(
+    () => actionLogs[selectedId] ?? [],
+    [actionLogs, selectedId]
+  )
 
-  // Handlers
-  const handleSelectOpportunity = (opportunity: Opportunity) => {
-    setSelectedOpportunityId(opportunity.id)
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+  const appendLog = useCallback(
+    (oppId: string, log: Omit<ActionLog, 'id' | 'opportunityId' | 'operatorId' | 'operatorName'>) => {
+      const entry: ActionLog = {
+        id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        opportunityId: oppId,
+        operatorId: mockUser.id,
+        operatorName: mockUser.name,
+        ...log,
+      }
+      setActionLogs((prev) => ({
+        ...prev,
+        [oppId]: [...(prev[oppId] ?? []), entry],
+      }))
+    },
+    []
+  )
+
+  // ── Handlers ─────────────────────────────────────────────────────────────────
+  const handleSelectOpportunity = (opp: Opportunity) => {
+    setSelectedId(opp.id)
+    setViewingStage(opp.stageId)
   }
 
   const handleOpportunityUpdate = (data: Partial<Opportunity>) => {
-    if (!selectedOpportunityId) return
     setOpportunities((prev) =>
-      prev.map((opp) =>
-        opp.id === selectedOpportunityId
-          ? { ...opp, ...data, updatedAt: new Date().toISOString() }
-          : opp
+      prev.map((o) =>
+        o.id === selectedId ? { ...o, ...data, updatedAt: new Date().toISOString() } : o
       )
     )
   }
 
   const handleProductsChange = (products: SelectedProduct[]) => {
-    if (!selectedOpportunityId) return
-    setSelectedProducts((prev) => ({
-      ...prev,
-      [selectedOpportunityId]: products,
-    }))
+    setSelectedProducts((prev) => ({ ...prev, [selectedId]: products }))
   }
 
   const handleSave = () => {
-    if (!selectedOpportunity) return
-    
-    const newLog: ActionLog = {
-      id: `log-${Date.now()}`,
-      opportunityId: selectedOpportunity.id,
-      operatorId: mockUser.id,
-      operatorName: mockUser.name,
-      actionType: 'FORM',
-      actionLabel: '保存变更',
-      timestamp: new Date().toISOString(),
-    }
-    
-    setActionLogs((prev) => ({
-      ...prev,
-      [selectedOpportunity.id]: [...(prev[selectedOpportunity.id] || []), newLog],
-    }))
+    appendLog(selectedId, { actionType: 'FORM', actionLabel: '保存草稿' })
   }
 
   const handleAdvanceStage = () => {
-    if (!selectedOpportunity) return
-    
-    const stageMap: Record<StageId, StageId | null> = {
-      P1: 'P2',
-      P2: 'P3',
-      P3: null,
-    }
-    
-    const nextStage = stageMap[selectedOpportunity.stageId]
-    if (!nextStage) return
-    
+    const stageMap: Record<StageId, StageId | null> = { P1: 'P2', P2: 'P3', P3: null }
+    const next = stageMap[selectedOpportunity.stageId]
+    if (!next) return
     setOpportunities((prev) =>
-      prev.map((opp) =>
-        opp.id === selectedOpportunity.id
-          ? { ...opp, stageId: nextStage, updatedAt: new Date().toISOString() }
-          : opp
+      prev.map((o) =>
+        o.id === selectedId ? { ...o, stageId: next, updatedAt: new Date().toISOString() } : o
       )
     )
-    
-    const newLog: ActionLog = {
-      id: `log-${Date.now()}`,
-      opportunityId: selectedOpportunity.id,
-      operatorId: mockUser.id,
-      operatorName: mockUser.name,
+    setViewingStage(next)
+    appendLog(selectedId, {
       actionType: 'STAGE_CHANGE',
-      actionLabel: `推进至 ${nextStage}`,
-      timestamp: new Date().toISOString(),
-    }
-    
-    setActionLogs((prev) => ({
-      ...prev,
-      [selectedOpportunity.id]: [...(prev[selectedOpportunity.id] || []), newLog],
-    }))
+      actionLabel: `推进至 ${next}`,
+      remark: `从 ${selectedOpportunity.stageId} 推进`,
+    })
+  }
+
+  const handleQuoteSent = () => {
+    appendLog(selectedId, {
+      actionType: 'QUOTE',
+      actionLabel: '发送报价',
+      remark: '报价单已通过邮件/微信发送给客户',
+    })
   }
 
   return (
-    <div className="flex h-screen flex-col bg-[#f9fafb]">
-      {/* Top Bar */}
-      <header className="flex h-10 items-center justify-between border-b border-[#e5e7eb] bg-white px-4">
-        <div className="flex items-center gap-3">
-          <h1 className="text-[13px] font-semibold text-[#111827]">Bantu Sales Hub</h1>
-          <span className="rounded-sm bg-[#f3f4f6] px-1.5 py-0.5 text-[10px] font-medium text-[#6b7280]">
-            商机管理
-          </span>
-        </div>
-        <UserProfileBar user={mockUser} />
-      </header>
+    <div className="flex h-screen overflow-hidden bg-white">
+      {/* Pane 1 — primary nav (64px) */}
+      <PrimarySidebar
+        activeNav={activeNav}
+        onNavChange={setActiveNav}
+        userName={mockUser.name}
+      />
 
-      {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Pane A: Opportunity List */}
-        <OpportunityList
-          opportunities={opportunities}
-          selectedId={selectedOpportunityId}
-          onSelect={handleSelectOpportunity}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          stageFilter={stageFilter}
-          onStageFilterChange={setStageFilter}
-        />
+      {/* Pane 2 — opportunity list (280px) */}
+      <SecondarySidebar
+        opportunities={opportunities}
+        selectedId={selectedId}
+        onSelect={handleSelectOpportunity}
+      />
 
-        {/* Pane B: Operation Area */}
-        {selectedOpportunity ? (
-          <OperationPane
-            opportunity={selectedOpportunity}
-            products={mockProducts}
-            selectedProducts={currentProducts}
-            onOpportunityUpdate={handleOpportunityUpdate}
-            onProductsChange={handleProductsChange}
-            onSave={handleSave}
-            onAdvanceStage={handleAdvanceStage}
-          />
-        ) : (
-          <div className="flex flex-1 items-center justify-center bg-white text-[13px] text-[#9ca3af]">
-            请从左侧选择一个商机
-          </div>
-        )}
+      {/* Pane 3 — workspace (flex-1) */}
+      <WorkspacePane
+        opportunity={selectedOpportunity}
+        allProducts={mockProducts}
+        selectedProducts={currentProducts}
+        viewingStage={viewingStage}
+        onViewingStageChange={setViewingStage}
+        onOpportunityUpdate={handleOpportunityUpdate}
+        onProductsChange={handleProductsChange}
+        onSave={handleSave}
+        onAdvanceStage={handleAdvanceStage}
+        onQuoteSent={handleQuoteSent}
+      />
 
-        {/* Pane C: Action Timeline */}
-        {selectedOpportunity && <ActionTimeline logs={currentLogs} />}
-      </div>
+      {/* Audit rail toggle button (shown when rail is hidden) */}
+      {!showAuditRail && (
+        <button
+          onClick={() => setShowAuditRail(true)}
+          title="查看操作记录"
+          aria-label="打开操作记录面板"
+          className="flex h-8 w-8 shrink-0 items-center justify-center self-start border-l border-[#e5e7eb] text-[#9ca3af] hover:bg-[#f3f4f6] hover:text-[#374151] mt-[52px]"
+        >
+          <ClipboardList size={14} />
+        </button>
+      )}
+
+      {/* Pane 4 — audit rail (256px, toggleable) */}
+      {showAuditRail && (
+        <AuditRail logs={currentLogs} onClose={() => setShowAuditRail(false)} />
+      )}
     </div>
   )
 }
