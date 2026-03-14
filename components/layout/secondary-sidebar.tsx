@@ -22,11 +22,11 @@ const STAGE_COLOR: Record<StageId, { bg: string; text: string; dot: string }> = 
   P8: { bg: '#dbeafe', text: '#1e3a8a', dot: '#2563eb' },
 }
 
-const STAGE_GROUPS: { label: string; stages: StageId[]; activeColor: string; dotColor: string }[] = [
-  { label: 'P1–P4', stages: ['P1', 'P2', 'P3', 'P4'], activeColor: '#d97706', dotColor: '#eab308' },
-  { label: 'P5–P6', stages: ['P5', 'P6'],              activeColor: '#16a34a', dotColor: '#4ade80' },
-  { label: 'P7',    stages: ['P7'],                    activeColor: '#15803d', dotColor: '#16a34a' },
-  { label: 'P8',    stages: ['P8'],                    activeColor: '#2563eb', dotColor: '#2563eb' },
+const STAGE_GROUPS: { label: string; stages: StageId[]; activeColor: string; activeBg: string; inactiveBg: string; inactiveText: string }[] = [
+  { label: 'P1–P4', stages: ['P1', 'P2', 'P3', 'P4'], activeColor: '#ffffff', activeBg: '#d97706', inactiveBg: '#fef9c3', inactiveText: '#92400e' },
+  { label: 'P5–P6', stages: ['P5', 'P6'],              activeColor: '#ffffff', activeBg: '#16a34a', inactiveBg: '#dcfce7', inactiveText: '#14532d' },
+  { label: 'P7',    stages: ['P7'],                    activeColor: '#ffffff', activeBg: '#15803d', inactiveBg: '#bbf7d0', inactiveText: '#14532d' },
+  { label: 'P8',    stages: ['P8'],                    activeColor: '#ffffff', activeBg: '#2563eb', inactiveBg: '#dbeafe', inactiveText: '#1e3a8a' },
 ]
 
 const SERVICE_BADGES: Record<string, string> = {
@@ -101,20 +101,22 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect }: Second
           >
             全部
           </button>
-          {STAGE_GROUPS.map((g) => (
-            <button
-              key={g.label}
-              onClick={() => setGroupFilter(groupFilter === g.label ? null : g.label)}
-              className="h-5 rounded-sm px-1.5 text-[11px] font-medium transition-colors"
-              style={
-                groupFilter === g.label
-                  ? { backgroundColor: g.activeColor, color: '#fff' }
-                  : { backgroundColor: '#f3f4f6', color: '#6b7280' }
-              }
-            >
-              {g.label}
-            </button>
-          ))}
+          {STAGE_GROUPS.map((g) => {
+            const isActive = groupFilter === g.label
+            return (
+              <button
+                key={g.label}
+                onClick={() => setGroupFilter(isActive ? null : g.label)}
+                className="h-5 rounded-sm px-1.5 text-[11px] font-semibold transition-colors"
+                style={{
+                  backgroundColor: isActive ? g.activeBg : g.inactiveBg,
+                  color: isActive ? g.activeColor : g.inactiveText,
+                }}
+              >
+                {g.label}
+              </button>
+            )
+          })}
         </div>
       </div>
 
