@@ -120,7 +120,7 @@ export function P2ProductMatcher({
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left: Product Catalog */}
-        <div className="flex-1 flex flex-col min-w-0 border-r border-[#e5e7eb]">
+        <div className="w-1/2 flex flex-col min-w-0 border-r border-[#e5e7eb]">
           {/* Search */}
           <div className="border-b border-[#e5e7eb] p-2">
             <div className="flex items-center gap-1 rounded-sm border border-[#e5e7eb] bg-white px-2 py-1">
@@ -185,7 +185,7 @@ export function P2ProductMatcher({
         </div>
 
         {/* Right: Selected Services */}
-        <div className="w-80 shrink-0 flex flex-col p-2">
+        <div className="w-1/2 shrink-0 flex flex-col p-2">
           <div className="mb-2 pb-1 border-b border-[#e5e7eb]">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">
               已选服务清单
