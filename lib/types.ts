@@ -24,6 +24,7 @@ export interface OpportunityP2Data {
 
 export interface OpportunityP3Data {
   productId: string
+  quantity: number // 数量，默认 1
   lockedPrice: number // 当前售价（可编辑）
   currency: Currency // IDR or CNY
   recommendedPrice?: number // 推荐价格（取自 Product.recommendedPrice）

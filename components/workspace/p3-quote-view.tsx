@@ -40,6 +40,7 @@ export function P3QuoteView({
       const product = allProducts.find((p) => p.id === p2Item.productId)
       return {
         productId: p2Item.productId,
+        quantity: 1,
         lockedPrice: product?.basePrice ?? 0,
         currency: 'CNY' as Currency,
         recommendedPrice: product?.recommendedPrice,
@@ -74,6 +75,14 @@ export function P3QuoteView({
     )
   }
 
+  const updateQuantity = (productId: string, quantity: number) => {
+    onP3DataChange(
+      p3Data.map((item) =>
+        item.productId === productId ? { ...item, quantity: Math.max(1, quantity) } : item
+      )
+    )
+  }
+
   const updateCurrency = (productId: string, currency: Currency) => {
     onP3DataChange(
       p3Data.map((item) =>
@@ -98,7 +107,7 @@ export function P3QuoteView({
     return enrichedDisplayData.reduce((sum, item) => {
       const inCNY = item.lockedPrice / EXCHANGE_RATES[item.currency]
       const inDisplayCurrency = inCNY * EXCHANGE_RATES[currentCurrency]
-      return sum + inDisplayCurrency
+      return sum + inDisplayCurrency * (item.quantity ?? 1)
     }, 0)
   }, [enrichedDisplayData, currentCurrency])
 
@@ -193,41 +202,64 @@ export function P3QuoteView({
         ) : (
           <div className="rounded-sm border border-[#e5e7eb] bg-white overflow-hidden">
             {/* Table Header */}
-            <div className="grid grid-cols-[1fr_90px_90px_70px_70px] gap-1 border-b border-[#e5e7eb] bg-[#f9fafb] px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#9ca3af]">
+            <div className="grid grid-cols-[1fr_64px_90px_80px_70px_68px] gap-1 border-b border-[#e5e7eb] bg-[#f9fafb] px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#9ca3af]">
               <div>产品名</div>
-              <div className="text-right">当前售价</div>
-              <div className="text-right">推荐价格</div>
-              <div className="text-right">成本线</div>
-              <div className="text-center">审批状态</div>
+              <div className="text-center">数量</div>
+              <div className="text-right">单价</div>
+              <div className="text-right">推荐价</div>
+              <div className="text-right">小计</div>
+              <div className="text-center">审批</div>
             </div>
 
             {/* Table Rows */}
             <div className="divide-y divide-[#f3f4f6]">
               {enrichedDisplayData.map((item) => {
                 if (!item.product) return null
+                const qty = item.quantity ?? 1
                 const displayPrice = convertToDisplay(item.lockedPrice, item.currency)
                 const displayRecommended = item.recommendedPrice ? convertToDisplay(item.recommendedPrice, 'CNY') : 0
-                const displayCostFloor = item.costFloor ? convertToDisplay(item.costFloor, 'CNY') : 0
                 const isLowPrice = displayPrice < displayRecommended
-                const profitMarginPercent = item.profitMargin?.toFixed(1) ?? '0'
+                const lineTotal = displayPrice * qty
 
                 return (
                   <div
                     key={item.productId}
-                    className={`grid grid-cols-[1fr_90px_90px_70px_70px] gap-1 items-center px-3 py-1 text-[12px] ${
+                    className={`grid grid-cols-[1fr_64px_90px_80px_70px_68px] gap-1 items-center px-3 py-1.5 text-[12px] ${
                       isLowPrice ? 'bg-[#fef2f2]' : 'bg-white'
                     }`}
                   >
-                    {/* Product name + difficulty + cycle */}
+                    {/* Product name */}
                     <div className="min-w-0">
                       <p className="font-medium text-[#111827] truncate">{item.product.name}</p>
                       <p className="text-[10px] text-[#9ca3af]">
-                        {item.product.difficulty ? `★${item.product.difficulty}` : ''}{' '}
                         {item.product.billingCycles?.[0] ?? ''}
                       </p>
                     </div>
 
-                    {/* Current Price Input */}
+                    {/* Quantity - stepper */}
+                    <div className="flex items-center justify-center gap-0.5">
+                      <button
+                        onClick={() => updateQuantity(item.productId, qty - 1)}
+                        className="flex h-5 w-5 items-center justify-center rounded-sm border border-[#e5e7eb] text-[#6b7280] hover:border-[#2563eb] hover:text-[#2563eb] text-[12px] leading-none"
+                      >
+                        -
+                      </button>
+                      <input
+                        type="number"
+                        min={1}
+                        value={qty}
+                        onChange={(e) => updateQuantity(item.productId, parseInt(e.target.value) || 1)}
+                        className="h-5 w-7 rounded-sm border border-[#e5e7eb] bg-white text-center font-mono text-[11px] text-[#111827] outline-none focus:border-[#2563eb]"
+                      />
+                      <button
+                        onClick={() => updateQuantity(item.productId, qty + 1)}
+                        className="flex h-5 w-5 items-center justify-center rounded-sm border border-[#e5e7eb] text-[#6b7280] hover:border-[#2563eb] hover:text-[#2563eb] text-[12px] leading-none"
+                      >
+                        +
+                      </button>
+                    </div>
+
+                    {/* Unit Price Input */}
                     <div>
                       <input
                         type="number"
@@ -239,37 +271,27 @@ export function P3QuoteView({
                             : 'border-[#e5e7eb] bg-white text-[#111827] focus:border-[#2563eb]'
                         }`}
                       />
-                      <p className="text-[10px] text-[#9ca3af] text-right mt-0.5">
-                        {currentCurrency === 'CNY' ? '¥' : 'Rp'}
-                      </p>
                     </div>
 
-                    {/* Recommended Price (Read-only) */}
+                    {/* Recommended Price */}
                     <div className="font-mono text-right text-[#9ca3af] text-[11px]">
-                      {displayRecommended > 0 ? (
-                        <>
-                          <p>{formatPrice(displayRecommended, currentCurrency)}</p>
-                          <p className="text-[9px]">（推荐）</p>
-                        </>
-                      ) : (
-                        '—'
-                      )}
+                      {displayRecommended > 0 ? formatPrice(displayRecommended, currentCurrency) : '—'}
                     </div>
 
-                    {/* Cost Floor (Read-only, red italic) */}
-                    <div className="font-mono text-right text-[#dc2626] italic text-[10px]">
-                      {displayCostFloor > 0 ? formatPrice(displayCostFloor, currentCurrency) : '—'}
+                    {/* Line Total */}
+                    <div className={`font-mono text-right text-[12px] font-semibold ${isLowPrice ? 'text-[#dc2626]' : 'text-[#111827]'}`}>
+                      {formatPrice(lineTotal, currentCurrency)}
                     </div>
 
                     {/* Approval Status Badge */}
                     <div className="text-center">
                       {isLowPrice ? (
-                        <span className="inline-flex items-center gap-0.5 rounded-sm bg-[#fee2e2] px-1.5 py-0.5 text-[10px] font-semibold text-[#dc2626]">
-                          ⚠ 审核中
+                        <span className="inline-flex items-center rounded-sm bg-[#fee2e2] px-1.5 py-0.5 text-[10px] font-semibold text-[#dc2626]">
+                          审核
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-0.5 rounded-sm bg-[#dcfce7] px-1.5 py-0.5 text-[10px] font-semibold text-[#16a34a]">
-                          ✓ 通过
+                        <span className="inline-flex items-center rounded-sm bg-[#dcfce7] px-1.5 py-0.5 text-[10px] font-semibold text-[#16a34a]">
+                          通过
                         </span>
                       )}
                     </div>
