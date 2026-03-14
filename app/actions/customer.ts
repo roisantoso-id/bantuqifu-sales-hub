@@ -240,7 +240,7 @@ export async function createCustomerAction(data: {
           wechat: data.wechat ?? null,
           level: data.level ?? 'L5',
           passportNo: data.passportNo ?? null,
-          industry: data.industry ?? null,
+          industryId: data.industry ?? null,
           isLocked: false,
         },
       ])
