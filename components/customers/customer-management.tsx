@@ -51,6 +51,15 @@ export function CustomerManagement({ opportunities, actionLogs = {}, onCustomerC
   const [foreignFormOpen, setForeignFormOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [archivedIds, setArchivedIds] = useState<Set<string>>(new Set())
+
+  // 联系人管理
+  const [contacts, setContacts] = useState<{ id: string; name: string; title: string; phone: string; email: string; wechat: string }[]>([])
+  const [addContactOpen, setAddContactOpen] = useState(false)
+  const [newContact, setNewContact] = useState({ name: '', title: '', phone: '', email: '', wechat: '' })
+
+  // 跟进记录
+  const [localFollowups, setLocalFollowups] = useState<{ id: string; operatorName: string; remark: string; timestamp: string }[]>([])
+  const [newFollowup, setNewFollowup] = useState('')
   const [newCustomerForm, setNewCustomerForm] = useState({
     customerName: '',
     passportNo: '',
@@ -343,51 +352,222 @@ export function CustomerManagement({ opportunities, actionLogs = {}, onCustomerC
               )}
 
               {activeTab === 'followups' && (
-                <div className="p-4 space-y-3">
-                  {customerFollowups.length === 0 ? (
-                    <div className="py-8 text-center text-[12px] text-[#9ca3af]">暂无跟进记录</div>
-                  ) : (
-                    customerFollowups.map((log) => (
-                      <div key={log.id} className="flex gap-3 p-3 border border-[#e5e7eb] rounded-sm">
-                        <div className="w-2 h-2 mt-1.5 rounded-full bg-[#2563eb] shrink-0" />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[12px] font-medium text-[#111827]">{log.operatorName}</span>
-                            <span className="font-mono text-[11px] text-[#9ca3af]">
-                              {new Date(log.timestamp).toLocaleString('zh-CN')}
-                            </span>
+                <div className="flex flex-col h-full">
+                  {/* 新增跟进记录输入框 */}
+                  <div className="p-4 border-b border-[#e5e7eb] bg-[#fafbfc]">
+                    <div className="flex gap-2">
+                      <textarea
+                        value={newFollowup}
+                        onChange={(e) => setNewFollowup(e.target.value)}
+                        placeholder="记录本次跟进内容，如：客户态度积极，计划下周签合同..."
+                        rows={2}
+                        className="flex-1 resize-none rounded-sm border border-[#e5e7eb] bg-white p-2 text-[12px] placeholder-[#9ca3af] outline-none focus:border-[#2563eb]"
+                      />
+                      <button
+                        onClick={() => {
+                          if (!newFollowup.trim()) return
+                          setLocalFollowups(prev => [{
+                            id: `fu-${Date.now()}`,
+                            operatorName: '系统管理员',
+                            remark: newFollowup.trim(),
+                            timestamp: new Date().toISOString(),
+                          }, ...prev])
+                          setNewFollowup('')
+                        }}
+                        disabled={!newFollowup.trim()}
+                        className="h-[60px] px-3 rounded-sm bg-[#2563eb] text-[12px] font-medium text-white hover:bg-[#1d4ed8] disabled:bg-[#d1d5db] disabled:cursor-not-allowed whitespace-nowrap"
+                      >
+                        添加记录
+                      </button>
+                    </div>
+                  </div>
+                  {/* 记录列表 */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                    {[...localFollowups, ...customerFollowups].length === 0 ? (
+                      <div className="py-10 text-center text-[12px] text-[#9ca3af]">暂无跟进记录，在上方输入框添加第一条</div>
+                    ) : (
+                      [...localFollowups, ...customerFollowups].map((log) => (
+                        <div key={log.id} className="flex gap-3 p-3 border border-[#e5e7eb] rounded-sm hover:bg-[#fafbfc]">
+                          <div className="mt-1 w-2 h-2 rounded-full bg-[#2563eb] shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[12px] font-medium text-[#111827]">{log.operatorName}</span>
+                              <span className="font-mono text-[11px] text-[#9ca3af] shrink-0">
+                                {new Date(log.timestamp).toLocaleString('zh-CN')}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-[12px] text-[#6b7280] break-words">{log.remark || (log as any).actionLabel}</p>
                           </div>
-                          <div className="mt-1 text-[12px] text-[#6b7280]">{log.remark || log.actionLabel}</div>
                         </div>
-                      </div>
-                    ))
-                  )}
+                      ))
+                    )}
+                  </div>
                 </div>
               )}
 
               {activeTab === 'contacts' && (
-                <div className="p-4">
+                <div className="p-4 space-y-3">
+                  {/* 新增联系人按钮 */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[12px] font-medium text-[#6b7280]">
+                      共 {contacts.length + 1} 位联系人
+                    </span>
+                    <button
+                      onClick={() => setAddContactOpen(true)}
+                      className="flex h-7 items-center gap-1 rounded-sm bg-[#2563eb] px-2 text-[11px] font-medium text-white hover:bg-[#1d4ed8]"
+                    >
+                      <Plus size={12} />
+                      新增联系人
+                    </button>
+                  </div>
+
+                  {/* 默认联系人（来自客户数据） */}
                   <div className="p-4 border border-[#e5e7eb] rounded-sm">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-[#eff6ff] flex items-center justify-center text-[#2563eb] font-semibold">
-                        {selectedCustomer.contactName.charAt(0)}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-[#eff6ff] flex items-center justify-center text-[#2563eb] text-[13px] font-semibold">
+                          {selectedCustomer.contactName.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="text-[13px] font-semibold text-[#111827]">{selectedCustomer.contactName}</div>
+                          <div className="text-[11px] text-[#9ca3af]">主联系人 · 经理</div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="text-[13px] font-semibold text-[#111827]">{selectedCustomer.contactName}</div>
-                        <div className="text-[11px] text-[#6b7280]">经理</div>
-                      </div>
+                      <span className="px-1.5 py-0.5 rounded-sm bg-[#eff6ff] text-[#2563eb] text-[10px] font-semibold">主要</span>
                     </div>
-                    <div className="mt-3 space-y-1 text-[12px]">
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-[12px]">
                       <div className="flex items-center gap-2">
-                        <span className="text-[#9ca3af] w-12">电话</span>
+                        <span className="text-[#9ca3af] shrink-0">电话</span>
                         <span className="font-mono text-[#111827]">{selectedCustomer.phone || '-'}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[#9ca3af] w-12">邮箱</span>
-                        <span className="text-[#111827]">{selectedCustomer.email || '-'}</span>
+                        <span className="text-[#9ca3af] shrink-0">邮箱</span>
+                        <span className="text-[#111827] truncate">{selectedCustomer.email || '-'}</span>
                       </div>
                     </div>
                   </div>
+
+                  {/* 手动新增的联系人 */}
+                  {contacts.map((contact) => (
+                    <div key={contact.id} className="p-4 border border-[#e5e7eb] rounded-sm group">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-[#f3f4f6] flex items-center justify-center text-[#374151] text-[13px] font-semibold">
+                            {contact.name.charAt(0)}
+                          </div>
+                          <div>
+                            <div className="text-[13px] font-semibold text-[#111827]">{contact.name}</div>
+                            {contact.title && <div className="text-[11px] text-[#9ca3af]">{contact.title}</div>}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setContacts(prev => prev.filter(c => c.id !== contact.id))}
+                          className="opacity-0 group-hover:opacity-100 h-6 w-6 flex items-center justify-center rounded-sm text-[#9ca3af] hover:bg-[#fee2e2] hover:text-[#dc2626] transition-opacity"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-[12px]">
+                        {contact.phone && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[#9ca3af] shrink-0">电话</span>
+                            <span className="font-mono text-[#111827]">{contact.phone}</span>
+                          </div>
+                        )}
+                        {contact.email && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[#9ca3af] shrink-0">邮箱</span>
+                            <span className="text-[#111827] truncate">{contact.email}</span>
+                          </div>
+                        )}
+                        {contact.wechat && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[#9ca3af] shrink-0">微信</span>
+                            <span className="text-[#111827]">{contact.wechat}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* 新增联系人内联表单 */}
+                  {addContactOpen && (
+                    <div className="p-4 border-2 border-[#2563eb] border-dashed rounded-sm bg-[#f8faff] space-y-3">
+                      <p className="text-[12px] font-semibold text-[#2563eb]">新增联系人</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[11px] text-[#6b7280]">姓名 *</label>
+                          <input
+                            type="text"
+                            value={newContact.name}
+                            onChange={(e) => setNewContact(p => ({ ...p, name: e.target.value }))}
+                            placeholder="联系人姓名"
+                            className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] outline-none focus:border-[#2563eb]"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] text-[#6b7280]">职位</label>
+                          <input
+                            type="text"
+                            value={newContact.title}
+                            onChange={(e) => setNewContact(p => ({ ...p, title: e.target.value }))}
+                            placeholder="如：总经理"
+                            className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] outline-none focus:border-[#2563eb]"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] text-[#6b7280]">电话</label>
+                          <input
+                            type="text"
+                            value={newContact.phone}
+                            onChange={(e) => setNewContact(p => ({ ...p, phone: e.target.value }))}
+                            placeholder="+62 812-3456-7890"
+                            className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 font-mono text-[12px] outline-none focus:border-[#2563eb]"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] text-[#6b7280]">邮箱</label>
+                          <input
+                            type="email"
+                            value={newContact.email}
+                            onChange={(e) => setNewContact(p => ({ ...p, email: e.target.value }))}
+                            placeholder="email@example.com"
+                            className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] outline-none focus:border-[#2563eb]"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] text-[#6b7280]">微信号</label>
+                          <input
+                            type="text"
+                            value={newContact.wechat}
+                            onChange={(e) => setNewContact(p => ({ ...p, wechat: e.target.value }))}
+                            placeholder="微信号"
+                            className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] outline-none focus:border-[#2563eb]"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => { setAddContactOpen(false); setNewContact({ name: '', title: '', phone: '', email: '', wechat: '' }) }}
+                          className="flex-1 h-8 rounded-sm border border-[#e5e7eb] text-[12px] font-medium text-[#374151] hover:bg-white"
+                        >
+                          取消
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (!newContact.name.trim()) return
+                            setContacts(prev => [...prev, { id: `c-${Date.now()}`, ...newContact }])
+                            setAddContactOpen(false)
+                            setNewContact({ name: '', title: '', phone: '', email: '', wechat: '' })
+                          }}
+                          disabled={!newContact.name.trim()}
+                          className="flex-1 h-8 rounded-sm bg-[#2563eb] text-[12px] font-medium text-white hover:bg-[#1d4ed8] disabled:bg-[#d1d5db] disabled:cursor-not-allowed"
+                        >
+                          保存联系人
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
