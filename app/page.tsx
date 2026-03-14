@@ -277,6 +277,8 @@ export default function SalesHub() {
       )
     )
   }
+
+  return (
     <div className="flex h-screen overflow-hidden bg-white">
       {/* Pane 1 — primary nav (64px) */}
       <PrimarySidebar
