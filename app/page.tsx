@@ -334,20 +334,7 @@ export default function SalesHub() {
         </>
       ) : activeNav === 'customers' ? (
         <div className="flex-1 overflow-hidden">
-          <CustomerManagement
-            customers={opportunities.map((o) => ({
-              customerId: o.customerId,
-              customerName: o.customer.name,
-              contactName: mockUser.name,
-              phone: o.customer.phone,
-              email: o.customer.email,
-              level: 'A',
-              isLocked: false,
-            }))}
-            opportunities={opportunities}
-            leads={leads}
-            actionLogs={actionLogs}
-          />
+          <CustomerManagement />
         </div>
       ) : activeNav === 'analytics' ? (
         <div className="flex-1 overflow-hidden">

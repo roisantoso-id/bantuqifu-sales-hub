@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
 import { generateBizId } from '@/lib/utils/id-generator'
 
@@ -215,7 +215,8 @@ export async function createCustomerAction(data: {
   level?: string
   passportNo?: string | null
 }): Promise<CustomerRow | null> {
-  const supabase = await createClient()
+  // 写操作使用 service_role 绕过 RLS
+  const supabase = await createServiceClient()
   const tenantId = await getCurrentTenantId()
 
   try {
