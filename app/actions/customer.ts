@@ -267,3 +267,262 @@ export async function createCustomerAction(data: {
     return null
   }
 }
+
+// ─── Types for Followups and Companies ───────────────────────────────────────
+
+export interface CustomerFollowupRow {
+  id: string
+  customerId: string
+  operatorId: string
+  operatorName: string
+  followupType: string
+  content: string
+  nextAction: string | null
+  nextActionDate: string | null
+  createdAt: string
+}
+
+export interface AssociatedCompanyRow {
+  id: string
+  customerId: string
+  companyType: 'domestic' | 'foreign'
+  companyName: string
+  registrationNo: string | null
+  country: string | null
+  createdAt: string
+}
+
+// ─── getCustomerFollowupsAction ──────────────────────────────────────────────
+
+export async function getCustomerFollowupsAction(customerId: string): Promise<CustomerFollowupRow[]> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  const { data, error } = await supabase
+    .from('customer_followups')
+    .select(`
+      id,
+      customerId,
+      operatorId,
+      followupType,
+      content,
+      nextAction,
+      nextActionDate,
+      createdAt,
+      users_auth!operatorId (name)
+    `)
+    .eq('organizationId', tenantId)
+    .eq('customerId', customerId)
+    .order('createdAt', { ascending: false })
+
+  if (error) {
+    console.error('[customer action] getFollowups error:', error.message)
+    return []
+  }
+
+  return (data ?? []).map((row: any) => ({
+    id: row.id,
+    customerId: row.customerId,
+    operatorId: row.operatorId,
+    operatorName: row.users_auth?.name ?? '未知用户',
+    followupType: row.followupType ?? 'general',
+    content: row.content,
+    nextAction: row.nextAction ?? null,
+    nextActionDate: row.nextActionDate ?? null,
+    createdAt: row.createdAt,
+  }))
+}
+
+// ─── addCustomerFollowupAction ───────────────────────────────────────────────
+
+export async function addCustomerFollowupAction(data: {
+  customerId: string
+  followupType?: string
+  content: string
+  nextAction?: string | null
+  nextActionDate?: string | null
+}): Promise<CustomerFollowupRow | null> {
+  const supabase = await createServiceClient()
+  const tenantId = await getCurrentTenantId()
+  const userId = await getCurrentUserId()
+
+  const { data: inserted, error } = await supabase
+    .from('customer_followups')
+    .insert([
+      {
+        organizationId: tenantId,
+        customerId: data.customerId,
+        operatorId: userId,
+        followupType: data.followupType ?? 'general',
+        content: data.content,
+        nextAction: data.nextAction ?? null,
+        nextActionDate: data.nextActionDate ?? null,
+      },
+    ])
+    .select(`
+      id,
+      customerId,
+      operatorId,
+      followupType,
+      content,
+      nextAction,
+      nextActionDate,
+      createdAt,
+      users_auth!operatorId (name)
+    `)
+    .single()
+
+  if (error) {
+    console.error('[customer action] addFollowup error:', error.message)
+    return null
+  }
+
+  return {
+    id: inserted.id,
+    customerId: inserted.customerId,
+    operatorId: inserted.operatorId,
+    operatorName: (inserted as any).users_auth?.name ?? '未知用户',
+    followupType: inserted.followupType ?? 'general',
+    content: inserted.content,
+    nextAction: inserted.nextAction ?? null,
+    nextActionDate: inserted.nextActionDate ?? null,
+    createdAt: inserted.createdAt,
+  }
+}
+
+// ─── getAssociatedCompaniesAction ────────────────────────────────────────────
+
+export async function getAssociatedCompaniesAction(customerId: string): Promise<AssociatedCompanyRow[]> {
+  const supabase = await createClient()
+
+  // 查询境外公司
+  const { data: foreignData, error: foreignError } = await supabase
+    .from('foreign_company_entities')
+    .select('id, customerId, companyName, registrationNo, country, createdAt')
+    .eq('customerId', customerId)
+    .order('createdAt', { ascending: false })
+
+  if (foreignError) {
+    console.error('[customer action] getAssociatedCompanies foreign error:', foreignError.message)
+  }
+
+  // 查询国内公司关联
+  const { data: domesticData, error: domesticError } = await supabase
+    .from('domestic_entity_associations')
+    .select('id, customerId, entityName, unifiedSocialCreditCode, createdAt')
+    .eq('customerId', customerId)
+    .order('createdAt', { ascending: false })
+
+  if (domesticError) {
+    console.error('[customer action] getAssociatedCompanies domestic error:', domesticError.message)
+  }
+
+  const companies: AssociatedCompanyRow[] = []
+
+  // 合并境外公司
+  for (const row of foreignData ?? []) {
+    companies.push({
+      id: row.id,
+      customerId: row.customerId,
+      companyType: 'foreign',
+      companyName: row.companyName,
+      registrationNo: row.registrationNo ?? null,
+      country: row.country ?? null,
+      createdAt: row.createdAt,
+    })
+  }
+
+  // 合并国内公司
+  for (const row of domesticData ?? []) {
+    companies.push({
+      id: row.id,
+      customerId: row.customerId,
+      companyType: 'domestic',
+      companyName: row.entityName,
+      registrationNo: row.unifiedSocialCreditCode ?? null,
+      country: 'CN',
+      createdAt: row.createdAt,
+    })
+  }
+
+  // 按创建时间排序
+  return companies.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+}
+
+// ─── addAssociatedCompanyAction ──────────────────────────────────────────────
+
+export async function addAssociatedCompanyAction(data: {
+  customerId: string
+  companyType: 'domestic' | 'foreign'
+  companyName: string
+  registrationNo?: string | null
+  country?: string | null
+}): Promise<AssociatedCompanyRow | null> {
+  const supabase = await createServiceClient()
+
+  if (data.companyType === 'foreign') {
+    const { data: inserted, error } = await supabase
+      .from('foreign_company_entities')
+      .insert([
+        {
+          customerId: data.customerId,
+          companyName: data.companyName,
+          registrationNo: data.registrationNo ?? null,
+          country: data.country ?? 'ID',
+        },
+      ])
+      .select()
+      .single()
+
+    if (error) {
+      console.error('[customer action] addForeignCompany error:', error.message)
+      return null
+    }
+
+    return {
+      id: inserted.id,
+      customerId: inserted.customerId,
+      companyType: 'foreign',
+      companyName: inserted.companyName,
+      registrationNo: inserted.registrationNo ?? null,
+      country: inserted.country ?? null,
+      createdAt: inserted.createdAt,
+    }
+  } else {
+    const { data: inserted, error } = await supabase
+      .from('domestic_entity_associations')
+      .insert([
+        {
+          customerId: data.customerId,
+          entityName: data.companyName,
+          unifiedSocialCreditCode: data.registrationNo ?? null,
+        },
+      ])
+      .select()
+      .single()
+
+    if (error) {
+      console.error('[customer action] addDomesticCompany error:', error.message)
+      return null
+    }
+
+    return {
+      id: inserted.id,
+      customerId: inserted.customerId,
+      companyType: 'domestic',
+      companyName: inserted.entityName,
+      registrationNo: inserted.unifiedSocialCreditCode ?? null,
+      country: 'CN',
+      createdAt: inserted.createdAt,
+    }
+  }
+}
+
+// ─── getCurrentUserId helper ─────────────────────────────────────────────────
+
+async function getCurrentUserId(): Promise<string> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  return user.id
+}

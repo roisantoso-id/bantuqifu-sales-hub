@@ -1,14 +1,21 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { Search, Plus, Edit2, Archive, ChevronRight, Lock, Users, RefreshCw } from 'lucide-react'
+import { Search, Plus, Edit2, Archive, ChevronRight, Lock, Users, RefreshCw, X, Building2, Phone, MessageSquare, Mail, Calendar, Globe } from 'lucide-react'
 import { CUSTOMER_LEVELS } from '@/lib/types'
 import {
   getCustomersAction,
   getCustomerDetailAction,
+  createCustomerAction,
+  getCustomerFollowupsAction,
+  addCustomerFollowupAction,
+  getAssociatedCompaniesAction,
+  addAssociatedCompanyAction,
   type CustomerRow,
   type CustomerOpportunityRow,
   type CustomerActionLogRow,
+  type CustomerFollowupRow,
+  type AssociatedCompanyRow,
 } from '@/app/actions/customer'
 
 interface CustomerManagementProps {
@@ -70,7 +77,26 @@ export function CustomerManagement({ onSelectCustomer }: CustomerManagementProps
   const [detailLoading, setDetailLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedLevel, setSelectedLevel] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'opportunities' | 'followups'>('opportunities')
+  const [activeTab, setActiveTab] = useState<'opportunities' | 'followups' | 'companies'>('opportunities')
+
+  // ── Followups state ──
+  const [followups, setFollowups] = useState<CustomerFollowupRow[]>([])
+  const [followupsLoading, setFollowupsLoading] = useState(false)
+  const [showAddFollowup, setShowAddFollowup] = useState(false)
+  const [newFollowupForm, setNewFollowupForm] = useState({ content: '', followupType: 'general', nextAction: '', nextActionDate: '' })
+  const [addingFollowup, setAddingFollowup] = useState(false)
+
+  // ── Associated Companies state ──
+  const [companies, setCompanies] = useState<AssociatedCompanyRow[]>([])
+  const [companiesLoading, setCompaniesLoading] = useState(false)
+  const [showAddCompany, setShowAddCompany] = useState(false)
+  const [newCompanyForm, setNewCompanyForm] = useState({ companyName: '', companyType: 'foreign' as 'domestic' | 'foreign', registrationNo: '', country: 'ID' })
+  const [addingCompany, setAddingCompany] = useState(false)
+
+  // ── Create customer modal ──
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [createForm, setCreateForm] = useState({ customerName: '', phone: '', email: '', wechat: '', level: 'L5' })
+  const [creating, setCreating] = useState(false)
 
   useEffect(() => {
     setListLoading(true)
@@ -84,6 +110,8 @@ export function CustomerManagement({ onSelectCustomer }: CustomerManagementProps
     setSelectedCustomer(customer)
     setActiveTab('opportunities')
     setDetailLoading(true)
+    setFollowups([])
+    setCompanies([])
     try {
       const detail = await getCustomerDetailAction(customer.id)
       if (detail) {
@@ -94,6 +122,113 @@ export function CustomerManagement({ onSelectCustomer }: CustomerManagementProps
       console.error('[v0] customer detail error:', err)
     } finally {
       setDetailLoading(false)
+    }
+  }
+
+  // ── Load followups when tab switches ──
+  const loadFollowups = async () => {
+    if (!selectedCustomer) return
+    setFollowupsLoading(true)
+    try {
+      const data = await getCustomerFollowupsAction(selectedCustomer.id)
+      setFollowups(data)
+    } catch (err) {
+      console.error('[v0] load followups error:', err)
+    } finally {
+      setFollowupsLoading(false)
+    }
+  }
+
+  // ── Load companies when tab switches ──
+  const loadCompanies = async () => {
+    if (!selectedCustomer) return
+    setCompaniesLoading(true)
+    try {
+      const data = await getAssociatedCompaniesAction(selectedCustomer.id)
+      setCompanies(data)
+    } catch (err) {
+      console.error('[v0] load companies error:', err)
+    } finally {
+      setCompaniesLoading(false)
+    }
+  }
+
+  // ── Handle tab change ──
+  const handleTabChange = (tab: 'opportunities' | 'followups' | 'companies') => {
+    setActiveTab(tab)
+    if (tab === 'followups' && followups.length === 0) loadFollowups()
+    if (tab === 'companies' && companies.length === 0) loadCompanies()
+  }
+
+  // ── Add followup handler ──
+  const handleAddFollowup = async () => {
+    if (!selectedCustomer || !newFollowupForm.content.trim()) return
+    setAddingFollowup(true)
+    try {
+      const result = await addCustomerFollowupAction({
+        customerId: selectedCustomer.id,
+        followupType: newFollowupForm.followupType,
+        content: newFollowupForm.content.trim(),
+        nextAction: newFollowupForm.nextAction || null,
+        nextActionDate: newFollowupForm.nextActionDate || null,
+      })
+      if (result) {
+        setFollowups((prev) => [result, ...prev])
+        setNewFollowupForm({ content: '', followupType: 'general', nextAction: '', nextActionDate: '' })
+        setShowAddFollowup(false)
+      }
+    } catch (err) {
+      console.error('[v0] add followup error:', err)
+    } finally {
+      setAddingFollowup(false)
+    }
+  }
+
+  // ── Add company handler ──
+  const handleAddCompany = async () => {
+    if (!selectedCustomer || !newCompanyForm.companyName.trim()) return
+    setAddingCompany(true)
+    try {
+      const result = await addAssociatedCompanyAction({
+        customerId: selectedCustomer.id,
+        companyType: newCompanyForm.companyType,
+        companyName: newCompanyForm.companyName.trim(),
+        registrationNo: newCompanyForm.registrationNo || null,
+        country: newCompanyForm.country || null,
+      })
+      if (result) {
+        setCompanies((prev) => [result, ...prev])
+        setNewCompanyForm({ companyName: '', companyType: 'foreign', registrationNo: '', country: 'ID' })
+        setShowAddCompany(false)
+      }
+    } catch (err) {
+      console.error('[v0] add company error:', err)
+    } finally {
+      setAddingCompany(false)
+    }
+  }
+
+  // ── Create customer handler ──
+  const handleCreateCustomer = async () => {
+    if (!createForm.customerName.trim()) return
+    setCreating(true)
+    try {
+      const result = await createCustomerAction({
+        customerName: createForm.customerName.trim(),
+        phone: createForm.phone || null,
+        email: createForm.email || null,
+        wechat: createForm.wechat || null,
+        level: createForm.level,
+      })
+      if (result) {
+        setCustomers((prev) => [result, ...prev])
+        setCreateForm({ customerName: '', phone: '', email: '', wechat: '', level: 'L5' })
+        setShowCreateModal(false)
+      }
+    } catch (err) {
+      console.error('[v0] create customer error:', err)
+    } finally {
+      setCreating(false)
     }
   }
 
@@ -169,7 +304,7 @@ export function CustomerManagement({ onSelectCustomer }: CustomerManagementProps
           })}
         </div>
         <div className="p-3 border-t border-[#e5e7eb]">
-          <button className="w-full flex items-center justify-center gap-1.5 h-8 rounded-sm bg-[#2563eb] text-[12px] font-medium text-white hover:bg-[#1d4ed8]"><Plus size={13} />新增客户</button>
+          <button onClick={() => setShowCreateModal(true)} className="w-full flex items-center justify-center gap-1.5 h-8 rounded-sm bg-[#2563eb] text-[12px] font-medium text-white hover:bg-[#1d4ed8]"><Plus size={13} />新增客户</button>
         </div>
       </div>
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -244,8 +379,12 @@ export function CustomerManagement({ onSelectCustomer }: CustomerManagementProps
               </div>
             </div>
             <div className="h-10 border-b border-[#e5e7eb] flex">
-              {[{ id: 'opportunities' as const, label: '关联商机', count: detailOpportunities.length }, { id: 'followups' as const, label: '跟进记录', count: detailLogs.length }].map((tab) => (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-4 h-full text-[12px] font-medium border-b-2 transition-colors ${activeTab === tab.id ? 'text-[#2563eb] border-[#2563eb]' : 'text-[#6b7280] border-transparent hover:text-[#111827]'}`}>{tab.label} ({tab.count})</button>
+              {[
+                { id: 'opportunities' as const, label: '关联商机', count: detailOpportunities.length },
+                { id: 'followups' as const, label: '跟进记录', count: followups.length },
+                { id: 'companies' as const, label: '关联公司', count: companies.length },
+              ].map((tab) => (
+                <button key={tab.id} onClick={() => handleTabChange(tab.id)} className={`px-4 h-full text-[12px] font-medium border-b-2 transition-colors ${activeTab === tab.id ? 'text-[#2563eb] border-[#2563eb]' : 'text-[#6b7280] border-transparent hover:text-[#111827]'}`}>{tab.label} ({tab.count})</button>
               ))}
             </div>
             <div className="flex-1 overflow-y-auto">
@@ -266,26 +405,224 @@ export function CustomerManagement({ onSelectCustomer }: CustomerManagementProps
                     </tbody>
                   </table>
                 )
-              ) : (
-                detailLogs.length === 0 ? <div className="py-12 text-center text-[12px] text-[#9ca3af]">暂无跟进记录</div> : (
-                  <div className="p-4 space-y-3">
-                    {detailLogs.map((log) => (
-                      <div key={log.id} className="border border-[#e5e7eb] rounded-sm p-3">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-[12px] font-semibold text-[#111827]">{log.actionLabel}</span>
-                          <span className="font-mono text-[10px] text-[#9ca3af]">{new Date(log.timestamp).toLocaleString('zh-CN')}</span>
-                        </div>
-                        {log.remark && <p className="text-[12px] text-[#374151]">{log.remark}</p>}
-                        {log.stageId && <span className={`mt-1 inline-block px-1.5 py-0.5 rounded-sm text-[10px] font-semibold ${stageColors[log.stageId] ?? 'bg-slate-100 text-slate-600'}`}>{log.stageId}</span>}
-                      </div>
-                    ))}
+              ) : activeTab === 'followups' ? (
+                /* ── 跟进记录 Tab ── */
+                <div className="flex flex-col h-full">
+                  <div className="p-3 border-b border-[#e5e7eb] bg-[#fafbfc]">
+                    <button onClick={() => setShowAddFollowup(true)} className="flex items-center gap-1.5 h-8 px-3 rounded-sm bg-[#2563eb] text-[12px] font-medium text-white hover:bg-[#1d4ed8]">
+                      <Plus size={13} /> 添加跟进
+                    </button>
                   </div>
-                )
+                  {followupsLoading ? <DetailSkeleton /> : followups.length === 0 ? (
+                    <div className="py-12 text-center text-[12px] text-[#9ca3af]">暂无跟进记录，点击上方按钮添加</div>
+                  ) : (
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                      {followups.map((f) => (
+                        <div key={f.id} className="border border-[#e5e7eb] rounded-sm p-3 hover:shadow-sm transition-shadow">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className={`px-1.5 py-0.5 rounded-sm text-[10px] font-medium ${f.followupType === 'call' ? 'bg-green-100 text-green-700' : f.followupType === 'visit' ? 'bg-blue-100 text-blue-700' : f.followupType === 'meeting' ? 'bg-violet-100 text-violet-700' : f.followupType === 'email' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                                {f.followupType === 'call' ? '电话' : f.followupType === 'visit' ? '拜访' : f.followupType === 'meeting' ? '会议' : f.followupType === 'email' ? '邮件' : '一般'}
+                              </span>
+                              <span className="text-[11px] text-[#6b7280]">{f.operatorName}</span>
+                            </div>
+                            <span className="font-mono text-[10px] text-[#9ca3af]">{new Date(f.createdAt).toLocaleString('zh-CN')}</span>
+                          </div>
+                          <p className="text-[12px] text-[#374151] leading-relaxed whitespace-pre-wrap">{f.content}</p>
+                          {f.nextAction && (
+                            <div className="mt-2 pt-2 border-t border-[#f3f4f6]">
+                              <span className="text-[11px] text-[#9ca3af]">下一步: </span>
+                              <span className="text-[11px] text-[#111827]">{f.nextAction}</span>
+                              {f.nextActionDate && <span className="ml-2 font-mono text-[10px] text-[#6b7280]">{new Date(f.nextActionDate).toLocaleDateString('zh-CN')}</span>}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* ── 关联公司 Tab ── */
+                <div className="flex flex-col h-full">
+                  <div className="p-3 border-b border-[#e5e7eb] bg-[#fafbfc]">
+                    <button onClick={() => setShowAddCompany(true)} className="flex items-center gap-1.5 h-8 px-3 rounded-sm bg-[#2563eb] text-[12px] font-medium text-white hover:bg-[#1d4ed8]">
+                      <Plus size={13} /> 新增关联公司
+                    </button>
+                  </div>
+                  {companiesLoading ? <DetailSkeleton /> : companies.length === 0 ? (
+                    <div className="py-12 text-center text-[12px] text-[#9ca3af]">暂无关联公司，点击上方按钮添加</div>
+                  ) : (
+                    <div className="flex-1 overflow-y-auto">
+                      <table className="w-full text-[12px]">
+                        <thead>
+                          <tr className="border-b border-[#e5e7eb] bg-[#f9fafb] text-[11px] text-[#6b7280]">
+                            <th className="px-4 py-2 text-left font-semibold">公司名称</th>
+                            <th className="px-4 py-2 text-left font-semibold">类型</th>
+                            <th className="px-4 py-2 text-left font-semibold">注册号</th>
+                            <th className="px-4 py-2 text-left font-semibold">国家/地区</th>
+                            <th className="px-4 py-2 text-left font-semibold">添加时间</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#f3f4f6]">
+                          {companies.map((c) => (
+                            <tr key={c.id} className="hover:bg-[#f9fafb]">
+                              <td className="px-4 py-2 font-medium text-[#111827]">{c.companyName}</td>
+                              <td className="px-4 py-2">
+                                <span className={`px-1.5 py-0.5 rounded-sm text-[10px] font-medium ${c.companyType === 'domestic' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                                  {c.companyType === 'domestic' ? '国内' : '境外'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2 font-mono text-[11px] text-[#6b7280]">{c.registrationNo ?? '—'}</td>
+                              <td className="px-4 py-2 text-[11px] text-[#6b7280]">{c.country ?? '—'}</td>
+                              <td className="px-4 py-2 font-mono text-[10px] text-[#9ca3af]">{new Date(c.createdAt).toLocaleDateString('zh-CN')}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
         )}
       </div>
+
+      {/* ── 新增客户 Modal ── */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-[420px] bg-white rounded-sm shadow-lg">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[#e5e7eb]">
+              <h3 className="text-[14px] font-semibold text-[#111827]">新增客户</h3>
+              <button onClick={() => setShowCreateModal(false)} className="text-[#9ca3af] hover:text-[#111827]"><X size={16} /></button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="block text-[12px] text-[#6b7280] mb-1">客户名称 *</label>
+                <input type="text" value={createForm.customerName} onChange={(e) => setCreateForm((f) => ({ ...f, customerName: e.target.value }))} className="w-full h-8 px-2 text-[12px] border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb]" placeholder="请输入客户名称" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[12px] text-[#6b7280] mb-1">电话</label>
+                  <input type="text" value={createForm.phone} onChange={(e) => setCreateForm((f) => ({ ...f, phone: e.target.value }))} className="w-full h-8 px-2 text-[12px] font-mono border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb]" placeholder="手机号" />
+                </div>
+                <div>
+                  <label className="block text-[12px] text-[#6b7280] mb-1">微信</label>
+                  <input type="text" value={createForm.wechat} onChange={(e) => setCreateForm((f) => ({ ...f, wechat: e.target.value }))} className="w-full h-8 px-2 text-[12px] font-mono border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb]" placeholder="微信号" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[12px] text-[#6b7280] mb-1">邮箱</label>
+                <input type="text" value={createForm.email} onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))} className="w-full h-8 px-2 text-[12px] border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb]" placeholder="email@example.com" />
+              </div>
+              <div>
+                <label className="block text-[12px] text-[#6b7280] mb-1">客户等级</label>
+                <select value={createForm.level} onChange={(e) => setCreateForm((f) => ({ ...f, level: e.target.value }))} className="w-full h-8 px-2 text-[12px] border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb] bg-white">
+                  {CUSTOMER_LEVELS.map((l) => (<option key={l.id} value={l.id}>{l.id} · {l.zh}</option>))}
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 px-4 py-3 border-t border-[#e5e7eb]">
+              <button onClick={() => setShowCreateModal(false)} className="h-8 px-3 text-[12px] text-[#6b7280] hover:text-[#111827]">取消</button>
+              <button onClick={handleCreateCustomer} disabled={!createForm.customerName.trim() || creating} className="h-8 px-4 rounded-sm bg-[#2563eb] text-[12px] font-medium text-white hover:bg-[#1d4ed8] disabled:bg-[#d1d5db] disabled:cursor-not-allowed">{creating ? '创建中...' : '创建客户'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 添加跟进 Modal ── */}
+      {showAddFollowup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-[480px] bg-white rounded-sm shadow-lg">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[#e5e7eb]">
+              <h3 className="text-[14px] font-semibold text-[#111827]">添加跟进记录</h3>
+              <button onClick={() => setShowAddFollowup(false)} className="text-[#9ca3af] hover:text-[#111827]"><X size={16} /></button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="block text-[12px] text-[#6b7280] mb-1">跟进类型</label>
+                <div className="flex gap-2">
+                  {[{ id: 'general', label: '一般', icon: MessageSquare }, { id: 'call', label: '电话', icon: Phone }, { id: 'visit', label: '拜访', icon: Building2 }, { id: 'meeting', label: '会议', icon: Users }, { id: 'email', label: '邮件', icon: Mail }].map((t) => (
+                    <button key={t.id} onClick={() => setNewFollowupForm((f) => ({ ...f, followupType: t.id }))} className={`flex items-center gap-1 h-7 px-2 rounded-sm text-[11px] border ${newFollowupForm.followupType === t.id ? 'border-[#2563eb] bg-[#eff6ff] text-[#2563eb]' : 'border-[#e5e7eb] text-[#6b7280] hover:border-[#2563eb]'}`}>
+                      <t.icon size={12} /> {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-[12px] text-[#6b7280] mb-1">跟进内容 *</label>
+                <textarea value={newFollowupForm.content} onChange={(e) => setNewFollowupForm((f) => ({ ...f, content: e.target.value }))} rows={4} className="w-full px-2 py-1.5 text-[12px] border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb] resize-none" placeholder="记录本次跟进的详细内容..." />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[12px] text-[#6b7280] mb-1">下一步计划</label>
+                  <input type="text" value={newFollowupForm.nextAction} onChange={(e) => setNewFollowupForm((f) => ({ ...f, nextAction: e.target.value }))} className="w-full h-8 px-2 text-[12px] border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb]" placeholder="例如：发送报价单" />
+                </div>
+                <div>
+                  <label className="block text-[12px] text-[#6b7280] mb-1">计划日期</label>
+                  <input type="date" value={newFollowupForm.nextActionDate} onChange={(e) => setNewFollowupForm((f) => ({ ...f, nextActionDate: e.target.value }))} className="w-full h-8 px-2 text-[12px] border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb]" />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 px-4 py-3 border-t border-[#e5e7eb]">
+              <button onClick={() => setShowAddFollowup(false)} className="h-8 px-3 text-[12px] text-[#6b7280] hover:text-[#111827]">取消</button>
+              <button onClick={handleAddFollowup} disabled={!newFollowupForm.content.trim() || addingFollowup} className="h-8 px-4 rounded-sm bg-[#2563eb] text-[12px] font-medium text-white hover:bg-[#1d4ed8] disabled:bg-[#d1d5db] disabled:cursor-not-allowed">{addingFollowup ? '保存中...' : '保存记录'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 添加关联公司 Modal ── */}
+      {showAddCompany && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-[420px] bg-white rounded-sm shadow-lg">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[#e5e7eb]">
+              <h3 className="text-[14px] font-semibold text-[#111827]">新增关联公司</h3>
+              <button onClick={() => setShowAddCompany(false)} className="text-[#9ca3af] hover:text-[#111827]"><X size={16} /></button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="block text-[12px] text-[#6b7280] mb-1">公司类型</label>
+                <div className="flex gap-2">
+                  <button onClick={() => setNewCompanyForm((f) => ({ ...f, companyType: 'foreign' }))} className={`flex items-center gap-1 h-8 px-3 rounded-sm text-[12px] border ${newCompanyForm.companyType === 'foreign' ? 'border-[#2563eb] bg-[#eff6ff] text-[#2563eb]' : 'border-[#e5e7eb] text-[#6b7280] hover:border-[#2563eb]'}`}>
+                    <Globe size={13} /> 境外公司
+                  </button>
+                  <button onClick={() => setNewCompanyForm((f) => ({ ...f, companyType: 'domestic' }))} className={`flex items-center gap-1 h-8 px-3 rounded-sm text-[12px] border ${newCompanyForm.companyType === 'domestic' ? 'border-[#2563eb] bg-[#eff6ff] text-[#2563eb]' : 'border-[#e5e7eb] text-[#6b7280] hover:border-[#2563eb]'}`}>
+                    <Building2 size={13} /> 国内公司
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-[12px] text-[#6b7280] mb-1">公司名称 *</label>
+                <input type="text" value={newCompanyForm.companyName} onChange={(e) => setNewCompanyForm((f) => ({ ...f, companyName: e.target.value }))} className="w-full h-8 px-2 text-[12px] border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb]" placeholder="请输入公司全称" />
+              </div>
+              <div>
+                <label className="block text-[12px] text-[#6b7280] mb-1">{newCompanyForm.companyType === 'domestic' ? '统一社会信用代码' : '注册号'}</label>
+                <input type="text" value={newCompanyForm.registrationNo} onChange={(e) => setNewCompanyForm((f) => ({ ...f, registrationNo: e.target.value }))} className="w-full h-8 px-2 text-[12px] font-mono border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb]" placeholder={newCompanyForm.companyType === 'domestic' ? '91110000...' : 'Company Reg No.'} />
+              </div>
+              {newCompanyForm.companyType === 'foreign' && (
+                <div>
+                  <label className="block text-[12px] text-[#6b7280] mb-1">国家/地区</label>
+                  <select value={newCompanyForm.country} onChange={(e) => setNewCompanyForm((f) => ({ ...f, country: e.target.value }))} className="w-full h-8 px-2 text-[12px] border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb] bg-white">
+                    <option value="ID">印度尼西亚</option>
+                    <option value="SG">新加坡</option>
+                    <option value="MY">马来西亚</option>
+                    <option value="TH">泰国</option>
+                    <option value="VN">越南</option>
+                    <option value="PH">菲律宾</option>
+                    <option value="HK">香港</option>
+                    <option value="OTHER">其他</option>
+                  </select>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 px-4 py-3 border-t border-[#e5e7eb]">
+              <button onClick={() => setShowAddCompany(false)} className="h-8 px-3 text-[12px] text-[#6b7280] hover:text-[#111827]">取消</button>
+              <button onClick={handleAddCompany} disabled={!newCompanyForm.companyName.trim() || addingCompany} className="h-8 px-4 rounded-sm bg-[#2563eb] text-[12px] font-medium text-white hover:bg-[#1d4ed8] disabled:bg-[#d1d5db] disabled:cursor-not-allowed">{addingCompany ? '保存中...' : '保存公司'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
