@@ -1,7 +1,7 @@
 'use client'
 
 import { X, ClipboardList, Upload, FileText, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef, useMemo, useEffect } from 'react'
 import type { ActionLog, ActionType, StageId } from '@/lib/types'
 
 interface AuditRailProps {
@@ -53,13 +53,20 @@ function countLines(text: string): number {
 }
 
 export function AuditRail({ logs, opportunity, visible, onToggle, onAddNote }: AuditRailProps) {
-  // 如果不可见，不渲染
-  if (!visible) return null
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [inputValue, setInputValue] = useState('')
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // 客户端挂载后才显示时间，避免 hydration 不匹配
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // 如果不可见，不渲染
+  if (!visible) return null
 
   const sorted = [...logs].sort(
     (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
@@ -178,7 +185,7 @@ export function AuditRail({ logs, opportunity, visible, onToggle, onAddNote }: A
                         {log.actionLabel}
                       </span>
                       <span className="font-mono text-[10px] text-[#9ca3af] shrink-0 ml-auto">
-                        {date}
+                        {mounted ? date : '--/--'}
                       </span>
                     </div>
 
@@ -186,7 +193,7 @@ export function AuditRail({ logs, opportunity, visible, onToggle, onAddNote }: A
                     <div className="mt-0.5 flex items-center gap-1.5 text-[11px]">
                       <span className="text-[#6b7280] font-medium">{log.operatorName}</span>
                       <span className="text-[#d1d5db]">·</span>
-                      <span className="font-mono text-[#9ca3af]">{time}</span>
+                      <span className="font-mono text-[#9ca3af]">{mounted ? time : '--:--'}</span>
                     </div>
 
                     {/* Remark (with collapse/expand) */}
