@@ -153,7 +153,7 @@ export function WorkspacePane({
         )}
       </div>
 
-      {/* Footer action bar */}
+      {/* Footer action bar - Stage advance buttons */}
       {!isHistorical && (
         <div className="flex items-center justify-between border-t border-[#e5e7eb] bg-[#f9fafb] px-5 py-2">
           {['P1', 'P2', 'P3'].includes(viewingStage) && (
