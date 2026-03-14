@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, Plus, Edit2, Archive, Trash2, ChevronRight, Lock, Users } from 'lucide-react'
-import type { Opportunity, ActionLog } from '@/lib/types'
+import { Search, Plus, Edit2, Archive, Trash2, ChevronRight, Lock, Users, Building2, Globe, ExternalLink, X } from 'lucide-react'
+import type { Opportunity, ActionLog, ChinaEntity } from '@/lib/types'
+import { ChinaEntitySearchDialog } from './china-entity-search-dialog'
 
 import { CUSTOMER_LEVELS } from '@/lib/types'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -286,6 +287,7 @@ export function CustomerManagement({ opportunities, actionLogs = {}, onCustomerC
                 { id: 'opportunities', label: '关联商机', count: customerOpportunities.length },
                 { id: 'followups', label: '跟进记录', count: customerFollowups.length },
                 { id: 'contacts', label: '联系人', count: 1 },
+                { id: 'companies', label: '关联企业', count: chinaEntities.length + foreignEntities.length },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -385,6 +387,133 @@ export function CustomerManagement({ opportunities, actionLogs = {}, onCustomerC
                         <span className="text-[#111827]">{selectedCustomer.email || '-'}</span>
                       </div>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'companies' && (
+                <div className="p-4 space-y-6">
+                  {/* 中国境内企业 */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Building2 size={14} className="text-[#128BED]" />
+                        <span className="text-[13px] font-semibold text-[#111827]">中国境内企业</span>
+                        <span className="font-mono text-[11px] text-[#9ca3af]">via 天眼查</span>
+                      </div>
+                      <button
+                        onClick={() => setChinaEntityDialogOpen(true)}
+                        className="flex h-7 items-center gap-1 rounded-sm border border-[#128BED] bg-[#f0f9ff] px-2 text-[11px] font-medium text-[#128BED] hover:bg-[#e0f2fe]"
+                      >
+                        <Plus size={12} />
+                        搜索关联
+                      </button>
+                    </div>
+                    {chinaEntities.length === 0 ? (
+                      <div
+                        onClick={() => setChinaEntityDialogOpen(true)}
+                        className="flex cursor-pointer flex-col items-center justify-center rounded-sm border border-dashed border-[#d1d5db] bg-[#fafbfc] py-8 text-center hover:border-[#128BED] hover:bg-[#f0f9ff] transition-colors"
+                      >
+                        <Building2 size={20} className="mb-2 text-[#9ca3af]" />
+                        <p className="text-[12px] text-[#6b7280]">点击从天眼查搜索并关联</p>
+                        <p className="mt-1 text-[11px] text-[#9ca3af]">可关联多个国内主体</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {chinaEntities.map((entity: ChinaEntity) => (
+                          <div key={entity.id} className="rounded-sm border border-[#e5e7eb] border-l-4 border-l-[#128BED]">
+                            <div className="px-4 py-3">
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <p className="text-[13px] font-semibold text-[#111827]">{entity.companyName}</p>
+                                  <p className="mt-0.5 font-mono text-[11px] text-[#6b7280]">{entity.creditCode}</p>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className={`px-1.5 py-0.5 rounded-sm text-[10px] font-semibold ${
+                                    entity.status === '存续' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                  }`}>{entity.status}</span>
+                                  <a
+                                    href={`https://www.tianyancha.com/search?key=${entity.creditCode}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="h-6 w-6 flex items-center justify-center rounded-sm text-[#9ca3af] hover:bg-[#f3f4f6]"
+                                  >
+                                    <ExternalLink size={12} />
+                                  </a>
+                                  <button
+                                    onClick={() => setChinaEntities(prev => prev.filter(e => e.id !== entity.id))}
+                                    className="h-6 w-6 flex items-center justify-center rounded-sm text-[#9ca3af] hover:bg-[#fee2e2] hover:text-[#dc2626]"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+                                <div>
+                                  <span className="text-[#9ca3af]">法定代表人</span>
+                                  <p className="font-medium text-[#374151]">{entity.legalPerson}</p>
+                                </div>
+                                <div>
+                                  <span className="text-[#9ca3af]">注册资本</span>
+                                  <p className="font-mono font-medium text-[#374151]">{entity.regCapital}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border-t border-[#e5e7eb]" />
+
+                  {/* 其他国家企业 */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Globe size={14} className="text-[#6b7280]" />
+                        <span className="text-[13px] font-semibold text-[#111827]">其他国家企业</span>
+                        <span className="text-[11px] text-[#9ca3af]">手动录入</span>
+                      </div>
+                      <button
+                        onClick={() => setForeignFormOpen(true)}
+                        className="flex h-7 items-center gap-1 rounded-sm border border-[#e5e7eb] bg-white px-2 text-[11px] font-medium text-[#374151] hover:bg-[#f9fafb]"
+                      >
+                        <Plus size={12} />
+                        添加企业
+                      </button>
+                    </div>
+                    {foreignEntities.length === 0 ? (
+                      <div
+                        onClick={() => setForeignFormOpen(true)}
+                        className="flex cursor-pointer flex-col items-center justify-center rounded-sm border border-dashed border-[#d1d5db] bg-[#fafbfc] py-8 text-center hover:border-[#9ca3af] hover:bg-[#f9fafb] transition-colors"
+                      >
+                        <Globe size={20} className="mb-2 text-[#9ca3af]" />
+                        <p className="text-[12px] text-[#6b7280]">手动录入印尼、新加坡等海外企业信息</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {foreignEntities.map((entity: any) => (
+                          <div key={entity.id} className="rounded-sm border border-[#e5e7eb] px-4 py-3">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <p className="text-[13px] font-semibold text-[#111827]">{entity.companyName}</p>
+                                <p className="mt-0.5 text-[11px] text-[#6b7280]">{entity.country}</p>
+                              </div>
+                              <button
+                                onClick={() => setForeignEntities(prev => prev.filter(e => e.id !== entity.id))}
+                                className="h-6 w-6 flex items-center justify-center rounded-sm text-[#9ca3af] hover:bg-[#fee2e2] hover:text-[#dc2626]"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                            {entity.registrationNumber && (
+                              <p className="mt-1 font-mono text-[11px] text-[#6b7280]">{entity.registrationNumber}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -558,6 +687,114 @@ export function CustomerManagement({ opportunities, actionLogs = {}, onCustomerC
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* 天眼查搜索对话框 */}
+      <ChinaEntitySearchDialog
+        open={chinaEntityDialogOpen}
+        onOpenChange={setChinaEntityDialogOpen}
+        onSelect={(entity) => setChinaEntities(prev => [...prev, entity])}
+      />
+
+      {/* 海外企业表单 */}
+      <Sheet open={foreignFormOpen} onOpenChange={setForeignFormOpen}>
+        <SheetContent side="right" className="w-[400px]" aria-describedby={undefined}>
+          <SheetHeader>
+            <SheetTitle className="text-[14px] font-semibold">添加海外关联企业</SheetTitle>
+          </SheetHeader>
+          <ForeignEntityForm
+            onSave={(entity) => {
+              setForeignEntities(prev => [...prev, entity])
+              setForeignFormOpen(false)
+            }}
+            onCancel={() => setForeignFormOpen(false)}
+          />
+        </SheetContent>
+      </Sheet>
+    </div>
+  )
+}
+
+// 海外企业表单组件
+const COUNTRIES = ['印度尼西亚', '新加坡', '马来西亚', '香港', '泰国', '越南', '美国', '英国', '其他']
+
+function ForeignEntityForm({ onSave, onCancel }: { onSave: (entity: any) => void; onCancel: () => void }) {
+  const [form, setForm] = useState({
+    companyName: '',
+    country: '印度尼西亚',
+    registrationNumber: '',
+    legalPerson: '',
+    regCapital: '',
+  })
+
+  return (
+    <div className="mt-4 space-y-3">
+      <div>
+        <label className="text-[12px] font-medium text-[#6b7280]">企业全名 *</label>
+        <input
+          type="text"
+          value={form.companyName}
+          onChange={(e) => setForm(p => ({ ...p, companyName: e.target.value }))}
+          placeholder="PT. Example Indonesia"
+          className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] placeholder-[#9ca3af] outline-none focus:border-[#2563eb]"
+        />
+      </div>
+      <div>
+        <label className="text-[12px] font-medium text-[#6b7280]">注册国家 *</label>
+        <select
+          value={form.country}
+          onChange={(e) => setForm(p => ({ ...p, country: e.target.value }))}
+          className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] outline-none focus:border-[#2563eb]"
+        >
+          {COUNTRIES.map(c => <option key={c}>{c}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="text-[12px] font-medium text-[#6b7280]">注册号</label>
+        <input
+          type="text"
+          value={form.registrationNumber}
+          onChange={(e) => setForm(p => ({ ...p, registrationNumber: e.target.value }))}
+          placeholder="NIB: 8120000000000"
+          className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 font-mono text-[12px] placeholder-[#9ca3af] outline-none focus:border-[#2563eb]"
+        />
+      </div>
+      <div>
+        <label className="text-[12px] font-medium text-[#6b7280]">法定代表人</label>
+        <input
+          type="text"
+          value={form.legalPerson}
+          onChange={(e) => setForm(p => ({ ...p, legalPerson: e.target.value }))}
+          className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] outline-none focus:border-[#2563eb]"
+        />
+      </div>
+      <div>
+        <label className="text-[12px] font-medium text-[#6b7280]">注册资本</label>
+        <input
+          type="text"
+          value={form.regCapital}
+          onChange={(e) => setForm(p => ({ ...p, regCapital: e.target.value }))}
+          placeholder="IDR 1.000.000.000"
+          className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 font-mono text-[12px] placeholder-[#9ca3af] outline-none focus:border-[#2563eb]"
+        />
+      </div>
+      <div className="flex gap-2 border-t border-[#e5e7eb] pt-4">
+        <button
+          onClick={onCancel}
+          className="flex-1 h-8 rounded-sm border border-[#e5e7eb] text-[12px] font-medium text-[#374151] hover:bg-[#f9fafb]"
+        >
+          取消
+        </button>
+        <button
+          onClick={() => {
+            if (!form.companyName.trim()) return
+            onSave({ id: `FE-${Date.now()}`, ...form })
+          }}
+          disabled={!form.companyName.trim()}
+          className="flex-1 h-8 rounded-sm bg-[#2563eb] text-[12px] font-medium text-white hover:bg-[#1d4ed8] disabled:bg-[#d1d5db] disabled:cursor-not-allowed"
+        >
+          保存
+        </button>
+      </div>
     </div>
   )
 }
