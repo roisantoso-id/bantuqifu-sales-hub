@@ -188,7 +188,7 @@ export function CustomerManagement({ opportunities, actionLogs = {}, onCustomerC
         </div>
 
         {/* 客户列表 - 按等级分组 */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="scrollable-container high-density-list flex-1 overflow-y-auto">
           {CUSTOMER_LEVELS.filter((l) => !selectedLevel || l.id === selectedLevel).map((level) => {
             const levelCustomers = customersByLevel[level.id] || []
             if (levelCustomers.length === 0) return null
@@ -201,17 +201,20 @@ export function CustomerManagement({ opportunities, actionLogs = {}, onCustomerC
                 {levelCustomers.map((customer) => (
                   <div
                     key={customer.customerId}
+                    className="list-item"
                     onClick={() => setSelectedCustomer(customer)}
-                    className={`px-3 py-2 border-b border-[#f3f4f6] cursor-pointer hover:bg-[#f9fafb] ${
-                      selectedCustomer?.customerId === customer.customerId ? 'bg-[#eff6ff]' : ''
-                    }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-[12px] text-[#2563eb]">{customer.customerId}</span>
-                      {customer.isLocked && <Lock size={10} className="text-[#9ca3af]" />}
+                    <div
+                      className={`px-3 py-2 border-b border-[#f3f4f6] cursor-pointer hover:bg-[#f9fafb] ${
+                        selectedCustomer?.customerId === customer.customerId ? 'bg-[#eff6ff]' : ''
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-[12px] text-[#2563eb]">{customer.customerId}</span>
+                        {customer.isLocked && <Lock size={10} className="text-[#9ca3af]" />}
+                      </div>
+                      <div className="text-[12px] font-medium text-[#111827] truncate">{customer.customerName}</div>
                     </div>
-                    <div className="text-[12px] font-medium text-[#111827] truncate">{customer.customerName}</div>
-                  </div>
                 ))}
               </div>
             )

@@ -148,7 +148,7 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect }: Second
       </div>
 
       {/* List */}
-      <ul className="flex-1 overflow-y-auto">
+      <ul className="scrollable-container high-density-list flex-1 overflow-y-auto">
         {sorted.map((opp, idx) => {
           const isSelected = opp.id === selectedId
           const isPinned = pinnedIds.has(opp.id)
@@ -157,7 +157,7 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect }: Second
           // Divider between pinned and unpinned sections
           const showDivider = isPinned && idx === pinned.length - 1 && unpinned.length > 0
           return (
-            <li key={opp.id}>
+            <li key={opp.id} className="list-item">
               <button
                 onClick={() => onSelect(opp)}
                 onMouseEnter={() => setHoveredId(opp.id)}
