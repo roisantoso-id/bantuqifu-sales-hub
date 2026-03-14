@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
+import { generateBizId } from '@/lib/utils/id-generator'
 
 // ─── 租户隔离辅助 ─────────────────────────────────────────────────────────────
 
@@ -202,4 +203,66 @@ export async function getCustomerDetailAction(customerDbId: string): Promise<{
   }
 
   return { opportunities, actionLogs }
+}
+
+// ─── createCustomerAction ────────────────────────────────────────────────────
+
+export async function createCustomerAction(data: {
+  customerName: string
+  phone?: string | null
+  email?: string | null
+  wechat?: string | null
+  level?: string
+  passportNo?: string | null
+}): Promise<CustomerRow | null> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  try {
+    // 1. 生成语义化客户 ID
+    const customerId = await generateBizId('CUS') // 例如：CUS-260315-0001
+
+    // 2. 插入数据库
+    const { data: inserted, error } = await supabase
+      .from('customers')
+      .insert([
+        {
+          organizationId: tenantId,
+          customerId,
+          customerName: data.customerName,
+          phone: data.phone ?? null,
+          email: data.email ?? null,
+          wechat: data.wechat ?? null,
+          level: data.level ?? 'L5',
+          passportNo: data.passportNo ?? null,
+          isLocked: false,
+        },
+      ])
+      .select()
+      .single()
+
+    if (error) {
+      console.error('[customer action] createCustomer error:', error.message)
+      throw new Error(error.message)
+    }
+
+    return {
+      id: inserted.id,
+      customerId: inserted.customerId,
+      customerName: inserted.customerName,
+      phone: inserted.phone ?? null,
+      email: inserted.email ?? null,
+      wechat: inserted.wechat ?? null,
+      level: inserted.level ?? 'L5',
+      isLocked: inserted.isLocked ?? false,
+      passportNo: inserted.passportNo ?? null,
+      createdAt: inserted.createdAt,
+      opportunityCount: 0,
+      activeOpportunityCount: 0,
+      totalRevenue: 0,
+    }
+  } catch (error: any) {
+    console.error('[customer action] createCustomer caught error:', error)
+    return null
+  }
 }

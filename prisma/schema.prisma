@@ -700,3 +700,15 @@ model ActionLogAttachment {
   
   @@map("action_log_attachments")
 }
+
+// ════════════════════════════════════════════════════════════════════════════════
+// ── SYSTEM COUNTER (语义化 ID 生成计数器) ──────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════════
+
+model SystemCounter {
+  id        String   @id // 格式：OPP_20260315，CUS_20260315，LED_20260315
+  sequence  Int      @default(0)
+  updatedAt DateTime @updatedAt
+  
+  @@map("system_counters")
+}
