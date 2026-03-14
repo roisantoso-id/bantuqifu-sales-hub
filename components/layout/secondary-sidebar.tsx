@@ -10,23 +10,23 @@ interface SecondarySidebarProps {
   onSelect: (opp: Opportunity) => void
 }
 
-// 阶段颜色分组: P1-P4=黄, P5-P6=浅绿, P7=绿, P8=蓝
+// 阶段颜色分组: 使用单一灰色方案
 const STAGE_COLOR: Record<StageId, { bg: string; text: string; dot: string }> = {
-  P1: { bg: '#fef9c3', text: '#854d0e', dot: '#eab308' },
-  P2: { bg: '#fef9c3', text: '#854d0e', dot: '#eab308' },
-  P3: { bg: '#fef9c3', text: '#854d0e', dot: '#eab308' },
-  P4: { bg: '#fef9c3', text: '#854d0e', dot: '#eab308' },
-  P5: { bg: '#dcfce7', text: '#14532d', dot: '#4ade80' },
-  P6: { bg: '#dcfce7', text: '#14532d', dot: '#4ade80' },
-  P7: { bg: '#bbf7d0', text: '#14532d', dot: '#16a34a' },
-  P8: { bg: '#dbeafe', text: '#1e3a8a', dot: '#2563eb' },
+  P1: { bg: '#f3f4f6', text: '#374151', dot: '#9ca3af' },
+  P2: { bg: '#f3f4f6', text: '#374151', dot: '#9ca3af' },
+  P3: { bg: '#f3f4f6', text: '#374151', dot: '#9ca3af' },
+  P4: { bg: '#f3f4f6', text: '#374151', dot: '#9ca3af' },
+  P5: { bg: '#f3f4f6', text: '#374151', dot: '#9ca3af' },
+  P6: { bg: '#f3f4f6', text: '#374151', dot: '#9ca3af' },
+  P7: { bg: '#f3f4f6', text: '#374151', dot: '#9ca3af' },
+  P8: { bg: '#f3f4f6', text: '#374151', dot: '#9ca3af' },
 }
 
 const STAGE_GROUPS: { label: string; stages: StageId[]; activeColor: string; activeBg: string; inactiveBg: string; inactiveText: string }[] = [
-  { label: 'P1–P4', stages: ['P1', 'P2', 'P3', 'P4'], activeColor: '#ffffff', activeBg: '#d97706', inactiveBg: '#fef9c3', inactiveText: '#92400e' },
-  { label: 'P5–P6', stages: ['P5', 'P6'],              activeColor: '#ffffff', activeBg: '#16a34a', inactiveBg: '#dcfce7', inactiveText: '#14532d' },
-  { label: 'P7',    stages: ['P7'],                    activeColor: '#ffffff', activeBg: '#15803d', inactiveBg: '#bbf7d0', inactiveText: '#14532d' },
-  { label: 'P8',    stages: ['P8'],                    activeColor: '#ffffff', activeBg: '#2563eb', inactiveBg: '#dbeafe', inactiveText: '#1e3a8a' },
+  { label: 'P1–P4', stages: ['P1', 'P2', 'P3', 'P4'], activeColor: '#ffffff', activeBg: '#6b7280', inactiveBg: '#f3f4f6', inactiveText: '#6b7280' },
+  { label: 'P5–P6', stages: ['P5', 'P6'],              activeColor: '#ffffff', activeBg: '#6b7280', inactiveBg: '#f3f4f6', inactiveText: '#6b7280' },
+  { label: 'P7',    stages: ['P7'],                    activeColor: '#ffffff', activeBg: '#6b7280', inactiveBg: '#f3f4f6', inactiveText: '#6b7280' },
+  { label: 'P8',    stages: ['P8'],                    activeColor: '#ffffff', activeBg: '#6b7280', inactiveBg: '#f3f4f6', inactiveText: '#6b7280' },
 ]
 
 const SERVICE_BADGES: Record<string, string> = {
