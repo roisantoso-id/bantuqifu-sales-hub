@@ -1,11 +1,15 @@
 'use client'
 
 import { Send, FileText } from 'lucide-react'
-import type { Opportunity, SelectedProduct } from '@/lib/types'
+import { useState, useMemo } from 'react'
+import type { Opportunity, Product, OpportunityP3Data, Currency } from '@/lib/types'
+import { EXCHANGE_RATES } from '@/lib/mock-data'
 
 interface P3QuoteViewProps {
   opportunity: Opportunity
-  selectedProducts: SelectedProduct[]
+  allProducts: Product[]
+  p3Data: OpportunityP3Data[]
+  onP3DataChange: (data: OpportunityP3Data[]) => void
   onQuoteSent: () => void
 }
 
@@ -17,140 +21,228 @@ function formatDate(iso: string) {
   })
 }
 
-export function P3QuoteView({ opportunity, selectedProducts, onQuoteSent }: P3QuoteViewProps) {
-  const subtotal = selectedProducts.reduce((s, p) => s + p.subtotal, 0)
+export function P3QuoteView({
+  opportunity,
+  allProducts,
+  p3Data,
+  onP3DataChange,
+  onQuoteSent,
+}: P3QuoteViewProps) {
+  const [currentCurrency, setCurrentCurrency] = useState<Currency>('CNY')
+
+  const updatePrice = (productId: string, price: number) => {
+    onP3DataChange(
+      p3Data.map((item) =>
+        item.productId === productId ? { ...item, lockedPrice: price, currency: currentCurrency } : item
+      )
+    )
+  }
+
+  const updateCurrency = (productId: string, currency: Currency) => {
+    onP3DataChange(
+      p3Data.map((item) =>
+        item.productId === productId ? { ...item, currency } : item
+      )
+    )
+  }
+
+  const productMap = useMemo(() => {
+    return new Map(allProducts.map((p) => [p.id, p]))
+  }, [allProducts])
+
+  const displayData = useMemo(() => {
+    return p3Data.map((item) => ({
+      ...item,
+      product: productMap.get(item.productId),
+    }))
+  }, [p3Data, productMap])
+
+  const subtotal = useMemo(() => {
+    return displayData.reduce((sum, item) => {
+      const inCNY = item.lockedPrice / EXCHANGE_RATES[item.currency]
+      const inDisplayCurrency = inCNY * EXCHANGE_RATES[currentCurrency]
+      return sum + inDisplayCurrency
+    }, 0)
+  }, [displayData, currentCurrency])
+
   const tax = Math.round(subtotal * 0.06)
   const total = subtotal + tax
 
-  return (
-    <div className="space-y-5">
-      {/* Quote header card */}
-      <div className="rounded-sm border border-[#e5e7eb] bg-white p-4">
-        <div className="mb-3 flex items-start justify-between">
-          <div>
-            <h3 className="text-[14px] font-semibold text-[#111827]">服务报价单</h3>
-            <p className="font-mono text-[11px] text-[#9ca3af]">
-              QUO-{opportunity.id.replace('opp-', '').toUpperCase()}-{new Date().getFullYear()}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-[11px] text-[#9ca3af]">生成日期</p>
-            <p className="font-mono text-[12px] text-[#374151]">{formatDate(new Date().toISOString())}</p>
-          </div>
-        </div>
+  const formatPrice = (price: number, currency: Currency = currentCurrency) => {
+    const symbol = currency === 'CNY' ? '¥' : 'Rp'
+    return `${symbol}${Math.round(price).toLocaleString()}`
+  }
 
-        {/* Client & service summary */}
-        <div className="grid grid-cols-2 gap-x-6 gap-y-1 border-t border-[#e5e7eb] pt-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-[#9ca3af]">客户姓名</span>
-            <span className="text-[12px] font-medium text-[#111827]">{opportunity.customer.name}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-[#9ca3af]">护照号码</span>
-            <span className="font-mono text-[12px] text-[#374151]">{opportunity.customer.passportNo}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-[#9ca3af]">服务类型</span>
-            <span className="text-[12px] text-[#374151]">{opportunity.serviceTypeLabel}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-[#9ca3af]">目的地</span>
-            <span className="text-[12px] text-[#374151]">{opportunity.destination ?? '—'}</span>
-          </div>
-          {opportunity.travelDate && (
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] text-[#9ca3af]">出行日期</span>
-              <span className="font-mono text-[12px] text-[#374151]">
-                {formatDate(opportunity.travelDate)}
-              </span>
-            </div>
-          )}
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-[#9ca3af]">负责人</span>
-            <span className="text-[12px] text-[#374151]">{opportunity.assignee}</span>
-          </div>
+  const convertToDisplay = (price: number, fromCurrency: Currency) => {
+    if (fromCurrency === currentCurrency) return price
+    const inCNY = price / EXCHANGE_RATES[fromCurrency]
+    return inCNY * EXCHANGE_RATES[currentCurrency]
+  }
+
+  return (
+    <div className="flex h-full flex-col overflow-hidden">
+      {/* Header with Currency Toggle */}
+      <div className="border-b border-[#e5e7eb] px-4 py-2.5 flex items-center justify-between">
+        <h3 className="text-[13px] font-semibold text-[#111827]">P3: 报价单与币种</h3>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setCurrentCurrency('CNY')}
+            className={`rounded-sm px-2 py-1 text-[12px] font-medium transition-colors ${
+              currentCurrency === 'CNY'
+                ? 'bg-[#2563eb] text-white'
+                : 'bg-[#f3f4f6] text-[#6b7280] hover:bg-[#e5e7eb]'
+            }`}
+          >
+            RMB
+          </button>
+          <button
+            onClick={() => setCurrentCurrency('IDR')}
+            className={`rounded-sm px-2 py-1 text-[12px] font-medium transition-colors ${
+              currentCurrency === 'IDR'
+                ? 'bg-[#2563eb] text-white'
+                : 'bg-[#f3f4f6] text-[#6b7280] hover:bg-[#e5e7eb]'
+            }`}
+          >
+            IDR
+          </button>
         </div>
       </div>
 
-      {/* Line items */}
-      <div className="rounded-sm border border-[#e5e7eb] bg-white">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-[#e5e7eb]">
-              <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">
-                服务项目
-              </th>
-              <th className="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">
-                单价
-              </th>
-              <th className="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">
-                数量
-              </th>
-              <th className="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">
-                折扣
-              </th>
-              <th className="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">
-                小计
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {selectedProducts.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="py-6 text-center text-[12px] text-[#9ca3af]">
-                  暂无产品，请在 P2 阶段添加产品
-                </td>
-              </tr>
-            ) : (
-              selectedProducts.map((sp) => (
-                <tr key={sp.product.id} className="border-b border-[#f3f4f6]">
-                  <td className="px-3 py-2">
-                    <p className="text-[13px] text-[#111827]">{sp.product.name}</p>
-                    {sp.product.description && (
-                      <p className="text-[11px] text-[#9ca3af]">{sp.product.description}</p>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono text-[12px] text-[#374151]">
-                    ¥{sp.product.price.toLocaleString()}
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono text-[12px] text-[#374151]">
-                    {sp.quantity}
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono text-[12px] text-[#374151]">
-                    {sp.discount > 0 ? `${sp.discount}%` : '—'}
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono text-[12px] font-medium text-[#111827]">
-                    ¥{sp.subtotal.toLocaleString()}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      {/* Quote Content */}
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+        {/* Quote Header Card */}
+        <div className="rounded-sm border border-[#e5e7eb] bg-white p-3">
+          <div className="mb-2 flex items-start justify-between">
+            <div>
+              <h4 className="text-[13px] font-semibold text-[#111827]">服务报价单</h4>
+              <p className="font-mono text-[11px] text-[#9ca3af]">
+                QUO-{opportunity.id.replace('opp-', '').toUpperCase()}-{new Date().getFullYear()}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-[11px] text-[#9ca3af]">生成日期</p>
+              <p className="font-mono text-[12px] text-[#374151]">
+                {formatDate(new Date().toISOString())}
+              </p>
+            </div>
+          </div>
 
-        {/* Totals */}
-        {selectedProducts.length > 0 && (
-          <div className="border-t border-[#e5e7eb] px-3 py-2 space-y-1">
-            <div className="flex justify-between text-[12px]">
-              <span className="text-[#6b7280]">小计</span>
-              <span className="font-mono text-[#374151]">¥{subtotal.toLocaleString()}</span>
+          {/* Client Info */}
+          <div className="border-t border-[#e5e7eb] pt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[12px]">
+            <div className="flex justify-between">
+              <span className="text-[#9ca3af]">客户姓名</span>
+              <span className="font-medium text-[#111827]">{opportunity.customer.name}</span>
             </div>
-            <div className="flex justify-between text-[12px]">
-              <span className="text-[#6b7280]">税费 (6%)</span>
-              <span className="font-mono text-[#374151]">¥{tax.toLocaleString()}</span>
+            <div className="flex justify-between">
+              <span className="text-[#9ca3af]">护照号</span>
+              <span className="font-mono text-[#374151]">{opportunity.customer.passportNo}</span>
             </div>
-            <div className="flex justify-between border-t border-[#e5e7eb] pt-1.5 text-[13px] font-semibold">
-              <span className="text-[#111827]">总计</span>
-              <span className="font-mono text-[#111827]">¥{total.toLocaleString()}</span>
+            <div className="flex justify-between">
+              <span className="text-[#9ca3af]">服务类型</span>
+              <span className="text-[#374151]">{opportunity.serviceTypeLabel}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[#9ca3af]">目的地</span>
+              <span className="text-[#374151]">{opportunity.destination ?? '—'}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Line Items Table */}
+        {displayData.length === 0 ? (
+          <div className="flex items-center justify-center rounded-sm border border-[#e5e7eb] bg-white py-8 text-[13px] text-[#9ca3af]">
+            暂无产品，请在 P2 阶段添加产品
+          </div>
+        ) : (
+          <div className="rounded-sm border border-[#e5e7eb] bg-white overflow-hidden">
+            {/* Table Header */}
+            <div className="grid grid-cols-[1fr_100px_80px_80px] gap-2 border-b border-[#e5e7eb] bg-[#f9fafb] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">
+              <div>产品名</div>
+              <div className="text-right">单价</div>
+              <div className="text-right">币种</div>
+              <div className="text-right">小计</div>
+            </div>
+
+            {/* Table Rows */}
+            <div className="divide-y divide-[#f3f4f6]">
+              {displayData.map((item) => {
+                if (!item.product) return null
+                const displayPrice = convertToDisplay(item.lockedPrice, item.currency)
+
+                return (
+                  <div
+                    key={item.productId}
+                    className="grid grid-cols-[1fr_100px_80px_80px] gap-2 items-center px-3 py-1.5 text-[12px]"
+                  >
+                    {/* Product name */}
+                    <div className="text-[#111827] font-medium truncate">{item.product.name}</div>
+
+                    {/* Unit Price Input */}
+                    <div>
+                      <input
+                        type="number"
+                        value={item.lockedPrice}
+                        onChange={(e) => updatePrice(item.productId, parseFloat(e.target.value))}
+                        className="h-6 w-full rounded-sm border border-[#e5e7eb] px-1 font-mono text-[11px] text-[#111827] text-right outline-none focus:border-[#2563eb]"
+                      />
+                    </div>
+
+                    {/* Currency Select */}
+                    <div>
+                      <select
+                        value={item.currency}
+                        onChange={(e) => updateCurrency(item.productId, e.target.value as Currency)}
+                        className="h-6 w-full rounded-sm border border-[#e5e7eb] bg-white px-1 text-[11px] text-[#111827] outline-none focus:border-[#2563eb]"
+                      >
+                        <option value="CNY">RMB</option>
+                        <option value="IDR">IDR</option>
+                      </select>
+                    </div>
+
+                    {/* Subtotal */}
+                    <div className="font-mono text-right text-[#111827] font-medium">
+                      {formatPrice(displayPrice, currentCurrency)}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Totals */}
+            <div className="border-t border-[#e5e7eb] bg-[#f9fafb] px-3 py-1.5 space-y-1 text-[12px]">
+              <div className="flex justify-between">
+                <span className="text-[#6b7280]">小计</span>
+                <span className="font-mono text-[#111827]">{formatPrice(subtotal)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#6b7280]">税费 (6%)</span>
+                <span className="font-mono text-[#111827]">{formatPrice(tax)}</span>
+              </div>
+              <div className="flex justify-between border-t border-[#e5e7eb] pt-1 font-semibold">
+                <span className="text-[#111827]">总计</span>
+                <span className="font-mono text-[#111827]">{formatPrice(total)}</span>
+              </div>
             </div>
           </div>
         )}
+
+        {/* Approval Section */}
+        <div className="rounded-sm border border-[#e5e7eb] bg-white p-3">
+          <h4 className="text-[12px] font-semibold text-[#111827] mb-2">财务审核</h4>
+          <div className="space-y-1.5 text-[11px]">
+            <div className="flex items-center gap-2 rounded-sm bg-[#eff6ff] px-2 py-1.5 border border-[#bfdbfe]">
+              <span className="w-2 h-2 rounded-full bg-[#2563eb]" />
+              <span className="text-[#1e40af]">待提交审核</span>
+            </div>
+            <p className="text-[#9ca3af] italic">点击下方按钮提交报价供财务审核</p>
+          </div>
+        </div>
       </div>
 
-      {/* Actions */}
-      <div className="flex gap-2">
+      {/* Footer Actions */}
+      <div className="border-t border-[#e5e7eb] bg-[#f9fafb] px-4 py-2 flex gap-2">
         <button
-          className="flex h-8 items-center gap-1.5 rounded-sm border border-[#e5e7eb] bg-white px-3 text-[13px] text-[#374151] hover:bg-[#f9fafb]"
+          className="flex h-8 items-center gap-1.5 rounded-sm border border-[#e5e7eb] bg-white px-3 text-[13px] text-[#374151] hover:bg-white"
           aria-label="导出PDF"
         >
           <FileText size={14} />
@@ -159,10 +251,10 @@ export function P3QuoteView({ opportunity, selectedProducts, onQuoteSent }: P3Qu
         <button
           onClick={onQuoteSent}
           className="flex h-8 items-center gap-1.5 rounded-sm bg-[#2563eb] px-3 text-[13px] font-medium text-white hover:bg-[#1d4ed8]"
-          aria-label="发送报价"
+          aria-label="提交财务审核"
         >
           <Send size={13} />
-          发送报价
+          提交财务审核
         </button>
       </div>
     </div>

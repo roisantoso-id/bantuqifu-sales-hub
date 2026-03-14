@@ -1,7 +1,6 @@
 'use client'
 
-import { useState } from 'react'
-import type { Opportunity, Product, SelectedProduct, StageId, Currency } from '@/lib/types'
+import type { Opportunity, Product, StageId, OpportunityP2Data, OpportunityP3Data } from '@/lib/types'
 import { BreadcrumbStepper } from './breadcrumb-stepper'
 import { P1RequirementForm } from './p1-requirement-form'
 import { P2ProductMatcher } from './p2-product-matcher'
@@ -11,11 +10,9 @@ import { ChevronRight, Save } from 'lucide-react'
 interface WorkspaceProps {
   opportunity: Opportunity
   allProducts: Product[]
-  selectedProducts: SelectedProduct[]
   viewingStage: StageId
   onViewingStageChange: (stage: StageId) => void
   onOpportunityUpdate: (data: Partial<Opportunity>) => void
-  onProductsChange: (products: SelectedProduct[]) => void
   onSave: () => void
   onAdvanceStage: () => void
   onQuoteSent: () => void
@@ -31,22 +28,25 @@ const STAGE_NEXT_LABEL: Record<StageId, string> = {
 export function WorkspacePane({
   opportunity,
   allProducts,
-  selectedProducts,
   viewingStage,
   onViewingStageChange,
   onOpportunityUpdate,
-  onProductsChange,
   onSave,
   onAdvanceStage,
   onQuoteSent,
 }: WorkspaceProps) {
-  const [displayCurrency, setDisplayCurrency] = useState<Currency>(opportunity.currency as Currency || 'CNY')
-
   const isOnCurrentStage = viewingStage === opportunity.stageId
-  const isLast = opportunity.stageId === 'P3'
   const currentIdx = STAGE_ORDER[opportunity.stageId]
   const viewingIdx = STAGE_ORDER[viewingStage]
   const isHistorical = viewingIdx < currentIdx
+
+  const handleP2DataChange = (data: OpportunityP2Data[]) => {
+    onOpportunityUpdate({ p2Data: data })
+  }
+
+  const handleP3DataChange = (data: OpportunityP3Data[]) => {
+    onOpportunityUpdate({ p3Data: data })
+  }
 
   return (
     <div className="flex h-full flex-1 flex-col overflow-hidden bg-white">
@@ -87,23 +87,25 @@ export function WorkspacePane({
       )}
 
       {/* Stage content — scrollable */}
-      <div className="flex-1 overflow-y-auto px-5 py-4">
+      <div className="flex-1 overflow-hidden">
         {viewingStage === 'P1' && (
-          <P1RequirementForm opportunity={opportunity} onUpdate={onOpportunityUpdate} />
+          <div className="h-full overflow-y-auto px-5 py-4">
+            <P1RequirementForm opportunity={opportunity} onUpdate={onOpportunityUpdate} />
+          </div>
         )}
         {viewingStage === 'P2' && (
           <P2ProductMatcher
             allProducts={allProducts}
-            selectedProducts={selectedProducts}
-            currentCurrency={displayCurrency}
-            onProductsChange={onProductsChange}
-            onCurrencyChange={setDisplayCurrency}
+            selectedData={opportunity.p2Data || []}
+            onDataChange={handleP2DataChange}
           />
         )}
         {viewingStage === 'P3' && (
           <P3QuoteView
             opportunity={opportunity}
-            selectedProducts={selectedProducts}
+            allProducts={allProducts}
+            p3Data={opportunity.p3Data || []}
+            onP3DataChange={handleP3DataChange}
             onQuoteSent={onQuoteSent}
           />
         )}

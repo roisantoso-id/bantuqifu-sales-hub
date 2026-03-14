@@ -17,6 +17,17 @@ export interface Customer {
 // ─── Opportunity ─────────────────────────────────────────────────────────────
 export type OpportunityStatus = 'active' | 'won' | 'lost'
 
+export interface OpportunityP2Data {
+  productId: string
+  cycle?: string // 服务周期（如"1个月"、"12个月"）
+}
+
+export interface OpportunityP3Data {
+  productId: string
+  lockedPrice: number // 固定单价（财务阶段不可改）
+  currency: Currency // IDR or CNY
+}
+
 export interface Opportunity {
   id: string
   customerId: string
@@ -32,6 +43,8 @@ export interface Opportunity {
   destination?: string
   travelDate?: string
   assignee: string
+  p2Data?: OpportunityP2Data[] // P2阶段选中的产品
+  p3Data?: OpportunityP3Data[] // P3阶段的报价数据
   createdAt: string
   updatedAt: string
 }

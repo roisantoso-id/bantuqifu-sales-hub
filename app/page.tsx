@@ -6,7 +6,7 @@ import { SecondarySidebar } from '@/components/layout/secondary-sidebar'
 import { WorkspacePane } from '@/components/workspace/workspace-pane'
 import { AuditRail } from '@/components/audit-rail/audit-panel'
 import { mockOpportunities, mockProducts, mockActionLogs, mockUser } from '@/lib/mock-data'
-import type { Opportunity, NavSection, StageId, SelectedProduct, ActionLog } from '@/lib/types'
+import type { Opportunity, NavSection, StageId, ActionLog } from '@/lib/types'
 import { ClipboardList } from 'lucide-react'
 
 export default function SalesHub() {
@@ -14,7 +14,6 @@ export default function SalesHub() {
   const [opportunities, setOpportunities] = useState<Opportunity[]>(mockOpportunities)
   const [selectedId, setSelectedId] = useState<string>(mockOpportunities[0].id)
   const [viewingStage, setViewingStage] = useState<StageId>(mockOpportunities[0].stageId)
-  const [selectedProducts, setSelectedProducts] = useState<Record<string, SelectedProduct[]>>({})
   const [actionLogs, setActionLogs] = useState<Record<string, ActionLog[]>>(mockActionLogs)
   const [showAuditRail, setShowAuditRail] = useState(true)
 
@@ -22,11 +21,6 @@ export default function SalesHub() {
   const selectedOpportunity = useMemo(
     () => opportunities.find((o) => o.id === selectedId) ?? opportunities[0],
     [opportunities, selectedId]
-  )
-
-  const currentProducts = useMemo(
-    () => selectedProducts[selectedId] ?? [],
-    [selectedProducts, selectedId]
   )
 
   const currentLogs = useMemo(
@@ -64,10 +58,6 @@ export default function SalesHub() {
         o.id === selectedId ? { ...o, ...data, updatedAt: new Date().toISOString() } : o
       )
     )
-  }
-
-  const handleProductsChange = (products: SelectedProduct[]) => {
-    setSelectedProducts((prev) => ({ ...prev, [selectedId]: products }))
   }
 
   const handleSave = () => {
@@ -119,11 +109,9 @@ export default function SalesHub() {
       <WorkspacePane
         opportunity={selectedOpportunity}
         allProducts={mockProducts}
-        selectedProducts={currentProducts}
         viewingStage={viewingStage}
         onViewingStageChange={setViewingStage}
         onOpportunityUpdate={handleOpportunityUpdate}
-        onProductsChange={handleProductsChange}
         onSave={handleSave}
         onAdvanceStage={handleAdvanceStage}
         onQuoteSent={handleQuoteSent}
