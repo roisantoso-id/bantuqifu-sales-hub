@@ -1,0 +1,600 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// ── USER & PROFILE ────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════════
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?  @unique
+  role      String   @default("User") // "Admin", "Sales Manager", "Finance", etc.
+  company   String
+  avatar    String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  leads          Lead[]
+  opportunities  Opportunity[]
+  actionLogs     ActionLog[]
+  leadsAssigned  Lead[]         @relation("LeadAssignee")
+  oppAssigned    Opportunity[]  @relation("OpportunityAssignee")
+  
+  @@map("users")
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// ── LEAD ──────────────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════════
+
+enum LeadSource {
+  wechat
+  referral
+  facebook
+  website
+  cold_outreach
+}
+
+enum LeadStatus {
+  new
+  contacted
+  no_interest
+  ready_for_opportunity
+  discarded
+  public_pool
+}
+
+enum LeadUrgency {
+  HIGH    // 高
+  MEDIUM  // 中
+  LOW     // 低
+}
+
+enum LeadCategory {
+  VISA
+  COMPANY_REGISTRATION
+  FINANCIAL_SERVICES
+  PERMIT_SERVICES
+  TAX_SERVICES
+}
+
+enum DiscardReason {
+  NO_CONTACT
+  MISMATCH_NEEDS
+  LIMITED_SALES_CAPABILITY
+  OTHER
+}
+
+model Lead {
+  id                    String   @id @default(cuid())
+  leadCode              String   @unique @default(cuid()) // LEAD-系列ID
+  wechatName            String   // 微信名/称呼
+  phone                 String?
+  source                LeadSource
+  
+  // 业务画像
+  category              LeadCategory?
+  budgetMin             Float?    // 预算范围（最小）
+  budgetMax             Float?    // 预算范围（最大）
+  budgetCurrency        String    @default("CNY")
+  urgency               LeadUrgency @default(MEDIUM)
+  initialIntent         String    // 初步意向备注
+  
+  // 跟进逻辑
+  assigneeId            String?
+  assignee              User?     @relation("LeadAssignee", fields: [assigneeId], references: [id])
+  nextFollowDate        DateTime? // 下次跟进计划（关键字段）
+  lastActionAt          DateTime?
+  status                LeadStatus @default(new)
+  
+  // 丢弃逻辑
+  discardedAt           DateTime?
+  discardReason         DiscardReason?
+  discardedById         String?
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  notes                 String?
+  
+  // Relations
+  convertedOpportunityId String?
+  convertedOpportunity   Opportunity? @relation("LeadToOpportunity")
+  
+  @@index([status])
+  @@index([assigneeId])
+  @@index([discardedAt])
+  @@map("leads")
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// ── CUSTOMER ──────────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════════
+
+enum CustomerLevel {
+  L2 // 央企总部和龙头企业
+  L3 // 国有企业和上市公司
+  L4 // 非上市品牌公司
+  L5 // 中小型企业
+  L6 // 个人创业小公司
+}
+
+model Customer {
+  id              String   @id @default(cuid())
+  customerId      String   @unique // 客户编号
+  customerName    String
+  passportNo      String?
+  phone           String?
+  email           String?
+  wechat          String?
+  level           CustomerLevel @default(L5)
+  isLocked        Boolean  @default(false)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  opportunities   Opportunity[]
+  chinaEntities   DomesticEntityAssociation[]
+  foreignEntities ForeignCompanyEntity[]
+  contacts        CustomerContact[]
+  
+  @@map("customers")
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// ── CUSTOMER CONTACT ──────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════════
+
+model CustomerContact {
+  id            String   @id @default(cuid())
+  customerId    String
+  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  name          String
+  title         String?
+  phone         String?
+  email         String?
+  wechat        String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@map("customer_contacts")
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// ── DOMESTIC ENTITY (关联中国企业) ──────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════════
+
+enum ChinaEntityStatus {
+  OPERATING   // 存续
+  REVOKED     // 吊销
+  CANCELLED   // 注销
+}
+
+model DomesticEntity {
+  id                  String   @id @default(cuid())
+  creditCode          String   @unique // 统一社会信用代码
+  companyName         String
+  legalPerson         String?
+  regCapital          String?
+  businessScope       String?
+  status              ChinaEntityStatus
+  industry            String?
+  foundedDate         DateTime?
+  registrationLocation String?
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  // Relations
+  associations        DomesticEntityAssociation[]
+  
+  @@map("domestic_entities")
+}
+
+model DomesticEntityAssociation {
+  id                String   @id @default(cuid())
+  customerId        String
+  customer          Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  chinaEntityId     String
+  chinaEntity       DomesticEntity @relation(fields: [chinaEntityId], references: [id])
+  
+  businessMatch     String   @default("medium") // "high", "medium", "low"
+  riskLevel         String   @default("medium") // "low", "medium", "high"
+  notes             String?
+  associatedAt      DateTime @default(now())
+  
+  @@unique([customerId, chinaEntityId])
+  @@map("domestic_entity_associations")
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// ── FOREIGN COMPANY ENTITY ────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════════
+
+model ForeignCompanyEntity {
+  id                String   @id @default(cuid())
+  customerId        String
+  customer          Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  companyName       String
+  country           String
+  registrationNumber String?
+  legalPerson       String?
+  regCapital        String?
+  notes             String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@map("foreign_company_entities")
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// ── PRODUCT & SERVICE ─────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════════
+
+model Product {
+  id              String   @id @default(cuid())
+  productCode     String   @unique // zcrm_6302359000000489135
+  name            String
+  category        String   // "签证服务", "公司开办服务", etc.
+  price           Float
+  currency        String   @default("IDR")
+  description     String?
+  difficulty      Int      @default(1) // 1-5
+  billingCycles   String[] @default(["一次性"])
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  p2Data          OpportunityP2Data[]
+  p3Data          OpportunityP3Data[]
+  materials       MaterialItem[]
+  progressPoints  ProgressPoint[]
+  
+  @@map("products")
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// ── OPPORTUNITY ───────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════════
+
+enum ServiceType {
+  VISA
+  IMMIGRATION
+  STUDY
+  WORK
+}
+
+enum OpportunityStatus {
+  active
+  won
+  lost
+}
+
+model Opportunity {
+  id                      String   @id @default(cuid())
+  opportunityCode         String   @unique @default(cuid())
+  
+  customerId              String
+  customer                Customer @relation(fields: [customerId], references: [id])
+  
+  stageId                 String   @default("P1") // P1-P8
+  status                  OpportunityStatus @default(active)
+  serviceType             ServiceType
+  serviceTypeLabel        String
+  
+  estimatedAmount         Float
+  currency                String   @default("IDR")
+  requirements            String?
+  notes                   String?
+  destination             String?
+  travelDate              DateTime?
+  
+  assigneeId              String
+  assignee                User @relation("OpportunityAssignee", fields: [assigneeId], references: [id])
+  
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  
+  // Lead conversion
+  convertedFromLeadId     String?
+  convertedFromLead       Lead? @relation("LeadToOpportunity", fields: [convertedFromLeadId], references: [id])
+  
+  // Stage-specific data
+  p2Data                  OpportunityP2Data[]
+  p3Data                  OpportunityP3Data[]
+  p4Data                  OpportunityP4Data?
+  p5Data                  OpportunityP5Data?
+  p6Data                  OpportunityP6Data?
+  p7Data                  OpportunityP7Data?
+  p8Data                  OpportunityP8Data?
+  
+  // Relations
+  actionLogs              ActionLog[]
+  
+  @@index([customerId])
+  @@index([stageId])
+  @@index([assigneeId])
+  @@map("opportunities")
+}
+
+// ── P2 Data: 方案匹配 ──
+model OpportunityP2Data {
+  id                String   @id @default(cuid())
+  opportunityId     String
+  opportunity       Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  
+  productId         String
+  product           Product @relation(fields: [productId], references: [id])
+  
+  cycle             String? // 服务周期，如"1个月"、"12个月"
+  
+  @@map("opportunity_p2_data")
+}
+
+// ── P3 Data: 报价审核 ──
+model OpportunityP3Data {
+  id                String   @id @default(cuid())
+  opportunityId     String
+  opportunity       Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  
+  productId         String
+  product           Product @relation(fields: [productId], references: [id])
+  
+  quantity          Int      @default(1)
+  lockedPrice       Float
+  currency          String
+  recommendedPrice  Float?
+  costFloor         Float?
+  profitMargin      Float?
+  
+  approvalStatus    String   @default("auto-approved") // "auto-approved", "admin-required", "pending"
+  approvedAt        DateTime?
+  approvedById      String?
+  
+  @@map("opportunity_p3_data")
+}
+
+// ── P4 Data: 合同签署 ──
+model OpportunityP4Data {
+  id                String   @id @default(cuid())
+  opportunityId     String   @unique
+  opportunity       Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  
+  contractFileUrl   String?
+  contractStatus    String   @default("pending") // "pending", "returned", "archived"
+  uploadedAt        DateTime?
+  notes             String?
+  
+  @@map("opportunity_p4_data")
+}
+
+// ── P5 Data: 财务确认 ──
+model OpportunityP5Data {
+  id                String   @id @default(cuid())
+  opportunityId     String   @unique
+  opportunity       Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  
+  bankAccount       String?
+  bankName          String?
+  accountHolder     String?
+  swiftCode         String?
+  
+  dueAmount         Float
+  receivedAmount    Float @default(0)
+  receiptFileUrl    String?
+  receiptFileName   String?
+  receiptUploadedAt DateTime?
+  receiptUploadedBy String?
+  
+  paymentStatus     String   @default("pending") // "pending", "verified", "rejected"
+  rejectionReason   String?
+  confirmedAt       DateTime?
+  confirmedById     String?
+  
+  @@map("opportunity_p5_data")
+}
+
+// ── P6 Data: 材料提交 ──
+model OpportunityP6Data {
+  id                String   @id @default(cuid())
+  opportunityId     String   @unique
+  opportunity       Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  
+  lastUpdatedAt     DateTime?
+  materials         MaterialItem[]
+  
+  @@map("opportunity_p6_data")
+}
+
+model MaterialItem {
+  id                String   @id @default(cuid())
+  p6DataId          String
+  p6Data            OpportunityP6Data @relation(fields: [p6DataId], references: [id], onDelete: Cascade)
+  
+  productId         String?
+  product           Product? @relation(fields: [productId], references: [id])
+  
+  name              String   // 如 "护照首页"、"Kitap扫描件"
+  requirement       String?  // 要求说明
+  status            String   @default("missing") // "missing", "pending_review", "approved", "rejected"
+  
+  fileUrl           String?
+  fileName          String?
+  fileSize          Int?     // bytes
+  
+  ocrStatus         String   @default("pending") // "pending", "completed", "failed"
+  rejectionReason   String?
+  
+  uploadedAt        DateTime?
+  uploadedBy        String?
+  approvedAt        DateTime?
+  approvedBy        String?
+  
+  @@map("material_items")
+}
+
+// ── P7 Data: 交付完成 ──
+model OpportunityP7Data {
+  id                String   @id @default(cuid())
+  opportunityId     String   @unique
+  opportunity       Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  
+  finalDocumentUrl  String?
+  finalDocumentName String?
+  deliveryStatus    String   @default("in_transit") // "in_transit", "delivered"
+  deliveredAt       DateTime?
+  
+  notes             String?
+  progressPoints    ProgressPoint[]
+  completedAt       DateTime?
+  
+  @@map("opportunity_p7_data")
+}
+
+model ProgressPoint {
+  id                String   @id @default(cuid())
+  p7DataId          String
+  p7Data            OpportunityP7Data @relation(fields: [p7DataId], references: [id], onDelete: Cascade)
+  
+  productId         String?
+  product           Product? @relation(fields: [productId], references: [id])
+  
+  label             String   // 如 "移民局接收"、"正在审理"、"贴纸完成"
+  status            String   @default("pending") // "pending", "in_progress", "completed"
+  timestamp         DateTime?
+  
+  @@map("progress_points")
+}
+
+// ── P8 Data: 财务结算 ──
+model OpportunityP8Data {
+  id                String   @id @default(cuid())
+  opportunityId     String   @unique
+  opportunity       Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  
+  totalAmount       Float
+  paidAmount        Float    @default(0)
+  balanceDue        Float
+  balanceReceiptUrl String?
+  balanceReceivedAt DateTime?
+  balanceStatus     String   @default("pending") // "pending", "received", "partial"
+  
+  totalRefund       Float    @default(0)
+  totalExpense      Float    @default(0)
+  netBalance        Float
+  
+  profitMargin      Float?
+  settledAt         DateTime?
+  settledById       String?
+  archived          Boolean  @default(false)
+  notes             String?
+  
+  refunds           RefundItem[]
+  expenses          ExpenseItem[]
+  
+  @@map("opportunity_p8_data")
+}
+
+model RefundItem {
+  id                String   @id @default(cuid())
+  p8DataId          String
+  p8Data            OpportunityP8Data @relation(fields: [p8DataId], references: [id], onDelete: Cascade)
+  
+  serviceId         String   // 关联的产品ID
+  serviceName       String
+  originalAmount    Float
+  refundedAmount    Float
+  reason            String
+  
+  refundedAt        DateTime?
+  refundedBy        String?
+  receiptUrl        String?
+  
+  @@map("refund_items")
+}
+
+model ExpenseItem {
+  id                String   @id @default(cuid())
+  p8DataId          String
+  p8Data            OpportunityP8Data @relation(fields: [p8DataId], references: [id], onDelete: Cascade)
+  
+  description       String   // 事由
+  amount            Float
+  category          String   @default("other") // "gov-fee", "expedite", "travel", "other"
+  receiptUrl        String?
+  receiptFileName   String?
+  
+  createdBy         String
+  createdAt         DateTime @default(now())
+  approvedBy        String?
+  approvedAt        DateTime?
+  
+  @@map("expense_items")
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// ── ACTION LOG ────────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════════
+
+enum ActionType {
+  FORM
+  MATCH
+  STAGE_CHANGE
+  NOTE
+  QUOTE
+  CREATE
+}
+
+model ActionLog {
+  id                String   @id @default(cuid())
+  opportunityId     String
+  opportunity       Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  
+  operatorId        String
+  operator          User @relation(fields: [operatorId], references: [id])
+  
+  stageId           String?
+  actionType        ActionType
+  actionLabel       String
+  remark            String?
+  timestamp         DateTime @default(now())
+  
+  attachments       ActionLogAttachment[]
+  
+  @@index([opportunityId])
+  @@index([operatorId])
+  @@index([timestamp])
+  @@map("action_logs")
+}
+
+model ActionLogAttachment {
+  id                String   @id @default(cuid())
+  actionLogId       String
+  actionLog         ActionLog @relation(fields: [actionLogId], references: [id], onDelete: Cascade)
+  
+  fileName          String
+  fileSize          Int      // bytes
+  fileUrl           String
+  uploadedAt        DateTime @default(now())
+  
+  @@map("action_log_attachments")
+}
