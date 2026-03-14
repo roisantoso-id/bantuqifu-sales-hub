@@ -1,5 +1,14 @@
-// ─── Lead ────────────────────────────────────────────────────────────────────
-export type LeadSource = 'wechat' | 'referral' | 'facebook' | 'website' | 'cold_outreach'
+// ─── Customer Level ──────────────────────────────────────────────────────────
+export const CUSTOMER_LEVELS = [
+  { id: 'L1', zh: '央企总部和龙头企业', id_: 'BUMN Pusat & Perusahaan Unggulan' },
+  { id: 'L2', zh: '国有企业和上市公司', id_: 'Perusahaan Negara & Perusahaan Tbk' },
+  { id: 'L3', zh: '非上市品牌公司',    id_: 'Perusahaan Merek Non-Tbk' },
+  { id: 'L4', zh: '中小型企业',        id_: 'Usaha Kecil & Menengah (UKM)' },
+  { id: 'L5', zh: '个人创业小公司',    id_: 'Wirausaha & Perusahaan Rintisan' },
+] as const
+export type CustomerLevelId = typeof CUSTOMER_LEVELS[number]['id']
+
+// ─── Lead ────────────────────────────────────────────────────────────────────export type LeadSource = 'wechat' | 'referral' | 'facebook' | 'website' | 'cold_outreach'
 export type LeadStatus = 'new' | 'contacted' | 'no_interest' | 'ready_for_opportunity' | 'discarded' | 'public_pool'
 export type LeadUrgency = '高' | '中' | '低'
 export type DiscardReason = '无法联系' | '需求不匹配' | '销售能力有限' | '其他'

@@ -1,9 +1,378 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, Plus, Edit2, Archive, Trash2, X } from 'lucide-react'
+import { Search, Plus, Edit2, Archive, Trash2 } from 'lucide-react'
 import type { Opportunity } from '@/lib/types'
+import { CUSTOMER_LEVELS } from '@/lib/types'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+
+interface CustomerRecord {
+  id: string
+  customerId: string
+  customerName: string
+  level: string // 客户级别 ID，如 'L1'
+  contactName: string
+  phone: string
+  lastInteraction: string
+  activeOpportunitiesCount: number
+  opportunitiesByStage: Record<string, number>
+}
+
+interface CustomerManagementProps {
+  opportunities: Opportunity[]
+  onCustomerCreate?: (customerData: any) => void
+  onCustomerUpdate?: (customerId: string, data: any) => void
+  onSelectCustomer?: (customerId: string) => void
+}
+
+export function CustomerManagement({ opportunities, onCustomerCreate, onCustomerUpdate, onSelectCustomer }: CustomerManagementProps) {
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedLevel, setSelectedLevel] = useState<string | null>(null)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [editingCustomer, setEditingCustomer] = useState<CustomerRecord | null>(null)
+  const [archivedIds, setArchivedIds] = useState<Set<string>>(new Set())
+  const [newCustomerForm, setNewCustomerForm] = useState({
+    customerName: '',
+    passportNo: '',
+    contactName: '',
+    phone: '',
+    email: '',
+    wechat: '',
+    level: 'L4',
+  })
+
+  const customers = useMemo(() => {
+    const customerMap = new Map<string, CustomerRecord>()
+    opportunities.forEach((opp) => {
+      if (!customerMap.has(opp.customerId)) {
+        customerMap.set(opp.customerId, {
+          id: opp.id,
+          customerId: opp.customerId,
+          customerName: opp.customer.name,
+          level: 'L4', // default level
+          contactName: opp.customer.name.split('-')[0] ?? '',
+          phone: opp.customer.phone,
+          lastInteraction: new Date(opp.updatedAt).toLocaleString('zh-CN'),
+          activeOpportunitiesCount: 0,
+          opportunitiesByStage: {},
+        })
+      }
+      const rec = customerMap.get(opp.customerId)!
+      rec.activeOpportunitiesCount++
+      rec.opportunitiesByStage[opp.stageId] = (rec.opportunitiesByStage[opp.stageId] ?? 0) + 1
+    })
+    return Array.from(customerMap.values()).sort(
+      (a, b) => new Date(b.lastInteraction).getTime() - new Date(a.lastInteraction).getTime()
+    )
+  }, [opportunities])
+
+  const filtered = useMemo(() => {
+    return customers.filter((c) => {
+      if (archivedIds.has(c.customerId)) return false
+      const matchesQuery =
+        !searchQuery ||
+        c.customerId.includes(searchQuery) ||
+        c.customerName.toLowerCase().includes(searchQuery.toLowerCase())
+      const matchesLevel = !selectedLevel || c.level === selectedLevel
+      return matchesQuery && matchesLevel
+    })
+  }, [customers, searchQuery, selectedLevel, archivedIds])
+
+  const canDelete = (customer: CustomerRecord): boolean => {
+    const dangerousStages = ['P4', 'P5', 'P6', 'P7', 'P8']
+    for (const stage of dangerousStages) {
+      if ((customer.opportunitiesByStage[stage] ?? 0) > 0) return false
+    }
+    return true
+  }
+
+  const getLevelLabel = (levelId: string) => {
+    return CUSTOMER_LEVELS.find((l) => l.id === levelId)?.zh ?? levelId
+  }
+
+  const levelColors: Record<string, { bg: string; text: string }> = {
+    L1: { bg: '#fef3c7', text: '#92400e' },
+    L2: { bg: '#dbeafe', text: '#1e40af' },
+    L3: { bg: '#e0e7ff', text: '#3730a3' },
+    L4: { bg: '#f3f4f6', text: '#374151' },
+    L5: { bg: '#f0fdf4', text: '#166534' },
+  }
+
+  return (
+    <div className="flex h-full flex-col bg-white">
+      {/* Header */}
+      <div className="border-b border-[#e5e7eb] px-5 py-3">
+        <h2 className="text-[14px] font-semibold text-[#111827]">客户管理</h2>
+        <p className="mt-0.5 text-[11px] text-[#9ca3af]">共 {filtered.length} 个客户 · {customers.length} 个在库</p>
+      </div>
+
+      {/* Search & Filters */}
+      <div className="border-b border-[#e5e7eb] bg-[#fafbfc] px-5 py-3 space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search size={13} className="absolute left-2 top-[9px] text-[#9ca3af]" />
+            <input
+              type="text"
+              placeholder="搜索客户ID或客户名..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-8 w-full rounded-sm border border-[#e5e7eb] bg-white pl-7 pr-2 text-[12px] text-[#111827] placeholder-[#9ca3af] outline-none focus:border-[#2563eb]"
+            />
+          </div>
+          <button
+            onClick={() => {
+              setNewCustomerForm({ customerName: '', passportNo: '', contactName: '', phone: '', email: '', wechat: '', level: 'L4' })
+              setIsCreateModalOpen(true)
+            }}
+            className="flex h-8 items-center gap-1.5 rounded-sm bg-[#2563eb] px-3 text-[12px] font-medium text-white hover:bg-[#1d4ed8]"
+          >
+            <Plus size={13} />
+            新增
+          </button>
+        </div>
+
+        {/* Level Filter */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] text-[#6b7280]">级别：</span>
+          <button
+            onClick={() => setSelectedLevel(null)}
+            className={`h-6 rounded-sm px-2 text-[11px] font-medium transition-colors ${
+              selectedLevel === null ? 'bg-[#2563eb] text-white' : 'border border-[#e5e7eb] text-[#6b7280] hover:border-[#2563eb]'
+            }`}
+          >
+            全部
+          </button>
+          {CUSTOMER_LEVELS.map((lvl) => (
+            <button
+              key={lvl.id}
+              onClick={() => setSelectedLevel(selectedLevel === lvl.id ? null : lvl.id)}
+              className={`h-6 rounded-sm px-2 text-[11px] font-medium transition-colors ${
+                selectedLevel === lvl.id ? 'bg-[#2563eb] text-white' : 'border border-[#e5e7eb] text-[#6b7280] hover:border-[#2563eb]'
+              }`}
+            >
+              {lvl.id} · {lvl.zh}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="flex-1 overflow-auto">
+        <table className="w-full border-collapse text-[12px]">
+          <thead>
+            <tr className="border-b border-[#e5e7eb] bg-[#f9fafb] text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">
+              <th className="px-4 py-2 text-left font-semibold">客户ID</th>
+              <th className="px-4 py-2 text-left font-semibold">客户名</th>
+              <th className="px-4 py-2 text-left font-semibold">级别</th>
+              <th className="px-4 py-2 text-left font-semibold">联系人</th>
+              <th className="px-4 py-2 text-left font-semibold">最近互动</th>
+              <th className="px-4 py-2 text-left font-semibold">活跃商机</th>
+              <th className="px-4 py-2 text-center font-semibold w-20">操作</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[#f3f4f6]">
+            {filtered.map((customer) => {
+              const color = levelColors[customer.level] ?? levelColors['L4']
+              return (
+                <tr
+                  key={customer.customerId}
+                  className="group cursor-pointer hover:bg-[#f9fafb]"
+                  onClick={() => onSelectCustomer?.(customer.customerId)}
+                >
+                  <td className="px-4 py-2 font-mono text-[#2563eb]">{customer.customerId}</td>
+                  <td className="px-4 py-2 font-medium text-[#111827]">{customer.customerName}</td>
+                  <td className="px-4 py-2">
+                    <span
+                      className="inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[11px] font-semibold"
+                      style={{ background: color.bg, color: color.text }}
+                    >
+                      <span className="font-mono">{customer.level}</span>
+                      <span>{getLevelLabel(customer.level)}</span>
+                    </span>
+                  </td>
+                  <td className="px-4 py-2 text-[#6b7280]">{customer.contactName}</td>
+                  <td className="px-4 py-2 font-mono text-[11px] text-[#9ca3af]">{customer.lastInteraction}</td>
+                  <td className="px-4 py-2">
+                    <span className="inline-flex items-center rounded-sm bg-[#eff6ff] px-1.5 py-0.5 text-[11px] font-semibold text-[#2563eb]">
+                      {customer.activeOpportunitiesCount}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2">
+                    <div className="flex items-center justify-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setEditingCustomer(customer); setIsEditModalOpen(true) }}
+                        className="flex h-6 w-6 items-center justify-center rounded-sm text-[#6b7280] hover:bg-[#e5e7eb] hover:text-[#111827]"
+                        title="编辑"
+                      >
+                        <Edit2 size={13} />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setArchivedIds((prev) => new Set(prev).add(customer.customerId)) }}
+                        className="flex h-6 w-6 items-center justify-center rounded-sm text-[#6b7280] hover:bg-[#e5e7eb] hover:text-[#111827]"
+                        title="归档"
+                      >
+                        <Archive size={13} />
+                      </button>
+                      {canDelete(customer) && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); if (confirm('确定删除？')) {} }}
+                          className="flex h-6 w-6 items-center justify-center rounded-sm text-[#6b7280] hover:bg-[#fee2e2] hover:text-[#dc2626]"
+                          title="删除"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        {filtered.length === 0 && (
+          <div className="py-12 text-center text-[12px] text-[#9ca3af]">无匹配客户</div>
+        )}
+      </div>
+
+      {/* Edit Modal */}
+      <Sheet open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <SheetContent side="right" className="w-[420px]" aria-describedby={undefined}>
+          <SheetHeader>
+            <SheetTitle className="text-[14px] font-semibold">编辑客户</SheetTitle>
+          </SheetHeader>
+          {editingCustomer && (
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="text-[12px] font-medium text-[#6b7280]">客户ID</label>
+                <div className="mt-1 font-mono text-[13px] text-[#2563eb]">{editingCustomer.customerId}</div>
+              </div>
+              <div>
+                <label className="text-[12px] font-medium text-[#6b7280]">客户名</label>
+                <input type="text" defaultValue={editingCustomer.customerName}
+                  className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] outline-none focus:border-[#2563eb]" />
+              </div>
+              <div>
+                <label className="text-[12px] font-medium text-[#6b7280]">级别</label>
+                <select defaultValue={editingCustomer.level}
+                  className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] outline-none focus:border-[#2563eb]">
+                  {CUSTOMER_LEVELS.map((lvl) => (
+                    <option key={lvl.id} value={lvl.id}>{lvl.id} · {lvl.zh}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[12px] font-medium text-[#6b7280]">联系电话</label>
+                <input type="text" defaultValue={editingCustomer.phone}
+                  className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] outline-none focus:border-[#2563eb]" />
+              </div>
+              <div className="flex gap-2 border-t border-[#e5e7eb] pt-4">
+                <button onClick={() => setIsEditModalOpen(false)}
+                  className="flex-1 h-8 rounded-sm border border-[#e5e7eb] text-[12px] font-medium text-[#374151] hover:bg-[#f9fafb]">取消</button>
+                <button className="flex-1 h-8 rounded-sm bg-[#2563eb] text-[12px] font-medium text-white hover:bg-[#1d4ed8]">保存</button>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Create Customer Modal */}
+      <Sheet open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+        <SheetContent side="right" className="w-[420px] overflow-y-auto" aria-describedby={undefined}>
+          <SheetHeader>
+            <SheetTitle className="text-[14px] font-semibold">新增客户</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4 space-y-3">
+            <div>
+              <label className="text-[12px] font-medium text-[#6b7280]">客户名 *</label>
+              <input type="text" value={newCustomerForm.customerName}
+                onChange={(e) => setNewCustomerForm((p) => ({ ...p, customerName: e.target.value }))}
+                placeholder="客户名"
+                className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] placeholder-[#9ca3af] outline-none focus:border-[#2563eb]" />
+            </div>
+            <div>
+              <label className="text-[12px] font-medium text-[#6b7280]">客户级别 *</label>
+              <select value={newCustomerForm.level}
+                onChange={(e) => setNewCustomerForm((p) => ({ ...p, level: e.target.value }))}
+                className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] outline-none focus:border-[#2563eb]">
+                {CUSTOMER_LEVELS.map((lvl) => (
+                  <option key={lvl.id} value={lvl.id}>{lvl.id} · {lvl.zh}</option>
+                ))}
+              </select>
+              {/* Bilingual reference table */}
+              <div className="mt-2 rounded-sm border border-[#e5e7eb] overflow-hidden">
+                <table className="w-full text-[11px]">
+                  <thead>
+                    <tr className="bg-[#f9fafb] border-b border-[#e5e7eb]">
+                      <th className="px-2 py-1 text-left font-semibold text-[#6b7280] w-8">ID</th>
+                      <th className="px-2 py-1 text-left font-semibold text-[#6b7280]">中文</th>
+                      <th className="px-2 py-1 text-left font-semibold text-[#6b7280]">Indonesia</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#f3f4f6]">
+                    {CUSTOMER_LEVELS.map((lvl) => (
+                      <tr key={lvl.id} className="hover:bg-[#f9fafb]">
+                        <td className="px-2 py-1 font-mono font-semibold text-[#2563eb]">{lvl.id}</td>
+                        <td className="px-2 py-1 text-[#374151]">{lvl.zh}</td>
+                        <td className="px-2 py-1 text-[#6b7280]">{lvl.id_}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div>
+              <label className="text-[12px] font-medium text-[#6b7280]">护照号</label>
+              <input type="text" value={newCustomerForm.passportNo}
+                onChange={(e) => setNewCustomerForm((p) => ({ ...p, passportNo: e.target.value }))}
+                placeholder="E00000000"
+                className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 font-mono text-[12px] placeholder-[#9ca3af] outline-none focus:border-[#2563eb]" />
+            </div>
+            <div>
+              <label className="text-[12px] font-medium text-[#6b7280]">联系人</label>
+              <input type="text" value={newCustomerForm.contactName}
+                onChange={(e) => setNewCustomerForm((p) => ({ ...p, contactName: e.target.value }))}
+                placeholder="联系人名字"
+                className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] placeholder-[#9ca3af] outline-none focus:border-[#2563eb]" />
+            </div>
+            <div>
+              <label className="text-[12px] font-medium text-[#6b7280]">电话</label>
+              <input type="text" value={newCustomerForm.phone}
+                onChange={(e) => setNewCustomerForm((p) => ({ ...p, phone: e.target.value }))}
+                placeholder="手机号"
+                className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] placeholder-[#9ca3af] outline-none focus:border-[#2563eb]" />
+            </div>
+            <div>
+              <label className="text-[12px] font-medium text-[#6b7280]">邮箱</label>
+              <input type="email" value={newCustomerForm.email}
+                onChange={(e) => setNewCustomerForm((p) => ({ ...p, email: e.target.value }))}
+                placeholder="email@example.com"
+                className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] placeholder-[#9ca3af] outline-none focus:border-[#2563eb]" />
+            </div>
+            <div>
+              <label className="text-[12px] font-medium text-[#6b7280]">微信</label>
+              <input type="text" value={newCustomerForm.wechat}
+                onChange={(e) => setNewCustomerForm((p) => ({ ...p, wechat: e.target.value }))}
+                placeholder="微信号"
+                className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] placeholder-[#9ca3af] outline-none focus:border-[#2563eb]" />
+            </div>
+            <div className="flex gap-2 border-t border-[#e5e7eb] pt-4">
+              <button onClick={() => setIsCreateModalOpen(false)}
+                className="flex-1 h-8 rounded-sm border border-[#e5e7eb] text-[12px] font-medium text-[#374151] hover:bg-[#f9fafb]">取消</button>
+              <button
+                onClick={() => {
+                  if (!newCustomerForm.customerName.trim()) { alert('客户名不能为空'); return }
+                  onCustomerCreate?.(newCustomerForm)
+                  setIsCreateModalOpen(false)
+                }}
+                className="flex-1 h-8 rounded-sm bg-[#2563eb] text-[12px] font-medium text-white hover:bg-[#1d4ed8]">创建</button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+    </div>
+  )
+}
 
 interface CustomerRecord {
   id: string
