@@ -6,7 +6,6 @@ import { SecondarySidebar } from '@/components/layout/secondary-sidebar'
 import { WorkspacePane } from '@/components/workspace/workspace-pane'
 import { CustomerManagement } from '@/components/customers/customer-management'
 import { LeadManagement } from '@/components/leads/lead-management'
-import { LeadListSidebar } from '@/components/leads/lead-list-sidebar'
 import { AuditRail } from '@/components/audit-rail/audit-panel'
 import { mockOpportunities, mockProducts, mockActionLogs, mockUser, mockLeads } from '@/lib/mock-data'
 import { addAuditNote } from '@/app/actions/audit'
@@ -289,18 +288,7 @@ export default function SalesHub() {
 
       {/* Pane 2+ — conditional content based on activeNav */}
       {activeNav === 'leads' ? (
-        <>
-          {/* Lead list (320px) */}
-          <LeadListSidebar
-            leads={leads}
-            selectedId={leads[0]?.id ?? null}
-            onSelect={(lead) => {
-              // Lead selection in sidebar (visual only)
-            }}
-            onDelete={handleDeleteLead}
-          />
-
-          {/* Lead management (flex-1) */}
+        <div className="flex-1 overflow-hidden">
           <LeadManagement
             leads={leads}
             onLeadStatusChange={handleLeadStatusChange}
@@ -310,7 +298,7 @@ export default function SalesHub() {
             onDiscardLead={handleDiscardLead}
             onClaimLead={handleClaimLead}
           />
-        </>
+        </div>
       ) : activeNav === 'opportunities' ? (
         <>
           {/* Opportunity list (280px) */}
