@@ -359,7 +359,13 @@ export default function SalesHub() {
         </>
       ) : activeNav === 'analytics' ? (
         <div className="flex-1 overflow-hidden">
-          <MyDashboard />
+          <MyDashboard
+            opportunities={opportunities}
+            leads={leads}
+            actionLogs={actionLogs}
+            assignee={mockUser.name}
+            userName={mockUser.name}
+          />
         </div>
       ) : (
         <div className="flex-1 flex items-center justify-center text-[#9ca3af]">
