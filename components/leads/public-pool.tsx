@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import { Search, UserPlus } from 'lucide-react'
 import type { Lead } from '@/lib/types'
 
+
 interface PublicPoolProps {
   leads: Lead[]
   onClaimLead: (lead: Lead) => void

@@ -1,5 +1,39 @@
-// ─── Lead ────────────────────────────────────────────────────────────────────
-export type LeadSource = 'wechat' | 'referral' | 'facebook' | 'website' | 'cold_outreach'
+// ─── Domestic Entity (国内关联实体) ──────────────────────────────────────────
+export type ChinaEntityStatus = '存续' | '吊销' | '注销'
+
+export interface ChinaEntity {
+  id: string // 统一社会信用代码
+  companyName: string // 公司全名
+  creditCode: string // 统一社会信用代码 (font-mono)
+  legalPerson: string // 法定代表人
+  regCapital: string // 注册资本 (如 "1000万人民币")
+  businessScope?: string // 经营范围
+  status: ChinaEntityStatus
+  industry?: string // 行业分类 (如 "制造业")
+  foundedDate?: string
+  registrationLocation?: string // 注册地
+}
+
+export interface DomesticEntityAssociation {
+  customerId: string
+  chinaEntity: ChinaEntity
+  businessMatch: 'high' | 'medium' | 'low' // 与印尼业务的匹配度
+  riskLevel: 'low' | 'medium' | 'high' // 风险等级
+  notes?: string
+  associatedAt: string
+}
+
+// ─── Customer Level ──────────────────────────────────────────────────────────
+export const CUSTOMER_LEVELS = [
+  { id: 'L2', zh: '央企总部和龙头企业', id_: 'BUMN Pusat & Perusahaan Unggulan', weight: 5 },
+  { id: 'L3', zh: '国有企业和上市公司', id_: 'Perusahaan Negara & Perusahaan Tbk', weight: 4 },
+  { id: 'L4', zh: '非上市品牌公司',    id_: 'Perusahaan Merek Non-Tbk', weight: 3 },
+  { id: 'L5', zh: '中小型企业',        id_: 'Usaha Kecil & Menengah (UKM)', weight: 2 },
+  { id: 'L6', zh: '个人创业小公司',    id_: 'Wirausaha & Perusahaan Rintisan', weight: 1 },
+] as const
+export type CustomerLevelId = typeof CUSTOMER_LEVELS[number]['id']
+
+// ─── Lead ────────────────────────────────────────────────────────────────────export type LeadSource = 'wechat' | 'referral' | 'facebook' | 'website' | 'cold_outreach'
 export type LeadStatus = 'new' | 'contacted' | 'no_interest' | 'ready_for_opportunity' | 'discarded' | 'public_pool'
 export type LeadUrgency = '高' | '中' | '低'
 export type DiscardReason = '无法联系' | '需求不匹配' | '销售能力有限' | '其他'
@@ -166,7 +200,7 @@ export interface RefundItem {
 
 export interface ExpenseItem {
   id: string
-  description: string // 事由（如："政府规费"、"加急费"、"差旅费"）
+  description: string // 事由（如："政���规费"、"加急费"、"差旅费"）
   amount: number
   category: 'gov-fee' | 'expedite' | 'travel' | 'other' // 分类
   receiptUrl?: string
