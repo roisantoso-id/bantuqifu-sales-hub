@@ -6,6 +6,7 @@ import { CUSTOMER_LEVELS } from '@/lib/types'
 import {
   getCustomersAction,
   getCustomerDetailAction,
+  createCustomerAction,
   type CustomerRow,
   type CustomerOpportunityRow,
   type CustomerActionLogRow,
@@ -85,6 +86,11 @@ export function CustomerManagement({ onSelectCustomer }: CustomerManagementProps
   const [newFollowup, setNewFollowup] = useState('')
   const [newFollowupFiles, setNewFollowupFiles] = useState<File[]>([])
 
+  // ── Create customer modal state ──
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [createForm, setCreateForm] = useState({ customerName: '', phone: '', email: '', wechat: '', level: 'L5' })
+  const [creating, setCreating] = useState(false)
+
   // ── Load customers on mount ──
   useEffect(() => {
     setListLoading(true)
@@ -146,6 +152,30 @@ export function CustomerManagement({ onSelectCustomer }: CustomerManagementProps
   const totalRevenue = detailOpportunities.reduce((s, o) => s + (o.estimatedAmount ?? 0), 0)
   const activeOppCount = detailOpportunities.filter((o) => o.status === 'active').length
   const lastLog = detailLogs[0]
+
+  // ── Create customer handler ──
+  const handleCreateCustomer = async () => {
+    if (!createForm.customerName.trim()) return
+    setCreating(true)
+    try {
+      const newCustomer = await createCustomerAction({
+        customerName: createForm.customerName.trim(),
+        phone: createForm.phone || null,
+        email: createForm.email || null,
+        wechat: createForm.wechat || null,
+        level: createForm.level,
+      })
+      if (newCustomer) {
+        setCustomers((prev) => [newCustomer, ...prev])
+        setShowCreateModal(false)
+        setCreateForm({ customerName: '', phone: '', email: '', wechat: '', level: 'L5' })
+      }
+    } catch (err) {
+      console.error('[v0] create customer error:', err)
+    } finally {
+      setCreating(false)
+    }
+  }
 
   return (
     <div className="flex h-full bg-white">
@@ -238,12 +268,100 @@ export function CustomerManagement({ onSelectCustomer }: CustomerManagementProps
 
         {/* 新增客户按钮 */}
         <div className="p-3 border-t border-[#e5e7eb]">
-          <button className="w-full flex items-center justify-center gap-1.5 h-8 rounded-sm bg-[#2563eb] text-[12px] font-medium text-white hover:bg-[#1d4ed8]">
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="w-full flex items-center justify-center gap-1.5 h-8 rounded-sm bg-[#2563eb] text-[12px] font-medium text-white hover:bg-[#1d4ed8]"
+          >
             <Plus size={13} />
             新增客户
           </button>
         </div>
       </div>
+
+      {/* ── 新增客户 Modal ─────────────────────────────────────────── */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-[420px] bg-white rounded-sm shadow-lg">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[#e5e7eb]">
+              <h3 className="text-[14px] font-semibold text-[#111827]">新增客户</h3>
+              <button onClick={() => setShowCreateModal(false)} className="text-[#9ca3af] hover:text-[#111827]">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="block text-[12px] text-[#6b7280] mb-1">客户名称 *</label>
+                <input
+                  type="text"
+                  value={createForm.customerName}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, customerName: e.target.value }))}
+                  className="w-full h-8 px-2 text-[12px] border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb]"
+                  placeholder="请输入客户名称"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[12px] text-[#6b7280] mb-1">电话</label>
+                  <input
+                    type="text"
+                    value={createForm.phone}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, phone: e.target.value }))}
+                    className="w-full h-8 px-2 text-[12px] font-mono border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb]"
+                    placeholder="手机号"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[12px] text-[#6b7280] mb-1">微信</label>
+                  <input
+                    type="text"
+                    value={createForm.wechat}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, wechat: e.target.value }))}
+                    className="w-full h-8 px-2 text-[12px] font-mono border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb]"
+                    placeholder="微信号"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[12px] text-[#6b7280] mb-1">邮箱</label>
+                <input
+                  type="text"
+                  value={createForm.email}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))}
+                  className="w-full h-8 px-2 text-[12px] border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb]"
+                  placeholder="email@example.com"
+                />
+              </div>
+              <div>
+                <label className="block text-[12px] text-[#6b7280] mb-1">客户等级</label>
+                <select
+                  value={createForm.level}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, level: e.target.value }))}
+                  className="w-full h-8 px-2 text-[12px] border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb] bg-white"
+                >
+                  {CUSTOMER_LEVELS.map((l) => (
+                    <option key={l.id} value={l.id}>{l.id} · {l.zh}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 px-4 py-3 border-t border-[#e5e7eb]">
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="h-8 px-3 text-[12px] text-[#6b7280] hover:text-[#111827]"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleCreateCustomer}
+                disabled={!createForm.customerName.trim() || creating}
+                className="h-8 px-4 rounded-sm bg-[#2563eb] text-[12px] font-medium text-white hover:bg-[#1d4ed8] disabled:bg-[#d1d5db] disabled:cursor-not-allowed"
+              >
+                {creating ? '创建中...' : '创建客户'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── 主作业区 ─────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden">
