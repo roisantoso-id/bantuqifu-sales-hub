@@ -219,13 +219,21 @@ model Customer {
   organizationId  String   // 强制租户隔离
   organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   
-  customerId      String   @unique // 客户编号
+  customerId      String   @unique // 客户编号（语义化 ID，如 CUS-260315-0001）
   customerName    String
   passportNo      String?
   phone           String?
   email           String?
   wechat          String?
-  level           CustomerLevel @default(L5)
+  
+  // 字典外键关联
+  level           CustomerLevel @default(L5)  // 保留枚举用于向后兼容
+  levelDictId     String?       // 新增：关联客户等级字典
+  levelDict       CustomerLevelDict? @relation(fields: [levelDictId], references: [id])
+  
+  industryId      String?       // 新增：关联行业分类字典
+  industry        Industry?     @relation(fields: [industryId], references: [id])
+  
   isLocked        Boolean  @default(false)
   
   createdAt       DateTime @default(now())
@@ -238,6 +246,8 @@ model Customer {
   contacts        CustomerContact[]
   
   @@index([organizationId])
+  @@index([levelDictId])
+  @@index([industryId])
   @@unique([organizationId, customerId])
   @@map("customers")
 }
@@ -699,6 +709,59 @@ model ActionLogAttachment {
   uploadedAt        DateTime @default(now())
   
   @@map("action_log_attachments")
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// ── DICTIONARY: INDUSTRY (行业分类字典) ─────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════════
+
+model Industry {
+  id          String   @id @default(cuid())
+  code        String   @unique   // 行业代码，如 "IT", "MANUFACTURING", "FINANCE"
+  nameZh      String             // 中文名称，如 "信息技术"
+  nameId      String?            // 印尼语名称，如 "Teknologi Informasi"
+  nameEn      String?            // 英文名称，如 "Information Technology"
+  parentId    String?            // 父级行业（支持层级结构）
+  parent      Industry?  @relation("IndustryHierarchy", fields: [parentId], references: [id])
+  children    Industry[] @relation("IndustryHierarchy")
+  sortOrder   Int       @default(0)  // 排序权重
+  isActive    Boolean   @default(true)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  customers   Customer[]
+  
+  @@index([parentId])
+  @@index([sortOrder])
+  @@map("dict_industries")
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// ── DICTIONARY: CUSTOMER LEVEL (客户等级字典) ───────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════════
+
+model CustomerLevelDict {
+  id          String   @id @default(cuid())
+  code        String   @unique   // 等级代码，如 "L1", "L2", "L3", "L4", "L5", "L6"
+  nameZh      String             // 中文名称，如 "央企总部和龙头企业"
+  nameId      String?            // 印尼语名称，如 "BUMN Pusat & Perusahaan Unggulan"
+  nameEn      String?            // 英文名称
+  weight      Int       @default(1)  // 权重（用于排序和评分）
+  description String?            // 等级描述
+  colorClass  String?            // UI 颜色类，如 "bg-blue-900 text-white"
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  customers   Customer[]
+  
+  @@index([sortOrder])
+  @@map("dict_customer_levels")
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
