@@ -19,15 +19,26 @@ interface CustomerRecord {
 
 interface CustomerManagementProps {
   opportunities: Opportunity[]
+  onCustomerCreate?: (customerData: any) => void
   onCustomerUpdate?: (customerId: string, data: any) => void
 }
 
-export function CustomerManagement({ opportunities, onCustomerUpdate }: CustomerManagementProps) {
+export function CustomerManagement({ opportunities, onCustomerCreate, onCustomerUpdate }: CustomerManagementProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedIndustry, setSelectedIndustry] = useState<string | null>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<CustomerRecord | null>(null)
   const [archivedIds, setArchivedIds] = useState<Set<string>>(new Set())
+  const [newCustomerForm, setNewCustomerForm] = useState({
+    customerName: '',
+    passportNo: '',
+    contactName: '',
+    phone: '',
+    email: '',
+    wechat: '',
+    industry: '',
+  })
 
   // Extract unique customers from opportunities
   const customers = useMemo(() => {
@@ -105,8 +116,23 @@ export function CustomerManagement({ opportunities, onCustomerUpdate }: Customer
               className="h-8 w-full rounded-sm border border-[#e5e7eb] bg-white pl-7 pr-2 text-[12px] text-[#111827] placeholder-[#9ca3af] outline-none focus:border-[#2563eb]"
             />
           </div>
-          <button className="flex h-8 w-8 items-center justify-center rounded-sm border border-[#e5e7eb] hover:bg-[#f9fafb]">
-            <Plus size={16} className="text-[#6b7280]" />
+          <button
+            onClick={() => {
+              setNewCustomerForm({
+                customerName: '',
+                passportNo: '',
+                contactName: '',
+                phone: '',
+                email: '',
+                wechat: '',
+                industry: '',
+              })
+              setIsCreateModalOpen(true)
+            }}
+            className="flex h-8 items-center gap-1.5 rounded-sm bg-[#2563eb] px-3 text-[12px] font-medium text-white hover:bg-[#1d4ed8]"
+          >
+            <Plus size={14} />
+            新增
           </button>
         </div>
 
@@ -250,6 +276,108 @@ export function CustomerManagement({ opportunities, onCustomerUpdate }: Customer
               </div>
             </div>
           )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Create Customer Modal */}
+      <Sheet open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+        <SheetContent side="right" className="w-[400px]">
+          <SheetHeader>
+            <SheetTitle className="text-[14px] font-semibold">新增客户</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4 space-y-3">
+            <div>
+              <label className="text-[12px] font-medium text-[#6b7280]">客户名*</label>
+              <input
+                type="text"
+                value={newCustomerForm.customerName}
+                onChange={(e) => setNewCustomerForm((prev) => ({ ...prev, customerName: e.target.value }))}
+                placeholder="客户名"
+                className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#111827] placeholder-[#9ca3af] outline-none focus:border-[#2563eb]"
+              />
+            </div>
+            <div>
+              <label className="text-[12px] font-medium text-[#6b7280]">护照号</label>
+              <input
+                type="text"
+                value={newCustomerForm.passportNo}
+                onChange={(e) => setNewCustomerForm((prev) => ({ ...prev, passportNo: e.target.value }))}
+                placeholder="E00000000"
+                className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 font-mono text-[12px] text-[#111827] placeholder-[#9ca3af] outline-none focus:border-[#2563eb]"
+              />
+            </div>
+            <div>
+              <label className="text-[12px] font-medium text-[#6b7280]">联系人</label>
+              <input
+                type="text"
+                value={newCustomerForm.contactName}
+                onChange={(e) => setNewCustomerForm((prev) => ({ ...prev, contactName: e.target.value }))}
+                placeholder="联系人名字"
+                className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#111827] placeholder-[#9ca3af] outline-none focus:border-[#2563eb]"
+              />
+            </div>
+            <div>
+              <label className="text-[12px] font-medium text-[#6b7280]">电话</label>
+              <input
+                type="text"
+                value={newCustomerForm.phone}
+                onChange={(e) => setNewCustomerForm((prev) => ({ ...prev, phone: e.target.value }))}
+                placeholder="手机号"
+                className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#111827] placeholder-[#9ca3af] outline-none focus:border-[#2563eb]"
+              />
+            </div>
+            <div>
+              <label className="text-[12px] font-medium text-[#6b7280]">邮箱</label>
+              <input
+                type="email"
+                value={newCustomerForm.email}
+                onChange={(e) => setNewCustomerForm((prev) => ({ ...prev, email: e.target.value }))}
+                placeholder="email@example.com"
+                className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#111827] placeholder-[#9ca3af] outline-none focus:border-[#2563eb]"
+              />
+            </div>
+            <div>
+              <label className="text-[12px] font-medium text-[#6b7280]">微信</label>
+              <input
+                type="text"
+                value={newCustomerForm.wechat}
+                onChange={(e) => setNewCustomerForm((prev) => ({ ...prev, wechat: e.target.value }))}
+                placeholder="微信号"
+                className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#111827] placeholder-[#9ca3af] outline-none focus:border-[#2563eb]"
+              />
+            </div>
+            <div>
+              <label className="text-[12px] font-medium text-[#6b7280]">行业</label>
+              <input
+                type="text"
+                value={newCustomerForm.industry}
+                onChange={(e) => setNewCustomerForm((prev) => ({ ...prev, industry: e.target.value }))}
+                placeholder="行业分类"
+                className="mt-1 h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#111827] placeholder-[#9ca3af] outline-none focus:border-[#2563eb]"
+              />
+            </div>
+            <div className="flex gap-2 border-t border-[#e5e7eb] pt-4 mt-6">
+              <button
+                onClick={() => setIsCreateModalOpen(false)}
+                className="flex-1 h-8 rounded-sm border border-[#e5e7eb] bg-white text-[12px] font-medium text-[#374151] hover:bg-[#f9fafb]"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  if (!newCustomerForm.customerName.trim()) {
+                    alert('客户名不能为空')
+                    return
+                  }
+                  onCustomerCreate?.(newCustomerForm)
+                  setIsCreateModalOpen(false)
+                }}
+                className="flex-1 h-8 rounded-sm bg-[#2563eb] text-[12px] font-medium text-white hover:bg-[#1d4ed8]"
+              >
+                创建
+              </button>
+            </div>
+          </div>
         </SheetContent>
       </Sheet>
     </div>

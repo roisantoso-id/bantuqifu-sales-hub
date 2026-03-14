@@ -8,7 +8,7 @@ import { CustomerManagement } from '@/components/customers/customer-management'
 import { AuditRail } from '@/components/audit-rail/audit-panel'
 import { mockOpportunities, mockProducts, mockActionLogs, mockUser } from '@/lib/mock-data'
 import { addAuditNote } from '@/app/actions/audit'
-import type { Opportunity, NavSection, StageId, ActionLog } from '@/lib/types'
+import type { Opportunity, NavSection, StageId, ActionLog, Customer } from '@/lib/types'
 import { ClipboardList } from 'lucide-react'
 
 export default function SalesHub() {
@@ -116,6 +116,57 @@ export default function SalesHub() {
     [selectedId]
   )
 
+  const handleCreateCustomer = (customerData: any) => {
+    const newCustomerId = `CUST-${Date.now()}`
+    const newCustomer: Customer = {
+      id: newCustomerId,
+      name: customerData.customerName,
+      passportNo: customerData.passportNo || `PASSPORT-${Date.now()}`,
+      phone: customerData.phone || '',
+      email: customerData.email || '',
+      wechat: customerData.wechat || '',
+    }
+
+    // Create a new opportunity with this customer
+    const newOpportunity: Opportunity = {
+      id: `OPP-${Date.now()}`,
+      customerId: newCustomerId,
+      customer: newCustomer,
+      stageId: 'P1',
+      status: 'active',
+      serviceType: 'VISA',
+      serviceTypeLabel: '旅游签证',
+      estimatedAmount: 0,
+      currency: 'CNY',
+      requirements: '',
+      notes: '',
+      destination: customerData.industry || '',
+      travelDate: '',
+      assignee: mockUser.name,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    setOpportunities((prev) => [newOpportunity, ...prev])
+    setActionLogs((prev) => ({
+      ...prev,
+      [newOpportunity.id]: [
+        {
+          id: `log-${Date.now()}`,
+          opportunityId: newOpportunity.id,
+          operatorId: mockUser.id,
+          operatorName: mockUser.name,
+          actionType: 'CREATE',
+          actionLabel: '创建商机',
+          remark: `创建新客户 ${customerData.customerName} 及其首个商机`,
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    }))
+
+    alert('客户已创建，并自动生成了一个新商机')
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-white">
       {/* Pane 1 — primary nav (64px) */}
@@ -171,7 +222,7 @@ export default function SalesHub() {
         </>
       ) : activeNav === 'customers' ? (
         <div className="flex-1">
-          <CustomerManagement opportunities={opportunities} />
+          <CustomerManagement opportunities={opportunities} onCustomerCreate={handleCreateCustomer} />
         </div>
       ) : (
         <div className="flex-1 flex items-center justify-center text-[#9ca3af]">
