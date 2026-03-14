@@ -266,11 +266,13 @@ model CustomerContact {
   customerId    String
   customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   
-  name          String
-  title         String?
+  contactName   String
+  position      String?
   phone         String?
   email         String?
   wechat        String?
+  isPrimary     Boolean  @default(false)
+  notes         String?
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -290,8 +292,8 @@ model CustomerFollowup {
   customerId      String
   customer        Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   
-  operatorId      String   // 记录人
-  operator        User     @relation("FollowupOperator", fields: [operatorId], references: [id])
+  operatorId      String?  // 记录人（可空 - 在用户未登录时允许保存）
+  operator        User?    @relation("FollowupOperator", fields: [operatorId], references: [id])
   
   followupType    String   @default("general") // "general", "call", "visit", "meeting", "email"
   content         String   // 跟进内容
