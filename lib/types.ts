@@ -26,7 +26,7 @@ export interface Opportunity {
   serviceType: 'VISA' | 'IMMIGRATION' | 'STUDY' | 'WORK'
   serviceTypeLabel: string
   estimatedAmount: number
-  currency: string
+  currency: Currency
   requirements?: string
   notes?: string
   destination?: string
@@ -44,13 +44,19 @@ export interface Product {
   price: number
   currency: string
   description?: string
+  difficulty?: number // 1-5
+  billingCycles?: string[] // e.g., ["3个月", "5个月", "12个月"]
 }
+
+export type Currency = 'CNY' | 'IDR'
 
 export interface SelectedProduct {
   product: Product
   quantity: number
   discount: number
+  billingCycle?: string // for products with cycles
   subtotal: number
+  currency: Currency // snapshot of currency at time of selection
 }
 
 // ─── Action Log ──────────────────────────────────────────────────────────────

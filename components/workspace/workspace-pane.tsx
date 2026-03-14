@@ -1,6 +1,7 @@
 'use client'
 
-import type { Opportunity, Product, SelectedProduct, StageId, ActionLog } from '@/lib/types'
+import { useState } from 'react'
+import type { Opportunity, Product, SelectedProduct, StageId, Currency } from '@/lib/types'
 import { BreadcrumbStepper } from './breadcrumb-stepper'
 import { P1RequirementForm } from './p1-requirement-form'
 import { P2ProductMatcher } from './p2-product-matcher'
@@ -39,6 +40,8 @@ export function WorkspacePane({
   onAdvanceStage,
   onQuoteSent,
 }: WorkspaceProps) {
+  const [displayCurrency, setDisplayCurrency] = useState<Currency>(opportunity.currency as Currency || 'CNY')
+
   const isOnCurrentStage = viewingStage === opportunity.stageId
   const isLast = opportunity.stageId === 'P3'
   const currentIdx = STAGE_ORDER[opportunity.stageId]
@@ -92,7 +95,9 @@ export function WorkspacePane({
           <P2ProductMatcher
             allProducts={allProducts}
             selectedProducts={selectedProducts}
+            currentCurrency={displayCurrency}
             onProductsChange={onProductsChange}
+            onCurrencyChange={setDisplayCurrency}
           />
         )}
         {viewingStage === 'P3' && (

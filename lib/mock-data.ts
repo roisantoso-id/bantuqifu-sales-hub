@@ -1,4 +1,10 @@
-import type { Opportunity, Product, ActionLog, UserProfile } from './types'
+import type { Opportunity, Product, ActionLog, UserProfile, Currency } from './types'
+
+// ─── Exchange Rate (Fixed for demo) ─────────────────────────────────────────
+export const EXCHANGE_RATES: Record<Currency, number> = {
+  CNY: 1,
+  IDR: 0.00044, // 1 CNY = 0.00044 IDR (simplified)
+}
 
 export const mockUser: UserProfile = {
   id: 'u1',
@@ -154,6 +160,7 @@ export const mockProducts: Product[] = [
     price: 2500,
     currency: 'CNY',
     description: '包含材料准备、预约、面签辅导',
+    difficulty: 2,
   },
   {
     id: 'prod-002',
@@ -162,6 +169,8 @@ export const mockProducts: Product[] = [
     price: 180000,
     currency: 'CNY',
     description: '包含评估、文案、递交、登陆指导',
+    difficulty: 4,
+    billingCycles: ['6个月', '12个月', '18个月'],
   },
   {
     id: 'prod-003',
@@ -170,6 +179,8 @@ export const mockProducts: Product[] = [
     price: 35000,
     currency: 'CNY',
     description: '最多申请8所学校',
+    difficulty: 3,
+    billingCycles: ['一次性'],
   },
   {
     id: 'prod-004',
@@ -178,6 +189,8 @@ export const mockProducts: Product[] = [
     price: 28000,
     currency: 'CNY',
     description: '雇主担保类工作签证',
+    difficulty: 3,
+    billingCycles: ['3个月', '6个月'],
   },
   {
     id: 'prod-005',
@@ -186,6 +199,7 @@ export const mockProducts: Product[] = [
     price: 1800,
     currency: 'CNY',
     description: '多次往返商务签证',
+    difficulty: 1,
   },
   {
     id: 'prod-006',
@@ -194,6 +208,7 @@ export const mockProducts: Product[] = [
     price: 500,
     currency: 'CNY',
     description: '每份文件翻译及公证',
+    difficulty: 1,
   },
   {
     id: 'prod-007',
@@ -202,6 +217,7 @@ export const mockProducts: Product[] = [
     price: 2000,
     currency: 'CNY',
     description: '优先处理通道',
+    difficulty: 1,
   },
   {
     id: 'prod-008',
@@ -210,6 +226,8 @@ export const mockProducts: Product[] = [
     price: 480000,
     currency: 'CNY',
     description: '房产投资路径，全家适用',
+    difficulty: 5,
+    billingCycles: ['12个月', '24个月'],
   },
 ]
 
