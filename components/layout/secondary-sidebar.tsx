@@ -158,12 +158,15 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect }: Second
           const showDivider = isPinned && idx === pinned.length - 1 && unpinned.length > 0
           return (
             <li key={opp.id}>
-              <button
+              <div
+                role="button"
+                tabIndex={0}
                 onClick={() => onSelect(opp)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(opp) } }}
                 onMouseEnter={() => setHoveredId(opp.id)}
                 onMouseLeave={() => setHoveredId(null)}
                 className={[
-                  'group relative w-full border-b border-[#e5e7eb] px-3 py-2.5 text-left transition-colors',
+                  'group relative w-full cursor-pointer border-b border-[#e5e7eb] px-3 py-2.5 text-left transition-colors',
                   isSelected ? 'bg-white' : 'hover:bg-white',
                   isPinned ? 'bg-[#fffbeb]' : '',
                 ].join(' ')}
@@ -231,7 +234,7 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect }: Second
                   </span>
                   <span className="text-[10px] text-[#9ca3af]">{opp.assignee}</span>
                 </div>
-              </button>
+              </div>
               {/* Divider between pinned and unpinned */}
               {showDivider && (
                 <div className="flex items-center gap-1.5 border-b border-[#e5e7eb] bg-[#f9fafb] px-3 py-0.5">
