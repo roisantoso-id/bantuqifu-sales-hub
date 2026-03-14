@@ -215,6 +215,7 @@ export function CustomerManagement({ opportunities, actionLogs = {}, onCustomerC
                       </div>
                       <div className="text-[12px] font-medium text-[#111827] truncate">{customer.customerName}</div>
                     </div>
+                  </div>
                 ))}
               </div>
             )
