@@ -6,8 +6,9 @@ import type { ActionLog, ActionType, StageId } from '@/lib/types'
 
 interface AuditRailProps {
   logs: ActionLog[]
-  opportunityId: string
-  onClose: () => void
+  opportunity?: { id: string }
+  visible: boolean
+  onToggle: (visible: boolean) => void
   onAddNote?: (remark: string, files: File[]) => Promise<void>
 }
 
@@ -51,7 +52,9 @@ function countLines(text: string): number {
   return text.split('\n').length
 }
 
-export function AuditRail({ logs, opportunityId, onClose, onAddNote }: AuditRailProps) {
+export function AuditRail({ logs, opportunity, visible, onToggle, onAddNote }: AuditRailProps) {
+  // 如果不可见，不渲染
+  if (!visible) return null
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [inputValue, setInputValue] = useState('')
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
@@ -117,7 +120,7 @@ export function AuditRail({ logs, opportunityId, onClose, onAddNote }: AuditRail
           </span>
         </div>
         <button
-          onClick={onClose}
+          onClick={() => onToggle(false)}
           aria-label="关闭操作记录"
           className="flex h-5 w-5 items-center justify-center rounded-sm text-[#9ca3af] hover:bg-[#f3f4f6] hover:text-[#374151]"
         >
