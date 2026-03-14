@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { Search, Plus, Edit2, Archive, Trash2, ChevronRight, Lock, Users } from 'lucide-react'
 import type { Opportunity, ActionLog } from '@/lib/types'
+
 import { CUSTOMER_LEVELS } from '@/lib/types'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 
