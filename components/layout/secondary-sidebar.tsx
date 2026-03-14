@@ -190,13 +190,16 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect }: Second
                   <div className="flex shrink-0 items-center gap-1">
                     {/* Pin toggle — visible on hover or if pinned */}
                     {(isHovered || isPinned) && (
-                      <button
+                      <span
+                        role="button"
+                        tabIndex={0}
                         onClick={(e) => togglePin(e, opp.id)}
-                        className="flex h-4 w-4 items-center justify-center rounded-sm text-[#9ca3af] hover:bg-[#f3f4f6] hover:text-[#f59e0b]"
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') togglePin(e, opp.id) }}
+                        className="flex h-4 w-4 items-center justify-center rounded-sm text-[#9ca3af] hover:bg-[#f3f4f6] hover:text-[#f59e0b] cursor-pointer"
                         title={isPinned ? '取消置顶' : '置顶'}
                       >
                         {isPinned ? <PinOff size={10} /> : <Pin size={10} />}
-                      </button>
+                      </span>
                     )}
                     <span className="font-mono text-[12px] text-[#374151]">
                       {formatAmount(opp.estimatedAmount, opp.currency)}
