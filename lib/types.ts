@@ -81,14 +81,31 @@ export interface ProgressPoint {
   label: string // e.g., 移民局接收、正在审理、贴纸完成
   status: 'pending' | 'in_progress' | 'completed'
   timestamp?: string
+  serviceId?: string // 关联的服务项 ID (P2Data中的productId)
+}
+
+export interface AssignmentLogic {
+  algorithm: 'expert' | 'load-balanced' // 专家匹配 或 负载均衡
+  triggerServiceId?: string // 触发因素（如果是专家算法）
+  triggerServiceName?: string // 触发因素名称
+  assignedManagerId: string
+  assignedManagerName: string
+  assignedManagerAvatar?: string
+  managedCount?: number // 当前在办件数
+  managedCapacity?: number // 管理容量上限
+  expertise?: string[] // 专家擅长领域
+  assignedAt: string
 }
 
 export interface OpportunityP7Data {
   progressPoints: ProgressPoint[]
   finalDocumentUrl?: string
+  finalDocumentName?: string
   deliveryStatus: 'in_transit' | 'delivered'
   deliveredAt?: string
   notes?: string
+  assignmentLogic?: AssignmentLogic // 自动化委派逻辑
+  completedAt?: string
 }
 
 export interface Opportunity {

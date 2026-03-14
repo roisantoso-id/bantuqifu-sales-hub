@@ -134,6 +134,8 @@ export function WorkspacePane({
         )}
         {viewingStage === 'P7' && (
           <P7Delivery
+            opportunity={opportunity}
+            allProducts={allProducts}
             p7Data={opportunity.p7Data}
             onDataChange={(data) => onOpportunityUpdate({ p7Data: data })}
             onCompleteDelivery={onAdvanceStage}
