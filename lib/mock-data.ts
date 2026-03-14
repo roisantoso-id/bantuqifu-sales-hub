@@ -1,9 +1,10 @@
 import type { Opportunity, Product, ActionLog, UserProfile, Currency } from './types'
 
 // ─── Exchange Rate (Fixed for demo) ─────────────────────────────────────────
+// Value represents how many units of currency = 1 CNY
 export const EXCHANGE_RATES: Record<Currency, number> = {
   CNY: 1,
-  IDR: 0.00044, // 1 CNY = 0.00044 IDR (simplified)
+  IDR: 2273, // 1 CNY ≈ 2273 IDR
 }
 
 export const mockUser: UserProfile = {

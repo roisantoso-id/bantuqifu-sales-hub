@@ -29,11 +29,9 @@ function getDifficultyLabel(difficulty?: number): string {
   return `难度: ${difficulty}/5`
 }
 
-function convertPrice(price: number, fromCurrency: Currency, toCurrency: Currency): number {
-  if (fromCurrency === toCurrency) return price
-  // Convert to base (CNY), then to target
-  const inCNY = price / EXCHANGE_RATES[fromCurrency]
-  return inCNY * EXCHANGE_RATES[toCurrency]
+function convertPrice(priceInCNY: number, toCurrency: Currency): number {
+  // All product prices are stored in CNY, convert to target currency
+  return priceInCNY * EXCHANGE_RATES[toCurrency]
 }
 
 export function P2ProductMatcher({
@@ -61,7 +59,7 @@ export function P2ProductMatcher({
       discount: 0,
       currency: currentCurrency,
       billingCycle: product.billingCycles?.[0],
-      subtotal: convertPrice(product.price, 'CNY', currentCurrency),
+      subtotal: convertPrice(product.price, currentCurrency),
     }
     onProductsChange([...selectedProducts, newItem])
   }
@@ -75,12 +73,13 @@ export function P2ProductMatcher({
     onProductsChange(
       selectedProducts.map((sp) => {
         if (sp.product.id === productId) {
-          const priceConverted = convertPrice(sp.product.price, 'CNY', sp.currency)
+          const priceConverted = convertPrice(sp.product.price, currentCurrency)
           const multiplier = sp.billingCycle ? sp.product.billingCycles?.indexOf(sp.billingCycle) ?? 0 : 0
           const basePrice = priceConverted * (multiplier + 1)
           return {
             ...sp,
             quantity: qty,
+            currency: currentCurrency,
             subtotal: basePrice * qty * (1 - sp.discount / 100),
           }
         }
@@ -94,12 +93,13 @@ export function P2ProductMatcher({
     onProductsChange(
       selectedProducts.map((sp) => {
         if (sp.product.id === productId) {
-          const priceConverted = convertPrice(sp.product.price, 'CNY', sp.currency)
+          const priceConverted = convertPrice(sp.product.price, currentCurrency)
           const multiplier = sp.billingCycle ? sp.product.billingCycles?.indexOf(sp.billingCycle) ?? 0 : 0
           const basePrice = priceConverted * (multiplier + 1)
           return {
             ...sp,
             discount: d,
+            currency: currentCurrency,
             subtotal: basePrice * sp.quantity * (1 - d / 100),
           }
         }
@@ -113,11 +113,12 @@ export function P2ProductMatcher({
       selectedProducts.map((sp) => {
         if (sp.product.id === productId && sp.product.billingCycles) {
           const multiplier = sp.product.billingCycles.indexOf(cycle)
-          const priceConverted = convertPrice(sp.product.price, 'CNY', sp.currency)
+          const priceConverted = convertPrice(sp.product.price, currentCurrency)
           const basePrice = priceConverted * (multiplier + 1)
           return {
             ...sp,
             billingCycle: cycle,
+            currency: currentCurrency,
             subtotal: basePrice * sp.quantity * (1 - sp.discount / 100),
           }
         }
@@ -126,10 +127,17 @@ export function P2ProductMatcher({
     )
   }
 
-  const totalAmount = useMemo(
-    () => selectedProducts.reduce((sum, sp) => sum + sp.subtotal, 0),
-    [selectedProducts]
-  )
+  const totalAmount = useMemo(() => {
+    return selectedProducts.reduce((sum, sp) => {
+      const displayPrice = convertPrice(sp.product.price, currentCurrency)
+      const multiplier = sp.billingCycle
+        ? sp.product.billingCycles?.indexOf(sp.billingCycle) ?? 0
+        : 0
+      const basePrice = displayPrice * (multiplier + 1)
+      const unitPrice = basePrice * (1 - sp.discount / 100)
+      return sum + unitPrice * sp.quantity
+    }, 0)
+  }, [selectedProducts, currentCurrency])
 
   const sortedCategories = [
     ...CATEGORY_ORDER.filter((c) => grouped[c]),
@@ -257,12 +265,13 @@ export function P2ProductMatcher({
               {/* Table rows */}
               <div className="flex-1 overflow-y-auto">
                 {selectedProducts.map((sp, idx) => {
-                  const displayPrice = convertPrice(sp.product.price, 'CNY', sp.currency)
+                  const displayPrice = convertPrice(sp.product.price, currentCurrency)
                   const multiplier = sp.billingCycle
                     ? sp.product.billingCycles?.indexOf(sp.billingCycle) ?? 0
                     : 0
                   const basePrice = displayPrice * (multiplier + 1)
                   const unitPrice = basePrice * (1 - sp.discount / 100)
+                  const subtotal = unitPrice * sp.quantity
 
                   return (
                     <div
@@ -326,13 +335,13 @@ export function P2ProductMatcher({
 
                       {/* Unit price */}
                       <div className="font-mono text-right text-[#111827]">
-                        {formatPrice(unitPrice, sp.currency)}
+                        {formatPrice(unitPrice, currentCurrency)}
                       </div>
 
                       {/* Subtotal */}
                       <div className="flex items-center justify-between">
                         <span className="font-mono font-semibold text-[#111827]">
-                          {formatPrice(sp.subtotal, sp.currency)}
+                          {formatPrice(subtotal, currentCurrency)}
                         </span>
                         <button
                           onClick={() => removeProduct(sp.product.id)}
