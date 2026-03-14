@@ -118,8 +118,10 @@ export function WorkspacePane({
         )}
         {viewingStage === 'P5' && (
           <P5Finance
+            opportunity={opportunity}
             p5Data={opportunity.p5Data}
             onDataChange={(data) => onOpportunityUpdate({ p5Data: data })}
+            onConfirmPayment={onAdvanceStage}
           />
         )}
         {viewingStage === 'P6' && (

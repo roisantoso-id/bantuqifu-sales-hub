@@ -38,12 +38,19 @@ export interface OpportunityP4Data {
 
 export interface OpportunityP5Data {
   bankAccount?: string
+  bankName?: string
+  accountHolder?: string
+  swiftCode?: string
   dueAmount: number
   receivedAmount: number
   receiptFileUrl?: string
+  receiptFileName?: string
+  receiptUploadedAt?: string
+  receiptUploadedBy?: string
   paymentStatus: 'pending' | 'verified' | 'rejected' // 待收款 | 已确认 | 驳回
   rejectionReason?: string
   confirmedAt?: string
+  confirmedBy?: string
 }
 
 export interface MaterialItem {
