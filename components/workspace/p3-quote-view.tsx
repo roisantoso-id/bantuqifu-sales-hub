@@ -1,7 +1,7 @@
 'use client'
 
 import { Send, FileText } from 'lucide-react'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import type { Opportunity, Product, OpportunityP3Data, Currency } from '@/lib/types'
 import { EXCHANGE_RATES } from '@/lib/mock-data'
 
@@ -29,6 +29,12 @@ export function P3QuoteView({
   onQuoteSent,
 }: P3QuoteViewProps) {
   const [currentCurrency, setCurrentCurrency] = useState<Currency>('CNY')
+  const [currentDate, setCurrentDate] = useState<Date | null>(null)
+
+  // Set date on client-side only to avoid hydration mismatch
+  useEffect(() => {
+    setCurrentDate(new Date())
+  }, [])
 
   // Auto-initialize p3Data from p2Data if empty
   const displayData = useMemo(() => {
@@ -162,13 +168,13 @@ export function P3QuoteView({
             <div>
               <h4 className="text-[13px] font-semibold text-[#111827]">服务报价单</h4>
               <p className="font-mono text-[11px] text-[#9ca3af]">
-                QUO-{opportunity.id.replace('opp-', '').toUpperCase()}-{new Date().getFullYear()}
+                QUO-{opportunity.id.replace('opp-', '').toUpperCase()}-{currentDate?.getFullYear() ?? '----'}
               </p>
             </div>
             <div className="text-right">
               <p className="text-[11px] text-[#9ca3af]">生成日期</p>
               <p className="font-mono text-[12px] text-[#374151]">
-                {formatDate(new Date().toISOString())}
+                {currentDate ? formatDate(currentDate.toISOString()) : '----/--/--'}
               </p>
             </div>
           </div>
@@ -353,7 +359,7 @@ export function P3QuoteView({
                     <p className="text-[#16a34a] italic">所有产品已通过自动审批，可提交财务确认</p>
                   )}
                   {total === 0 && (
-                    <p className="text-[#9ca3af] italic">请先在 P2 阶段添加产品</p>
+                    <p className="text-[#9ca3af] italic">请先在 P2 ��段添加产品</p>
                   )}
                 </>
               )
