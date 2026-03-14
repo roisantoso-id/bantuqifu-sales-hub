@@ -214,6 +214,7 @@ export async function createCustomerAction(data: {
   wechat?: string | null
   level?: string
   passportNo?: string | null
+  industry?: string | null
 }): Promise<CustomerRow | null> {
   // 写操作使用 service_role 绕过 RLS
   const supabase = await createServiceClient()
@@ -236,6 +237,7 @@ export async function createCustomerAction(data: {
           wechat: data.wechat ?? null,
           level: data.level ?? 'L5',
           passportNo: data.passportNo ?? null,
+          industry: data.industry ?? null,
           isLocked: false,
         },
       ])

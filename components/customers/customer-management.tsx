@@ -95,7 +95,7 @@ export function CustomerManagement({ onSelectCustomer }: CustomerManagementProps
 
   // Create customer modal
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [createForm, setCreateForm] = useState({ customerName: '', phone: '', email: '', wechat: '', level: 'L5' })
+  const [createForm, setCreateForm] = useState({ customerName: '', phone: '', email: '', wechat: '', level: 'L5', industry: '' })
   const [creating, setCreating] = useState(false)
 
   useEffect(() => {
@@ -207,13 +207,14 @@ export function CustomerManagement({ onSelectCustomer }: CustomerManagementProps
     if (!createForm.customerName.trim()) return
     setCreating(true)
     try {
-      const result = await createCustomerAction({
-        customerName: createForm.customerName.trim(),
-        phone: createForm.phone || null,
-        email: createForm.email || null,
-        wechat: createForm.wechat || null,
-        level: createForm.level,
-      })
+const result = await createCustomerAction({
+  customerName: createForm.customerName.trim(),
+  phone: createForm.phone || null,
+  email: createForm.email || null,
+  wechat: createForm.wechat || null,
+  level: createForm.level,
+  industry: createForm.industry || null,
+  })
       if (result) {
         setCustomers((prev) => [result, ...prev])
         setCreateForm({ customerName: '', phone: '', email: '', wechat: '', level: 'L5' })
@@ -582,16 +583,20 @@ export function CustomerManagement({ onSelectCustomer }: CustomerManagementProps
                   <input type="text" value={createForm.wechat} onChange={(e) => setCreateForm((f) => ({ ...f, wechat: e.target.value }))} className="w-full h-8 px-2 text-[12px] font-mono border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb]" placeholder="微信号" />
                 </div>
               </div>
-              <div>
-                <label className="block text-[12px] text-[#6b7280] mb-1">邮箱</label>
-                <input type="text" value={createForm.email} onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))} className="w-full h-8 px-2 text-[12px] border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb]" placeholder="email@example.com" />
-              </div>
-              <div>
-                <label className="block text-[12px] text-[#6b7280] mb-1">客户等级</label>
-                <select value={createForm.level} onChange={(e) => setCreateForm((f) => ({ ...f, level: e.target.value }))} className="w-full h-8 px-2 text-[12px] border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb] bg-white">
-                  {CUSTOMER_LEVELS.map((l) => <option key={l.id} value={l.id}>{l.id} - {l.zh}</option>)}
-                </select>
-              </div>
+<div>
+  <label className="block text-[12px] text-[#6b7280] mb-1">邮箱</label>
+  <input type="text" value={createForm.email} onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))} className="w-full h-8 px-2 text-[12px] border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb]" placeholder="email@example.com" />
+  </div>
+  <div>
+  <label className="block text-[12px] text-[#6b7280] mb-1">行业 *</label>
+  <input type="text" value={createForm.industry} onChange={(e) => setCreateForm((f) => ({ ...f, industry: e.target.value }))} className="w-full h-8 px-2 text-[12px] border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb]" placeholder="例如：跨境电商、物流、贸易" />
+  </div>
+  <div>
+  <label className="block text-[12px] text-[#6b7280] mb-1">客户等级</label>
+  <select value={createForm.level} onChange={(e) => setCreateForm((f) => ({ ...f, level: e.target.value }))} className="w-full h-8 px-2 text-[12px] border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb] bg-white">
+  {CUSTOMER_LEVELS.map((l) => <option key={l.id} value={l.id}>{l.id} - {l.zh}</option>)}
+  </select>
+  </div>
             </div>
             <div className="flex justify-end gap-2 px-4 py-3 border-t border-[#e5e7eb]">
               <button onClick={() => setShowCreateModal(false)} className="h-8 px-3 text-[12px] text-[#6b7280] hover:text-[#111827]">取消</button>
