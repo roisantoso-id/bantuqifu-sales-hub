@@ -30,6 +30,30 @@ export function P3QuoteView({
 }: P3QuoteViewProps) {
   const [currentCurrency, setCurrentCurrency] = useState<Currency>('CNY')
 
+  // Auto-initialize p3Data from p2Data if empty
+  const displayData = useMemo(() => {
+    if (p3Data.length > 0) return p3Data
+    if (!opportunity.p2Data || opportunity.p2Data.length === 0) return []
+    
+    // Initialize from P2 data
+    const initialized = opportunity.p2Data.map((p2Item) => {
+      const product = allProducts.find((p) => p.id === p2Item.productId)
+      return {
+        productId: p2Item.productId,
+        lockedPrice: product?.basePrice ?? 0,
+        currency: 'CNY' as Currency,
+        recommendedPrice: product?.recommendedPrice,
+        costFloor: product?.costPrice,
+        profitMargin: product ? ((product.basePrice - (product.costPrice ?? 0)) / (product.costPrice ?? 1)) * 100 : 0,
+        approvalStatus: 'auto-approved' as const,
+      } as OpportunityP3Data
+    })
+    
+    // Save to opportunity
+    onP3DataChange(initialized)
+    return initialized
+  }, [p3Data, opportunity.p2Data, allProducts, onP3DataChange])
+
   const updatePrice = (productId: string, price: number) => {
     onP3DataChange(
       p3Data.map((item) => {
@@ -62,20 +86,21 @@ export function P3QuoteView({
     return new Map(allProducts.map((p) => [p.id, p]))
   }, [allProducts])
 
-  const displayData = useMemo(() => {
-    return p3Data.map((item) => ({
+  // Enrich display data with product details
+  const enrichedDisplayData = useMemo(() => {
+    return displayData.map((item) => ({
       ...item,
       product: productMap.get(item.productId),
     }))
-  }, [p3Data, productMap])
+  }, [displayData, productMap])
 
   const subtotal = useMemo(() => {
-    return displayData.reduce((sum, item) => {
+    return enrichedDisplayData.reduce((sum, item) => {
       const inCNY = item.lockedPrice / EXCHANGE_RATES[item.currency]
       const inDisplayCurrency = inCNY * EXCHANGE_RATES[currentCurrency]
       return sum + inDisplayCurrency
     }, 0)
-  }, [displayData, currentCurrency])
+  }, [enrichedDisplayData, currentCurrency])
 
   const tax = Math.round(subtotal * 0.06)
   const total = subtotal + tax
@@ -178,7 +203,7 @@ export function P3QuoteView({
 
             {/* Table Rows */}
             <div className="divide-y divide-[#f3f4f6]">
-              {displayData.map((item) => {
+              {enrichedDisplayData.map((item) => {
                 if (!item.product) return null
                 const displayPrice = convertToDisplay(item.lockedPrice, item.currency)
                 const displayRecommended = item.recommendedPrice ? convertToDisplay(item.recommendedPrice, 'CNY') : 0
@@ -271,8 +296,8 @@ export function P3QuoteView({
               <div className="flex justify-between text-[11px] text-[#9ca3af]">
                 <span>平均毛利</span>
                 <span className="font-mono">
-                  {displayData.length > 0
-                    ? ((displayData.reduce((sum, d) => sum + (d.profitMargin ?? 0), 0) / displayData.length) || 0).toFixed(1)
+                  {enrichedDisplayData.length > 0
+                    ? ((enrichedDisplayData.reduce((sum, d) => sum + (d.profitMargin ?? 0), 0) / enrichedDisplayData.length) || 0).toFixed(1)
                     : '0'}
                   %
                 </span>
@@ -286,9 +311,9 @@ export function P3QuoteView({
           <h4 className="text-[12px] font-semibold text-[#111827] mb-2">审批状态概览</h4>
           <div className="space-y-1.5 text-[11px]">
             {(() => {
-              const autoApproved = displayData.filter((d) => d.approvalStatus === 'auto-approved').length
-              const adminRequired = displayData.filter((d) => d.approvalStatus === 'admin-required').length
-              const total = displayData.length
+              const autoApproved = enrichedDisplayData.filter((d) => d.approvalStatus === 'auto-approved').length
+              const adminRequired = enrichedDisplayData.filter((d) => d.approvalStatus === 'admin-required').length
+              const total = enrichedDisplayData.length
 
               return (
                 <>
