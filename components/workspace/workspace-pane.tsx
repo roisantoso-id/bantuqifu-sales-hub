@@ -111,6 +111,7 @@ export function WorkspacePane({
         )}
         {viewingStage === 'P4' && (
           <P4Contract
+            opportunity={opportunity}
             p4Data={opportunity.p4Data}
             onDataChange={(data) => onOpportunityUpdate({ p4Data: data })}
           />
