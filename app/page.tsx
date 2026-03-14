@@ -7,6 +7,7 @@ import { WorkspacePane } from '@/components/workspace/workspace-pane'
 import { CustomerManagement } from '@/components/customers/customer-management'
 import { CustomerProfile } from '@/components/customers/customer-profile'
 import { LeadManagement } from '@/components/leads/lead-management'
+import { MyDashboard } from '@/components/dashboard/my-dashboard'
 import { AuditRail } from '@/components/audit-rail/audit-panel'
 import { mockOpportunities, mockProducts, mockActionLogs, mockUser, mockLeads } from '@/lib/mock-data'
 import { addAuditNote } from '@/app/actions/audit'
@@ -368,6 +369,16 @@ export default function SalesHub() {
               onSelectCustomer={setSelectedCustomerId}
             />
           )}
+        </div>
+      ) : activeNav === 'analytics' ? (
+        <div className="flex-1">
+          <MyDashboard
+            opportunities={opportunities}
+            leads={leads}
+            actionLogs={actionLogs}
+            assignee={mockUser.name}
+            userName={mockUser.name}
+          />
         </div>
       ) : (
         <div className="flex-1 flex items-center justify-center text-[#9ca3af]">
