@@ -1,7 +1,7 @@
 'use client'
 
 import { X, ClipboardList, Upload, FileText, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import type { ActionLog, ActionType, StageId } from '@/lib/types'
 
 interface AuditRailProps {
@@ -60,6 +60,12 @@ export function AuditRail({ logs, opportunityId, onClose, onAddNote }: AuditRail
 
   const sorted = [...logs].sort(
     (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  )
+
+  // 预格式化所有日志的时间戳，避免 hydration 不匹配
+  const formattedLogs = useMemo(
+    () => sorted.map(log => ({ ...log, formattedTime: formatTimestamp(log.timestamp) })),
+    [sorted]
   )
 
   const toggleExpand = (id: string) => {
@@ -125,10 +131,10 @@ export function AuditRail({ logs, opportunityId, onClose, onAddNote }: AuditRail
           <div className="mt-6 text-center text-[12px] text-[#9ca3af]">暂无操作记录</div>
         ) : (
           <ul className="space-y-0">
-            {sorted.map((log, i) => {
+            {formattedLogs.map((log, i) => {
               const meta = ACTION_META[log.actionType] ?? ACTION_META.NOTE
-              const { date, time } = formatTimestamp(log.timestamp)
-              const isLast = i === sorted.length - 1
+              const { date, time } = log.formattedTime
+              const isLast = i === formattedLogs.length - 1
               const isExpanded = expandedIds.has(log.id)
               const remarkLines = log.remark ? countLines(log.remark) : 0
               const shouldShowCollapse = remarkLines > 3

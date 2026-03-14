@@ -316,12 +316,11 @@ export default function SalesHub() {
             opportunity={selectedOpportunity}
             allProducts={mockProducts}
             viewingStage={viewingStage}
+            onViewingStageChange={setViewingStage}
             onOpportunityUpdate={handleOpportunityUpdate}
             onSave={handleSave}
             onAdvanceStage={handleAdvanceStage}
             onQuoteSent={handleQuoteSent}
-            logs={currentLogs}
-            onAddNote={handleAddNote}
           />
 
           {/* 审计栏 (256px) */}
