@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Search, Plus } from 'lucide-react'
+import { Search, Plus, Pin, PinOff } from 'lucide-react'
 import type { Opportunity, StageId } from '@/lib/types'
 
 interface SecondarySidebarProps {
@@ -48,6 +48,17 @@ function formatAmount(amount: number, currency: string) {
 export function SecondarySidebar({ opportunities, selectedId, onSelect }: SecondarySidebarProps) {
   const [query, setQuery] = useState('')
   const [groupFilter, setGroupFilter] = useState<string | null>(null)
+  const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set())
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
+
+  const togglePin = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    setPinnedIds((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
 
   const activeGroup = STAGE_GROUPS.find((g) => g.label === groupFilter)
 
@@ -61,6 +72,11 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect }: Second
     const matchesStage = !activeGroup || activeGroup.stages.includes(opp.stageId)
     return matchesQuery && matchesStage
   })
+
+  // pinned first, then rest — preserve original order within each group
+  const pinned = filtered.filter((o) => pinnedIds.has(o.id))
+  const unpinned = filtered.filter((o) => !pinnedIds.has(o.id))
+  const sorted = [...pinned, ...unpinned]
 
   return (
     <aside className="flex h-full w-[280px] flex-col border-r border-[#e5e7eb] bg-[#f9fafb]">
@@ -121,37 +137,71 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect }: Second
       </div>
 
       {/* Count */}
-      <div className="px-3 py-1.5">
+      <div className="flex items-center justify-between px-3 py-1.5">
         <span className="text-[11px] text-[#9ca3af]">{filtered.length} 条商机</span>
+        {pinnedIds.size > 0 && (
+          <span className="inline-flex items-center gap-0.5 text-[10px] text-[#6b7280]">
+            <Pin size={10} className="text-[#f59e0b]" />
+            {pinnedIds.size} 个置顶
+          </span>
+        )}
       </div>
 
       {/* List */}
       <ul className="flex-1 overflow-y-auto">
-        {filtered.map((opp) => {
+        {sorted.map((opp, idx) => {
           const isSelected = opp.id === selectedId
+          const isPinned = pinnedIds.has(opp.id)
+          const isHovered = hoveredId === opp.id
           const stageColor = STAGE_COLOR[opp.stageId] ?? STAGE_COLOR.P1
+          // Divider between pinned and unpinned sections
+          const showDivider = isPinned && idx === pinned.length - 1 && unpinned.length > 0
           return (
             <li key={opp.id}>
               <button
                 onClick={() => onSelect(opp)}
+                onMouseEnter={() => setHoveredId(opp.id)}
+                onMouseLeave={() => setHoveredId(null)}
                 className={[
-                  'relative w-full border-b border-[#e5e7eb] px-3 py-2.5 text-left transition-colors',
+                  'group relative w-full border-b border-[#e5e7eb] px-3 py-2.5 text-left transition-colors',
                   isSelected ? 'bg-white' : 'hover:bg-white',
+                  isPinned ? 'bg-[#fffbeb]' : '',
                 ].join(' ')}
               >
                 {/* Active indicator bar */}
                 {isSelected && (
                   <span className="absolute inset-y-0 left-0 w-0.5 rounded-r-sm bg-[#2563eb]" />
                 )}
+                {/* Pinned indicator bar */}
+                {isPinned && !isSelected && (
+                  <span className="absolute inset-y-0 left-0 w-0.5 rounded-r-sm bg-[#f59e0b]" />
+                )}
 
-                {/* Row 1: name + amount */}
-                <div className="flex items-center justify-between">
-                  <span className="text-[13px] font-medium text-[#111827]">
-                    {opp.customer.name}
-                  </span>
-                  <span className="font-mono text-[12px] text-[#374151]">
-                    {formatAmount(opp.estimatedAmount, opp.currency)}
-                  </span>
+                {/* Row 1: name + amount + pin button */}
+                <div className="flex items-center justify-between gap-1">
+                  <div className="flex min-w-0 flex-1 items-center gap-1">
+                    {isPinned && (
+                      <Pin size={10} className="shrink-0 text-[#f59e0b]" style={{ fill: '#f59e0b' }} />
+                    )}
+                    <span className="truncate text-[13px] font-medium text-[#111827]">
+                      {opp.customer.name}
+                    </span>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {/* Pin toggle — visible on hover or if pinned */}
+                    {(isHovered || isPinned) && (
+                      <button
+                        onClick={(e) => togglePin(e, opp.id)}
+                        className="flex h-4 w-4 items-center justify-center rounded-sm text-[#9ca3af] hover:bg-[#f3f4f6] hover:text-[#f59e0b]"
+                        title={isPinned ? '取消置顶' : '置顶'}
+                      >
+                        {isPinned ? <PinOff size={10} /> : <Pin size={10} />}
+                      </button>
+                    )}
+                    <span className="font-mono text-[12px] text-[#374151]">
+                      {formatAmount(opp.estimatedAmount, opp.currency)}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Row 2: passport + destination */}
@@ -182,11 +232,19 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect }: Second
                   <span className="text-[10px] text-[#9ca3af]">{opp.assignee}</span>
                 </div>
               </button>
+              {/* Divider between pinned and unpinned */}
+              {showDivider && (
+                <div className="flex items-center gap-1.5 border-b border-[#e5e7eb] bg-[#f9fafb] px-3 py-0.5">
+                  <div className="h-px flex-1 bg-[#e5e7eb]" />
+                  <span className="text-[10px] text-[#9ca3af]">其他商机</span>
+                  <div className="h-px flex-1 bg-[#e5e7eb]" />
+                </div>
+              )}
             </li>
           )
         })}
 
-        {filtered.length === 0 && (
+        {sorted.length === 0 && (
           <li className="py-8 text-center text-[12px] text-[#9ca3af]">无匹配商机</li>
         )}
       </ul>
