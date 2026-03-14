@@ -2,7 +2,9 @@
 
 import { useState, useMemo } from 'react'
 import { ChevronLeft, Plus, Edit2, Archive } from 'lucide-react'
-import type { Opportunity, ActionLog, Lead } from '@/lib/types'
+import type { Opportunity, ActionLog, Lead, ChinaEntity } from '@/lib/types'
+import { ChinaEntitySearchDialog } from './china-entity-search-dialog'
+import { DomesticEntityCard } from './domestic-entity-card'
 
 interface CustomerProfileProps {
   customerId: string
@@ -41,6 +43,8 @@ export function CustomerProfile({
 }: CustomerProfileProps) {
   const [activeTab, setActiveTab] = useState<TabId>('opportunities')
   const [newNote, setNewNote] = useState('')
+  const [chinaEntityDialogOpen, setChinaEntityDialogOpen] = useState(false)
+  const [associatedEntity, setAssociatedEntity] = useState<ChinaEntity | null>(null)
 
   // Filter customer's opportunities and leads
   const customerOpportunities = useMemo(
@@ -150,6 +154,16 @@ export function CustomerProfile({
               <Plus size={14} />
               新建商机
             </button>
+            {!associatedEntity && (
+              <button
+                onClick={() => setChinaEntityDialogOpen(true)}
+                className="flex h-8 items-center gap-1 rounded-sm border border-[#128BED] bg-[#f0f9ff] px-2 text-[12px] font-medium text-[#128BED] hover:bg-[#e0f2fe]"
+                title="关联国内实体"
+              >
+                <Plus size={14} />
+                国内实体
+              </button>
+            )}
             <button className="flex h-8 w-8 items-center justify-center rounded-sm border border-[#e5e7eb] text-[#6b7280] hover:bg-[#f9fafb]">
               <Edit2 size={14} />
             </button>
@@ -181,6 +195,20 @@ export function CustomerProfile({
         </div>
       </div>
 
+      {/* Domestic Entity Card */}
+      {associatedEntity && (
+        <div className="border-b border-[#e5e7eb] px-5 py-4">
+          <DomesticEntityCard
+            entity={associatedEntity}
+            industry="制造业"
+            contactPerson={customerName}
+            businessMatch="high"
+            riskLevel="low"
+            onRemove={() => setAssociatedEntity(null)}
+          />
+        </div>
+      )}
+
       {/* Tab Content */}
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'opportunities' && (
@@ -198,6 +226,13 @@ export function CustomerProfile({
           />
         )}
       </div>
+
+      {/* China Entity Search Dialog */}
+      <ChinaEntitySearchDialog
+        open={chinaEntityDialogOpen}
+        onOpenChange={setChinaEntityDialogOpen}
+        onSelect={(entity) => setAssociatedEntity(entity)}
+      />
     </div>
   )
 }

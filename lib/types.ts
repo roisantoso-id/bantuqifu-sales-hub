@@ -1,3 +1,28 @@
+// ─── Domestic Entity (国内关联实体) ──────────────────────────────────────────
+export type ChinaEntityStatus = '存续' | '吊销' | '注销'
+
+export interface ChinaEntity {
+  id: string // 统一社会信用代码
+  companyName: string // 公司全名
+  creditCode: string // 统一社会信用代码 (font-mono)
+  legalPerson: string // 法定代表人
+  regCapital: string // 注册资本 (如 "1000万人民币")
+  businessScope?: string // 经营范围
+  status: ChinaEntityStatus
+  industry?: string // 行业分类 (如 "制造业")
+  foundedDate?: string
+  registrationLocation?: string // 注册地
+}
+
+export interface DomesticEntityAssociation {
+  customerId: string
+  chinaEntity: ChinaEntity
+  businessMatch: 'high' | 'medium' | 'low' // 与印尼业务的匹配度
+  riskLevel: 'low' | 'medium' | 'high' // 风险等级
+  notes?: string
+  associatedAt: string
+}
+
 // ─── Customer Level ──────────────────────────────────────────────────────────
 export const CUSTOMER_LEVELS = [
   { id: 'L2', zh: '央企总部和龙头企业', id_: 'BUMN Pusat & Perusahaan Unggulan', weight: 5 },
@@ -175,7 +200,7 @@ export interface RefundItem {
 
 export interface ExpenseItem {
   id: string
-  description: string // 事由（如："政府规费"、"加急费"、"差旅费"）
+  description: string // 事由（如："政���规费"、"加急费"、"差旅费"）
   amount: number
   category: 'gov-fee' | 'expedite' | 'travel' | 'other' // 分类
   receiptUrl?: string
