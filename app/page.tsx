@@ -316,12 +316,11 @@ export default function SalesHub() {
             opportunity={selectedOpportunity}
             allProducts={mockProducts}
             viewingStage={viewingStage}
+            onViewingStageChange={setViewingStage}
             onOpportunityUpdate={handleOpportunityUpdate}
             onSave={handleSave}
             onAdvanceStage={handleAdvanceStage}
             onQuoteSent={handleQuoteSent}
-            logs={currentLogs}
-            onAddNote={handleAddNote}
           />
 
           {/* 审计栏 (256px) */}
@@ -330,33 +329,26 @@ export default function SalesHub() {
             onToggle={setShowAuditRail}
             opportunity={selectedOpportunity}
             logs={currentLogs}
+            onAddNote={handleAddNote}
           />
         </>
       ) : activeNav === 'customers' ? (
-        <>
-          <SecondarySidebar
-            activeNav={activeNav}
+        <div className="flex-1 overflow-hidden">
+          <CustomerManagement
+            customers={opportunities.map((o) => ({
+              customerId: o.customerId,
+              customerName: o.customer.name,
+              contactName: mockUser.name,
+              phone: o.customer.phone,
+              email: o.customer.email,
+              level: 'A',
+              isLocked: false,
+            }))}
             opportunities={opportunities}
-            selectedId={selectedId}
-            onSelect={handleSelectOpportunity}
+            leads={leads}
+            actionLogs={actionLogs}
           />
-          <div className="flex-1 overflow-hidden">
-            <CustomerManagement
-              customers={opportunities.map((o) => ({
-                customerId: o.customerId,
-                customerName: o.customer.name,
-                contactName: mockUser.name,
-                phone: o.customer.phone,
-                email: o.customer.email,
-                level: 'A',
-                isLocked: false,
-              }))}
-              opportunities={opportunities}
-              leads={leads}
-              actionLogs={actionLogs}
-            />
-          </div>
-        </>
+        </div>
       ) : activeNav === 'analytics' ? (
         <div className="flex-1 overflow-hidden">
           <MyDashboard
