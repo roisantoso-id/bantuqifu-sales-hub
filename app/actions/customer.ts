@@ -520,16 +520,15 @@ export async function addAssociatedCompanyAction(data: {
 
 // ─── getCurrentUserId helper ─────────────────────────────────────────────────
 
-async function getCurrentUserId(): Promise<string> {
+async function getCurrentUserId(): Promise<string | null> {
   // 使用 service client 获取当前会话用户
   const supabase = await createServiceClient()
   const { data: { user }, error } = await supabase.auth.getUser()
   
   if (error || !user) {
-    // 如果没有认证用户，返回一个默认的系统用户 ID
-    // 实际生产中应该确保用户已登录
-    console.warn('[getCurrentUserId] No authenticated user, using fallback')
-    return 'system'
+    // 如果没有认证用户，返回 null（operatorId 已设为可空）
+    console.warn('[getCurrentUserId] No authenticated user')
+    return null
   }
   return user.id
 }
