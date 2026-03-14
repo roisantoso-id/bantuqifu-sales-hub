@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, LogIn, Globe, MessageCircle } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
@@ -17,6 +18,7 @@ const LANGUAGES = [
 ]
 
 export default function LoginPage() {
+  const router = useRouter()
   const [site, setSite] = useState<'ID' | 'CN'>('ID')
   const [selectedTenant, setSelectedTenant] = useState(TENANTS[0])
   const [tenantOpen, setTenantOpen] = useState(false)
@@ -31,9 +33,15 @@ export default function LoginPage() {
     setIsLoading(true)
     // 模拟登录延迟
     await new Promise(resolve => setTimeout(resolve, 800))
-    console.log('[v0] Login attempt:', { site, tenant: selectedTenant.id, email })
-    // TODO: 实现实际登录逻辑
-    setIsLoading(false)
+    
+    // 保存认证状态
+    localStorage.setItem('authToken', `token-${Date.now()}`)
+    localStorage.setItem('currentTenant', selectedTenant.id)
+    localStorage.setItem('currentSite', site)
+    localStorage.setItem('userEmail', email)
+    
+    // 重定向到主应用
+    router.push('/')
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
