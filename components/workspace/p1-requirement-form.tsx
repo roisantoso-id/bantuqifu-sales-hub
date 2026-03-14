@@ -1,164 +1,293 @@
 'use client'
 
+import { useState } from 'react'
 import type { Opportunity } from '@/lib/types'
-
-interface FormRowProps {
-  label: string
-  children: React.ReactNode
-}
-
-function FormRow({ label, children }: FormRowProps) {
-  return (
-    <div className="grid grid-cols-[140px_1fr] items-center gap-3 py-1.5">
-      <label className="text-right text-[12px] text-[#6b7280]">{label}</label>
-      <div>{children}</div>
-    </div>
-  )
-}
-
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  mono?: boolean
-}
-
-function FInput({ mono, className = '', ...props }: InputProps) {
-  return (
-    <input
-      className={[
-        'h-7 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[13px] text-[#111827]',
-        'placeholder-[#9ca3af] outline-none focus:border-[#2563eb]',
-        mono ? 'font-mono' : '',
-        className,
-      ].join(' ')}
-      {...props}
-    />
-  )
-}
-
-function FSelect({ className = '', ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  return (
-    <select
-      className={[
-        'h-7 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[13px] text-[#111827]',
-        'outline-none focus:border-[#2563eb]',
-        className,
-      ].join(' ')}
-      {...props}
-    />
-  )
-}
+import { mockProducts } from '@/lib/mock-data'
 
 interface P1FormProps {
   opportunity: Opportunity
   onUpdate: (data: Partial<Opportunity>) => void
+  onAdvance: () => void
 }
 
-export function P1RequirementForm({ opportunity, onUpdate }: P1FormProps) {
-  const { customer } = opportunity
+const DEMAND_SOURCES = ['群聊转入', '老客户转介绍', '渠道', '其他']
+const BUSINESS_CATEGORIES = ['签证服务', '财务服务', '准证服务', '公司开办服务', '税务服务']
+const CITIES = ['Jakarta', 'Surabaya', 'Bali', 'Bandung', 'Medan']
+const URGENCY_LEVELS = ['普通', '紧急', '特急']
+
+export function P1RequirementForm({ opportunity, onUpdate, onAdvance }: P1FormProps) {
+  const [formData, setFormData] = useState({
+    customerName: opportunity.customer.name,
+    contactName: '',
+    demandSource: '',
+    businessCategory: opportunity.serviceType,
+    searchTerm: '',
+    showSuggestions: false,
+    processingTime: '',
+    city: '',
+    passportNo: opportunity.customer.passportNo,
+    urgency: '普通',
+    requirements: opportunity.requirements ?? '',
+  })
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const filteredProducts = mockProducts.filter(
+    (p) =>
+      p.name.toLowerCase().includes(formData.searchTerm.toLowerCase()) ||
+      p.category.includes(formData.businessCategory)
+  )
+
+  const handleProductSelect = (product: typeof mockProducts[0]) => {
+    setFormData((prev) => ({
+      ...prev,
+      searchTerm: product.name,
+      showSuggestions: false,
+    }))
+  }
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {}
+    if (!opportunity.id) newErrors.opportunityId = '商机ID必填'
+    if (!formData.businessCategory) newErrors.businessCategory = '业务分类必填'
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleAdvance = () => {
+    if (!validateForm()) return
+    onUpdate({
+      customer: {
+        ...opportunity.customer,
+        name: formData.customerName,
+      },
+      destination: formData.city,
+      requirements: formData.requirements,
+    })
+    onAdvance()
+  }
 
   return (
-    <div className="space-y-0">
-      {/* Section: 客户信息 */}
-      <div className="mb-4">
-        <div className="mb-1 border-b border-[#e5e7eb] pb-1">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">
-            客户信息
-          </span>
-        </div>
-        <FormRow label="客户姓名">
-          <FInput defaultValue={customer.name} placeholder="请输入姓名" />
-        </FormRow>
-        <FormRow label="护照号码">
-          <FInput mono defaultValue={customer.passportNo} placeholder="E00000000" />
-        </FormRow>
-        <FormRow label="联系电话">
-          <FInput mono defaultValue={customer.phone} placeholder="手机号码" />
-        </FormRow>
-        <FormRow label="电子邮件">
-          <FInput defaultValue={customer.email} placeholder="email@example.com" />
-        </FormRow>
-        <FormRow label="微信号">
-          <FInput defaultValue={customer.wechat ?? ''} placeholder="（选填）" />
-        </FormRow>
+    <div className="flex h-full flex-col bg-white">
+      {/* Header */}
+      <div className="border-b border-[#e5e7eb] px-5 py-2.5">
+        <h3 className="text-[13px] font-semibold text-[#111827]">P1: 需求收集</h3>
+        <p className="mt-0.5 text-[11px] text-[#9ca3af]">记录客户基础信息与服务意向</p>
       </div>
 
-      {/* Section: 服务需求 */}
-      <div>
-        <div className="mb-1 border-b border-[#e5e7eb] pb-1">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">
-            服务需求
-          </span>
-        </div>
-        <FormRow label="服务类型">
-          <FSelect
-            defaultValue={opportunity.serviceType}
-            onChange={(e) =>
-              onUpdate({
-                serviceType: e.target.value as Opportunity['serviceType'],
-              })
-            }
-          >
-            <option value="VISA">旅游签证</option>
-            <option value="IMMIGRATION">移民服务</option>
-            <option value="STUDY">留学申请</option>
-            <option value="WORK">工作签证</option>
-          </FSelect>
-        </FormRow>
-        <FormRow label="目的地">
-          <FInput
-            defaultValue={opportunity.destination ?? ''}
-            placeholder="目的国家/地区"
-            onChange={(e) => onUpdate({ destination: e.target.value })}
-          />
-        </FormRow>
-        <FormRow label="出行日期">
-          <FInput
-            mono
-            type="date"
-            defaultValue={opportunity.travelDate ?? ''}
-            onChange={(e) => onUpdate({ travelDate: e.target.value })}
-          />
-        </FormRow>
-        <FormRow label="预估金额">
-          <div className="flex items-center gap-1.5">
-            <FInput
-              mono
-              type="number"
-              defaultValue={opportunity.estimatedAmount}
-              className="w-full"
-              onChange={(e) => onUpdate({ estimatedAmount: Number(e.target.value) })}
-            />
-            <FSelect
-              defaultValue={opportunity.currency}
-              className="w-20 shrink-0"
-              onChange={(e) => onUpdate({ currency: e.target.value })}
-            >
-              <option value="CNY">CNY</option>
-              <option value="USD">USD</option>
-              <option value="HKD">HKD</option>
-            </FSelect>
+      {/* Main Content - 两列网格 */}
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="max-w-4xl space-y-4">
+          {/* 区块 A: 客户与商机基础 */}
+          <div className="rounded-sm border border-[#e5e7eb] bg-white p-3">
+            <h4 className="mb-2 text-[12px] font-semibold text-[#111827]">A. 客户与商机基础</h4>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+              {/* 商机 ID - 只读 */}
+              <div className="flex items-center gap-1.5">
+                <label className="w-[120px] text-[12px] text-[#6b7280]">商机 ID</label>
+                <input
+                  type="text"
+                  value={opportunity.id}
+                  disabled
+                  className="h-8 flex-1 rounded-sm border border-[#e5e7eb] bg-[#f9fafb] px-2 font-mono text-[12px] text-[#9ca3af]"
+                />
+              </div>
+
+              {/* 客户名称 */}
+              <div className="flex items-center gap-1.5">
+                <label className="w-[120px] text-[12px] text-[#6b7280]">客户名称*</label>
+                <input
+                  type="text"
+                  value={formData.customerName}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, customerName: e.target.value }))}
+                  className="h-8 flex-1 rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#111827] outline-none focus:border-[#2563eb]"
+                />
+              </div>
+
+              {/* 联系人/微信名 */}
+              <div className="flex items-center gap-1.5">
+                <label className="w-[120px] text-[12px] text-[#6b7280]">联系人</label>
+                <input
+                  type="text"
+                  value={formData.contactName}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, contactName: e.target.value }))}
+                  className="h-8 flex-1 rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#111827] outline-none focus:border-[#2563eb]"
+                  placeholder="客户称呼/微信名"
+                />
+              </div>
+
+              {/* 需求来源 */}
+              <div className="flex items-center gap-1.5">
+                <label className="w-[120px] text-[12px] text-[#6b7280]">需求来源</label>
+                <select className="h-8 flex-1 rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#111827] outline-none focus:border-[#2563eb]">
+                  <option value="">请选择</option>
+                  {DEMAND_SOURCES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {errors.opportunityId && <p className="mt-1 text-[10px] text-[#dc2626]">{errors.opportunityId}</p>}
           </div>
-        </FormRow>
-        <FormRow label="负责人">
-          <FInput defaultValue={opportunity.assignee} placeholder="负责人姓名" onChange={(e) => onUpdate({ assignee: e.target.value })} />
-        </FormRow>
+
+          {/* 区块 B: 服务意向 */}
+          <div className="rounded-sm border border-[#e5e7eb] bg-white p-3">
+            <h4 className="mb-2 text-[12px] font-semibold text-[#111827]">B. 服务意向</h4>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+              {/* 业务分类 */}
+              <div className="flex items-center gap-1.5">
+                <label className="w-[120px] text-[12px] text-[#6b7280]">业务分类*</label>
+                <select
+                  value={formData.businessCategory}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, businessCategory: e.target.value }))}
+                  className={`h-8 flex-1 rounded-sm border px-2 text-[12px] outline-none focus:border-[#2563eb] ${
+                    errors.businessCategory
+                      ? 'border-[#fca5a5] bg-[#fef2f2] text-[#dc2626]'
+                      : 'border-[#e5e7eb] bg-white text-[#111827]'
+                  }`}
+                >
+                  <option value="">请选择</option>
+                  {BUSINESS_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 办理时长需求 */}
+              <div className="flex items-center gap-1.5">
+                <label className="w-[120px] text-[12px] text-[#6b7280]">办理时长</label>
+                <input
+                  type="text"
+                  value={formData.processingTime}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, processingTime: e.target.value }))}
+                  className="h-8 flex-1 rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#111827] outline-none focus:border-[#2563eb]"
+                  placeholder="如：7天、2周"
+                />
+              </div>
+
+              {/* 预选产品 - 模糊搜索 */}
+              <div className="relative flex items-center gap-1.5 col-span-2">
+                <label className="w-[120px] text-[12px] text-[#6b7280]">预选产品</label>
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    value={formData.searchTerm}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        searchTerm: e.target.value,
+                        showSuggestions: true,
+                      }))
+                    }
+                    onBlur={() => setTimeout(() => setFormData((prev) => ({ ...prev, showSuggestions: false })), 200)}
+                    onFocus={() => setFormData((prev) => ({ ...prev, showSuggestions: true }))}
+                    className="h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#111827] outline-none focus:border-[#2563eb]"
+                    placeholder="搜索产品"
+                  />
+                  {/* Suggestions */}
+                  {formData.showSuggestions && filteredProducts.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 z-10 mt-0.5 max-h-40 overflow-y-auto rounded-sm border border-[#e5e7eb] bg-white shadow-sm">
+                      {filteredProducts.slice(0, 5).map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => handleProductSelect(p)}
+                          className="flex w-full items-center gap-2 border-b border-[#f3f4f6] px-2 py-1 text-left text-[11px] hover:bg-[#f9fafb]"
+                        >
+                          <span className="flex-1 truncate text-[#111827] font-medium">{p.name}</span>
+                          <span className="text-[#9ca3af]">{p.category}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            {errors.businessCategory && <p className="mt-1 text-[10px] text-[#dc2626]">{errors.businessCategory}</p>}
+          </div>
+
+          {/* 区块 C: 交付关键参数 */}
+          <div className="rounded-sm border border-[#e5e7eb] bg-white p-3">
+            <h4 className="mb-2 text-[12px] font-semibold text-[#111827]">C. 交付关键参数</h4>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+              {/* 入境城市 */}
+              <div className="flex items-center gap-1.5">
+                <label className="w-[120px] text-[12px] text-[#6b7280]">入境城市</label>
+                <select
+                  value={formData.city}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, city: e.target.value }))}
+                  className="h-8 flex-1 rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#111827] outline-none focus:border-[#2563eb]"
+                >
+                  <option value="">请选择</option>
+                  {CITIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 护照号 */}
+              <div className="flex items-center gap-1.5">
+                <label className="w-[120px] text-[12px] text-[#6b7280]">护照号</label>
+                <input
+                  type="text"
+                  value={formData.passportNo}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, passportNo: e.target.value }))}
+                  className="h-8 flex-1 rounded-sm border border-[#e5e7eb] bg-white px-2 font-mono text-[12px] text-[#111827] outline-none focus:border-[#2563eb]"
+                  placeholder="E00000000"
+                />
+              </div>
+
+              {/* 紧急程度 - Toggle Group */}
+              <div className="col-span-2 flex items-center gap-1.5">
+                <label className="w-[120px] text-[12px] text-[#6b7280]">紧急程度</label>
+                <div className="flex gap-1">
+                  {URGENCY_LEVELS.map((level) => (
+                    <button
+                      key={level}
+                      onClick={() => setFormData((prev) => ({ ...prev, urgency: level }))}
+                      className={`h-8 px-2 rounded-sm text-[12px] font-medium transition-colors ${
+                        formData.urgency === level
+                          ? 'bg-[#2563eb] text-white'
+                          : 'border border-[#e5e7eb] text-[#6b7280] hover:border-[#2563eb]'
+                      }`}
+                    >
+                      {level}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 区块 D: 备注说明 */}
+          <div className="rounded-sm border border-[#e5e7eb] bg-white p-3">
+            <h4 className="mb-2 text-[12px] font-semibold text-[#111827]">D. 需求详情描述</h4>
+            <textarea
+              value={formData.requirements}
+              onChange={(e) => setFormData((prev) => ({ ...prev, requirements: e.target.value }))}
+              placeholder="记录客户具体需求、特殊情况、备注等"
+              rows={4}
+              className="w-full rounded-sm border border-[#e5e7eb] bg-white p-2 text-[12px] text-[#111827] placeholder-[#9ca3af] outline-none focus:border-[#2563eb] resize-none leading-relaxed"
+            />
+          </div>
+        </div>
       </div>
 
-      {/* Section: 客户备注 */}
-      <div className="mt-4">
-        <div className="mb-1 border-b border-[#e5e7eb] pb-1">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">
-            备注
-          </span>
-        </div>
-        <div className="py-1.5">
-          <textarea
-            defaultValue={opportunity.requirements ?? ''}
-            placeholder="记录客户具体需求、特殊情况..."
-            rows={4}
-            onChange={(e) => onUpdate({ requirements: e.target.value })}
-            className="w-full rounded-sm border border-[#e5e7eb] bg-white p-2 text-[13px] text-[#111827] placeholder-[#9ca3af] outline-none focus:border-[#2563eb] leading-relaxed resize-none"
-          />
-        </div>
+      {/* Footer - 固定工具栏 */}
+      <div className="border-t border-[#e5e7eb] bg-[#f9fafb] px-5 py-2 flex items-center justify-between">
+        <button className="flex h-8 items-center gap-1.5 rounded-sm border border-[#e5e7eb] bg-white px-3 text-[13px] text-[#374151] hover:border-[#d1d5db]">
+          保存草稿
+        </button>
+        <button
+          onClick={handleAdvance}
+          className="flex h-8 items-center gap-1.5 rounded-sm bg-[#2563eb] px-3 text-[13px] font-medium text-white hover:bg-[#1d4ed8]"
+        >
+          确认意向并推进至 P2
+        </button>
       </div>
     </div>
   )

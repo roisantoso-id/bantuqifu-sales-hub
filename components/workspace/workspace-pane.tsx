@@ -91,9 +91,7 @@ export function WorkspacePane({
       {/* Stage content — scrollable */}
       <div className="flex-1 overflow-hidden">
         {viewingStage === 'P1' && (
-          <div className="h-full overflow-y-auto px-5 py-4">
-            <P1RequirementForm opportunity={opportunity} onUpdate={onOpportunityUpdate} />
-          </div>
+          <P1RequirementForm opportunity={opportunity} onUpdate={onOpportunityUpdate} onAdvance={onAdvanceStage} />
         )}
         {viewingStage === 'P2' && (
           <P2ProductMatcher
