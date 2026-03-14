@@ -56,11 +56,19 @@ export interface OpportunityP5Data {
 export interface MaterialItem {
   id: string
   name: string // e.g., 护照首页、Kitap扫描件
+  requirement?: string // 要求说明，e.g., "PDF格式，不超过5MB"
+  serviceId?: string // 所属服务产品 ID (P2Data中的productId)
+  serviceName?: string // 所属服务名称 (显示用)
   status: 'missing' | 'pending_review' | 'approved' | 'rejected'
   fileUrl?: string
+  fileName?: string // 原始文件名
+  fileSize?: number // 文件大小，单位 bytes
   ocrStatus?: 'pending' | 'completed' | 'failed'
   rejectionReason?: string
   uploadedAt?: string
+  uploadedBy?: string
+  approvedAt?: string
+  approvedBy?: string
 }
 
 export interface OpportunityP6Data {
