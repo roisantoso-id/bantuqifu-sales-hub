@@ -1,6 +1,6 @@
 'use client'
 
-import { Plus, Minus, DollarSign } from 'lucide-react'
+import { Plus, Minus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { EXCHANGE_RATES } from '@/lib/mock-data'
 import type { Product, SelectedProduct, Currency } from '@/lib/types'
@@ -26,11 +26,11 @@ function groupByCategory(products: Product[]): Record<string, Product[]> {
 
 function getDifficultyLabel(difficulty?: number): string {
   if (!difficulty) return ''
-  return `难度: ${difficulty}/5`
+  const stars = '★'.repeat(difficulty) + '☆'.repeat(5 - difficulty)
+  return stars
 }
 
 function convertPrice(priceInCNY: number, toCurrency: Currency): number {
-  // All product prices are stored in CNY, convert to target currency
   return priceInCNY * EXCHANGE_RATES[toCurrency]
 }
 
@@ -41,15 +41,19 @@ export function P2ProductMatcher({
   onProductsChange,
   onCurrencyChange,
 }: P2ProductMatcherProps) {
-  const [expandedCycles, setExpandedCycles] = useState<Record<string, string>>({})
-
   const grouped = groupByCategory(allProducts)
+  const sortedCategories = useMemo(
+    () => [
+      ...CATEGORY_ORDER.filter((c) => grouped[c]),
+      ...Object.keys(grouped).filter((c) => !CATEGORY_ORDER.includes(c)),
+    ],
+    [grouped]
+  )
+
+  const [activeTab, setActiveTab] = useState<string>(sortedCategories[0] || '')
 
   const isSelected = (productId: string) =>
     selectedProducts.some((sp) => sp.product.id === productId)
-
-  const getSelected = (productId: string) =>
-    selectedProducts.find((sp) => sp.product.id === productId)
 
   const addProduct = (product: Product) => {
     if (isSelected(product.id)) return
@@ -74,7 +78,9 @@ export function P2ProductMatcher({
       selectedProducts.map((sp) => {
         if (sp.product.id === productId) {
           const priceConverted = convertPrice(sp.product.price, currentCurrency)
-          const multiplier = sp.billingCycle ? sp.product.billingCycles?.indexOf(sp.billingCycle) ?? 0 : 0
+          const multiplier = sp.billingCycle
+            ? (sp.product.billingCycles?.indexOf(sp.billingCycle) ?? 0)
+            : 0
           const basePrice = priceConverted * (multiplier + 1)
           return {
             ...sp,
@@ -94,7 +100,9 @@ export function P2ProductMatcher({
       selectedProducts.map((sp) => {
         if (sp.product.id === productId) {
           const priceConverted = convertPrice(sp.product.price, currentCurrency)
-          const multiplier = sp.billingCycle ? sp.product.billingCycles?.indexOf(sp.billingCycle) ?? 0 : 0
+          const multiplier = sp.billingCycle
+            ? (sp.product.billingCycles?.indexOf(sp.billingCycle) ?? 0)
+            : 0
           const basePrice = priceConverted * (multiplier + 1)
           return {
             ...sp,
@@ -131,7 +139,7 @@ export function P2ProductMatcher({
     return selectedProducts.reduce((sum, sp) => {
       const displayPrice = convertPrice(sp.product.price, currentCurrency)
       const multiplier = sp.billingCycle
-        ? sp.product.billingCycles?.indexOf(sp.billingCycle) ?? 0
+        ? (sp.product.billingCycles?.indexOf(sp.billingCycle) ?? 0)
         : 0
       const basePrice = displayPrice * (multiplier + 1)
       const unitPrice = basePrice * (1 - sp.discount / 100)
@@ -139,19 +147,16 @@ export function P2ProductMatcher({
     }, 0)
   }, [selectedProducts, currentCurrency])
 
-  const sortedCategories = [
-    ...CATEGORY_ORDER.filter((c) => grouped[c]),
-    ...Object.keys(grouped).filter((c) => !CATEGORY_ORDER.includes(c)),
-  ]
-
   const formatPrice = (price: number, currency: Currency) => {
     const symbol = currency === 'CNY' ? '¥' : 'Rp'
     return `${symbol}${Math.round(price).toLocaleString()}`
   }
 
+  const currentProducts = grouped[activeTab] || []
+
   return (
     <div className="flex h-full flex-col bg-white">
-      {/* Header with currency toggle */}
+      {/* Header: Title + Currency Toggle */}
       <div className="flex items-center justify-between border-b border-[#e5e7eb] px-4 py-2">
         <h3 className="text-[13px] font-semibold text-[#111827]">方案匹配</h3>
         <div className="flex items-center gap-1">
@@ -178,70 +183,96 @@ export function P2ProductMatcher({
         </div>
       </div>
 
-      {/* Main content */}
-      <div className="flex flex-1 gap-4 overflow-hidden p-4">
-        {/* Left: product catalog */}
-        <div className="flex-1 overflow-y-auto">
-          {sortedCategories.map((category) => (
-            <div key={category} className="mb-3">
-              <div className="mb-1.5 border-b border-[#e5e7eb] pb-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">
-                  {category}
-                </span>
-              </div>
-              <div className="space-y-1">
-                {grouped[category].map((product) => {
-                  const selected = isSelected(product.id)
-                  const displayPrice = convertPrice(product.price, 'CNY', currentCurrency)
-                  return (
-                    <div
-                      key={product.id}
-                      className={`flex items-center gap-2 rounded-sm px-2 py-1.5 transition-colors ${
-                        selected ? 'bg-[#eff6ff]' : 'hover:bg-[#f9fafb]'
-                      }`}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-baseline gap-2">
-                          <p className="text-[13px] font-medium text-[#111827]">{product.name}</p>
-                          {product.difficulty && (
-                            <span className="shrink-0 text-[11px] text-[#9ca3af]">
-                              {getDifficultyLabel(product.difficulty)}
-                            </span>
-                          )}
-                        </div>
-                        {product.description && (
-                          <p className="text-[11px] text-[#9ca3af]">{product.description}</p>
-                        )}
-                      </div>
-                      <span className="shrink-0 font-mono text-[12px] text-[#374151] whitespace-nowrap">
-                        {formatPrice(displayPrice, currentCurrency)}
-                      </span>
-                      <button
-                        onClick={() =>
-                          selected ? removeProduct(product.id) : addProduct(product)
-                        }
-                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-sm transition-colors ${
-                          selected
-                            ? 'bg-[#fee2e2] text-[#dc2626] hover:bg-[#fecaca]'
-                            : 'bg-[#f3f4f6] text-[#6b7280] hover:bg-[#e5e7eb] hover:text-[#111827]'
-                        }`}
-                        aria-label={selected ? '移除' : '添加'}
-                      >
-                        {selected ? <Minus size={12} /> : <Plus size={12} />}
-                      </button>
+      {/* Category Tabs */}
+      <div className="flex items-center border-b border-[#e5e7eb] bg-[#f9fafb] px-4">
+        {sortedCategories.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setActiveTab(cat)}
+            className={`relative px-3 py-2 text-[12px] font-medium transition-colors ${
+              activeTab === cat
+                ? 'text-[#2563eb]'
+                : 'text-[#6b7280] hover:text-[#374151]'
+            }`}
+          >
+            {cat}
+            {activeTab === cat && (
+              <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#2563eb]" />
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Main Content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left: Product List for active tab */}
+        <div className="flex-1 overflow-y-auto border-r border-[#e5e7eb] p-4">
+          <div className="space-y-1">
+            {currentProducts.map((product) => {
+              const selected = isSelected(product.id)
+              const displayPrice = convertPrice(product.price, currentCurrency)
+              return (
+                <div
+                  key={product.id}
+                  className={`flex items-center gap-3 rounded-sm border px-3 py-2 transition-colors ${
+                    selected
+                      ? 'border-[#2563eb] bg-[#eff6ff]'
+                      : 'border-[#e5e7eb] hover:border-[#d1d5db] hover:bg-[#f9fafb]'
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-[13px] font-medium text-[#111827]">{product.name}</p>
+                      {product.difficulty && (
+                        <span className="text-[10px] text-[#f59e0b]">
+                          {getDifficultyLabel(product.difficulty)}
+                        </span>
+                      )}
                     </div>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
+                    {product.description && (
+                      <p className="mt-0.5 text-[11px] text-[#9ca3af]">{product.description}</p>
+                    )}
+                    {product.billingCycles && product.billingCycles.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {product.billingCycles.map((cycle) => (
+                          <span
+                            key={cycle}
+                            className="rounded-sm bg-[#f3f4f6] px-1.5 py-0.5 text-[10px] text-[#6b7280]"
+                          >
+                            {cycle}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <span className="shrink-0 font-mono text-[12px] font-semibold text-[#374151]">
+                    {formatPrice(displayPrice, currentCurrency)}
+                  </span>
+                  <button
+                    onClick={() => (selected ? removeProduct(product.id) : addProduct(product))}
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-sm transition-colors ${
+                      selected
+                        ? 'bg-[#fee2e2] text-[#dc2626] hover:bg-[#fecaca]'
+                        : 'bg-[#2563eb] text-white hover:bg-[#1d4ed8]'
+                    }`}
+                    aria-label={selected ? '移除' : '添加'}
+                  >
+                    {selected ? <Minus size={14} /> : <Plus size={14} />}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
         </div>
 
-        {/* Right: selected products table */}
-        <div className="w-[520px] shrink-0 flex flex-col border-l border-[#e5e7eb] pl-4">
-          <div className="mb-2 border-b border-[#e5e7eb] pb-1">
+        {/* Right: Selected Products Table */}
+        <div className="flex w-[480px] shrink-0 flex-col p-4">
+          <div className="mb-2 flex items-center justify-between border-b border-[#e5e7eb] pb-2">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">
-              已选产品 ({selectedProducts.length})
+              已选产品
+            </span>
+            <span className="text-[12px] font-medium text-[#374151]">
+              {selectedProducts.length} 项
             </span>
           </div>
 
@@ -251,23 +282,22 @@ export function P2ProductMatcher({
             </div>
           ) : (
             <>
-              {/* Table header */}
-              <div className="mb-1 grid grid-cols-[30px_1fr_80px_60px_60px_60px_40px] gap-2 px-2 py-1 text-[11px] font-semibold text-[#6b7280]">
-                <div>序号</div>
-                <div>产品名</div>
-                <div className="text-right">周期</div>
-                <div className="text-right">数量</div>
-                <div className="text-right">折扣%</div>
-                <div className="text-right">单价</div>
+              {/* Table Header */}
+              <div className="mb-1 grid grid-cols-[1fr_70px_50px_50px_80px_24px] gap-2 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#9ca3af]">
+                <div>产品</div>
+                <div>周期</div>
+                <div className="text-center">数量</div>
+                <div className="text-center">折扣</div>
                 <div className="text-right">小计</div>
+                <div></div>
               </div>
 
-              {/* Table rows */}
-              <div className="flex-1 overflow-y-auto">
-                {selectedProducts.map((sp, idx) => {
+              {/* Table Rows */}
+              <div className="flex-1 space-y-1 overflow-y-auto">
+                {selectedProducts.map((sp) => {
                   const displayPrice = convertPrice(sp.product.price, currentCurrency)
                   const multiplier = sp.billingCycle
-                    ? sp.product.billingCycles?.indexOf(sp.billingCycle) ?? 0
+                    ? (sp.product.billingCycles?.indexOf(sp.billingCycle) ?? 0)
                     : 0
                   const basePrice = displayPrice * (multiplier + 1)
                   const unitPrice = basePrice * (1 - sp.discount / 100)
@@ -276,17 +306,14 @@ export function P2ProductMatcher({
                   return (
                     <div
                       key={sp.product.id}
-                      className="mb-1 grid grid-cols-[30px_1fr_80px_60px_60px_60px_40px] gap-2 rounded-sm border border-[#e5e7eb] bg-white px-2 py-1 text-[12px] items-center"
+                      className="grid grid-cols-[1fr_70px_50px_50px_80px_24px] items-center gap-2 rounded-sm border border-[#e5e7eb] bg-white px-2 py-1.5 text-[12px]"
                     >
-                      {/* Row number */}
-                      <div className="text-[#9ca3af] text-center">{idx + 1}</div>
-
                       {/* Product name */}
-                      <div className="min-w-0 truncate">
-                        <p className="text-[#111827] font-medium truncate">{sp.product.name}</p>
+                      <div className="min-w-0 truncate text-[#111827] font-medium">
+                        {sp.product.name}
                       </div>
 
-                      {/* Billing cycle select */}
+                      {/* Billing cycle */}
                       <div>
                         {sp.product.billingCycles && sp.product.billingCycles.length > 0 ? (
                           <select
@@ -305,21 +332,17 @@ export function P2ProductMatcher({
                         )}
                       </div>
 
-                      {/* Quantity input */}
-                      <div>
-                        <input
-                          type="number"
-                          min={1}
-                          value={sp.quantity}
-                          onChange={(e) =>
-                            updateQty(sp.product.id, parseInt(e.target.value, 10))
-                          }
-                          className="h-6 w-full rounded-sm border border-[#e5e7eb] px-1 font-mono text-[11px] text-[#111827] text-center outline-none focus:border-[#2563eb]"
-                        />
-                      </div>
+                      {/* Quantity */}
+                      <input
+                        type="number"
+                        min={1}
+                        value={sp.quantity}
+                        onChange={(e) => updateQty(sp.product.id, parseInt(e.target.value, 10))}
+                        className="h-6 w-full rounded-sm border border-[#e5e7eb] px-1 text-center font-mono text-[11px] text-[#111827] outline-none focus:border-[#2563eb]"
+                      />
 
-                      {/* Discount input */}
-                      <div className="flex items-center gap-0.5">
+                      {/* Discount */}
+                      <div className="flex items-center">
                         <input
                           type="number"
                           min={0}
@@ -328,42 +351,35 @@ export function P2ProductMatcher({
                           onChange={(e) =>
                             updateDiscount(sp.product.id, parseInt(e.target.value, 10))
                           }
-                          className="h-6 flex-1 rounded-sm border border-[#e5e7eb] px-1 font-mono text-[11px] text-[#111827] text-center outline-none focus:border-[#2563eb]"
+                          className="h-6 w-full rounded-sm border border-[#e5e7eb] px-1 text-center font-mono text-[11px] text-[#111827] outline-none focus:border-[#2563eb]"
                         />
-                        <span className="text-[#9ca3af] text-[10px]">%</span>
-                      </div>
-
-                      {/* Unit price */}
-                      <div className="font-mono text-right text-[#111827]">
-                        {formatPrice(unitPrice, currentCurrency)}
+                        <span className="ml-0.5 text-[10px] text-[#9ca3af]">%</span>
                       </div>
 
                       {/* Subtotal */}
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono font-semibold text-[#111827]">
-                          {formatPrice(subtotal, currentCurrency)}
-                        </span>
-                        <button
-                          onClick={() => removeProduct(sp.product.id)}
-                          className="shrink-0 text-[#9ca3af] hover:text-[#dc2626]"
-                          aria-label="移除"
-                        >
-                          <Minus size={12} />
-                        </button>
+                      <div className="text-right font-mono font-semibold text-[#111827]">
+                        {formatPrice(subtotal, currentCurrency)}
                       </div>
+
+                      {/* Remove */}
+                      <button
+                        onClick={() => removeProduct(sp.product.id)}
+                        className="flex h-6 w-6 items-center justify-center rounded-sm text-[#9ca3af] hover:bg-[#fee2e2] hover:text-[#dc2626]"
+                        aria-label="移除"
+                      >
+                        <Minus size={12} />
+                      </button>
                     </div>
                   )
                 })}
               </div>
 
-              {/* Total footer */}
-              <div className="mt-2 border-t border-[#e5e7eb] pt-2">
-                <div className="flex items-center justify-between px-2">
-                  <span className="text-[12px] text-[#6b7280] font-medium">总额</span>
-                  <span className="font-mono text-[14px] font-semibold text-[#111827]">
-                    {formatPrice(totalAmount, currentCurrency)}
-                  </span>
-                </div>
+              {/* Total */}
+              <div className="mt-3 flex items-center justify-between border-t border-[#e5e7eb] pt-3">
+                <span className="text-[13px] font-medium text-[#6b7280]">合计</span>
+                <span className="font-mono text-[16px] font-semibold text-[#111827]">
+                  {formatPrice(totalAmount, currentCurrency)}
+                </span>
               </div>
             </>
           )}
