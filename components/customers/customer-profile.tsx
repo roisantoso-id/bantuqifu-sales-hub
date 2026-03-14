@@ -48,36 +48,12 @@ export function CustomerProfile({
   const [foreignEntities, setForeignEntities] = useState<ForeignEntity[]>([])
   const [foreignFormOpen, setForeignFormOpen] = useState(false)
 
-  const customerOpportunities = useMemo(
-    () => opportunities.filter((o) => o.customerId === customerId),
-    [opportunities, customerId]
-  )
-
-  const customerLeads = useMemo(
-    () => leads.filter((l) => l.convertedOpportunityId && customerOpportunities.some((o) => o.id === l.convertedOpportunityId)),
-    [leads, customerOpportunities]
-  )
+  // 商机已经按 customerId 过滤（由父组件传入），直接使用
+  const customerOpportunities = opportunities
 
   const consolidatedActions = useMemo(() => {
-    const allActions: ConsolidatedAction[] = []
-    customerOpportunities.forEach((opp) => {
-      const logs = actionLogs[opp.id] ?? []
-      logs.forEach((log) => {
-        allActions.push({
-          id: log.id,
-          timestamp: log.timestamp,
-          operatorName: log.operatorName,
-          actionType: log.actionType,
-          actionLabel: log.actionLabel,
-          opportunityId: opp.id,
-          opportunityStage: opp.stageId,
-          remark: log.remark,
-          files: log.files,
-        })
-      })
-    })
-    return allActions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-  }, [customerOpportunities, actionLogs])
+    return [...actionLogs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+  }, [actionLogs])
 
   const metrics = useMemo(
     () => ({
@@ -156,8 +132,7 @@ export function CustomerProfile({
         <div className="flex gap-6">
           {([
             { id: 'opportunities', label: `关联商机 (${customerOpportunities.length})` },
-            { id: 'leads',         label: `关联线索 (${customerLeads.length})` },
-            { id: 'actions',       label: '全量跟进记录' },
+            { id: 'actions',       label: `全量跟进记录 (${consolidatedActions.length})` },
             { id: 'companies',     label: `关联企业${totalCompanies > 0 ? ` (${totalCompanies})` : ''}` },
           ] as const).map(({ id, label }) => (
             <button
@@ -178,15 +153,7 @@ export function CustomerProfile({
       {/* Tab Content */}
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'opportunities' && <OpportunitiesTab opportunities={customerOpportunities} />}
-        {activeTab === 'leads' && <LeadsTab leads={customerLeads} />}
-        {activeTab === 'actions' && (
-          <ActionsTab
-            actions={consolidatedActions}
-            newNote={newNote}
-            onNewNoteChange={setNewNote}
-            onAddNote={() => { if (newNote.trim()) { onAddNote?.(newNote); setNewNote('') } }}
-          />
-        )}
+        {activeTab === 'actions' && <ActionsTab actions={consolidatedActions} />}
         {activeTab === 'companies' && (
           <CompaniesTab
             chinaEntities={chinaEntities}
@@ -557,40 +524,48 @@ function ForeignEntityForm({
 }
 
 // ─── Opportunities Tab ────────────────────────────────────────────────────────
-function OpportunitiesTab({ opportunities }: { opportunities: Opportunity[] }) {
+function OpportunitiesTab({ opportunities }: { opportunities: CustomerOpportunityRow[] }) {
   return (
     <div className="p-4">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b border-[#e5e7eb] bg-[#f9fafb]">
-            {['商机编号', '产品名称', '阶段', '金额', '创建人', '状态'].map((h) => (
-              <th key={h} className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {opportunities.map((opp) => (
-            <tr key={opp.id} className="border-b border-[#f3f4f6] hover:bg-[#f9fafb]">
-              <td className="px-3 py-2 font-mono text-[12px] text-[#2563eb]">{opp.id}</td>
-              <td className="px-3 py-2 text-[13px] text-[#111827]">{opp.serviceTypeLabel}</td>
-              <td className="px-3 py-2">
-                <span className="inline-flex rounded-sm bg-[#e0e7ff] px-1.5 py-0.5 text-[11px] font-medium text-[#4f46e5]">{opp.stageId}</span>
-              </td>
-              <td className="px-3 py-2 text-right font-mono text-[13px] text-[#111827]">¥{opp.estimatedAmount?.toLocaleString()}</td>
-              <td className="px-3 py-2 text-[13px] text-[#6b7280]">{opp.assignee}</td>
-              <td className="px-3 py-2">
-                <span className={`inline-flex rounded-sm px-1.5 py-0.5 text-[11px] font-medium ${
-                  opp.status === 'active' ? 'bg-[#dcfce7] text-[#16a34a]' :
-                  opp.status === 'won'    ? 'bg-[#dbeafe] text-[#0284c7]' :
-                  'bg-[#fee2e2] text-[#dc2626]'
-                }`}>
-                  {opp.status === 'active' ? '活跃' : opp.status === 'won' ? '成交' : '丢失'}
-                </span>
-              </td>
+      {opportunities.length === 0 ? (
+        <div className="flex h-40 items-center justify-center text-[13px] text-[#9ca3af]">暂无关联商机</div>
+      ) : (
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-[#e5e7eb] bg-[#f9fafb]">
+              {['商机编号', '产品/服务', '阶段', '金额', '状态', '创建日期'].map((h) => (
+                <th key={h} className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">{h}</th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {opportunities.map((opp) => (
+              <tr key={opp.id} className="border-b border-[#f3f4f6] hover:bg-[#f9fafb]">
+                <td className="px-3 py-2 font-mono text-[12px] text-[#2563eb]">{opp.opportunityCode}</td>
+                <td className="px-3 py-2 text-[13px] text-[#111827]">{opp.serviceTypeLabel}</td>
+                <td className="px-3 py-2">
+                  <span className="inline-flex rounded-sm bg-[#e0e7ff] px-1.5 py-0.5 text-[11px] font-medium text-[#4f46e5]">{opp.stageId}</span>
+                </td>
+                <td className="px-3 py-2 text-right font-mono text-[13px] text-[#111827]">
+                  {opp.currency} {opp.estimatedAmount?.toLocaleString()}
+                </td>
+                <td className="px-3 py-2">
+                  <span className={`inline-flex rounded-sm px-1.5 py-0.5 text-[11px] font-medium ${
+                    opp.status === 'active' ? 'bg-[#dcfce7] text-[#16a34a]' :
+                    opp.status === 'won'    ? 'bg-[#dbeafe] text-[#0284c7]' :
+                    'bg-[#fee2e2] text-[#dc2626]'
+                  }`}>
+                    {opp.status === 'active' ? '活跃' : opp.status === 'won' ? '成交' : '丢失'}
+                  </span>
+                </td>
+                <td className="px-3 py-2 font-mono text-[11px] text-[#9ca3af]">
+                  {new Date(opp.createdAt).toLocaleDateString('zh-CN')}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   )
 }

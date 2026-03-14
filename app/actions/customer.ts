@@ -224,11 +224,13 @@ export async function createCustomerAction(data: {
     // 1. 生成语义化客户 ID
     const customerId = await generateBizId('CUS') // 例如：CUS-260315-0001
 
-    // 2. 插入数据库
+    // 2. 插入数据库（显式生成 id 避免 DEFAULT 缓存问题）
+    const newId = crypto.randomUUID()
     const { data: inserted, error } = await supabase
       .from('customers')
       .insert([
         {
+          id: newId,
           organizationId: tenantId,
           customerId,
           customerName: data.customerName,
@@ -351,6 +353,7 @@ export async function addCustomerFollowupAction(data: {
     .from('customer_followups')
     .insert([
       {
+        id: crypto.randomUUID(),
         organizationId: tenantId,
         customerId: data.customerId,
         operatorId: userId,
@@ -518,7 +521,7 @@ export async function addAssociatedCompanyAction(data: {
   }
 }
 
-// ─── getCurrentUserId helper ───────────────────���─────────────────────────────
+// ─── getCurrentUserId helper ───────────────────�����─────────────────────────────
 
 async function getCurrentUserId(): Promise<string | null> {
   // 使用 service client 获取当前会话用户
@@ -596,6 +599,7 @@ export async function addCustomerContactAction(data: {
     .from('customer_contacts')
     .insert([
       {
+        id: crypto.randomUUID(),
         organizationId: tenantId,
         customerId: data.customerId,
         contactName: data.contactName,
