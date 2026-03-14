@@ -245,7 +245,38 @@ export default function SalesHub() {
     setLeads((prev) => prev.filter((lead) => lead.id !== leadId))
   }
 
-  return (
+  const handleDiscardLead = (leadId: string, reason: any, discardedBy: string) => {
+    setLeads((prev) =>
+      prev.map((lead) =>
+        lead.id === leadId
+          ? {
+              ...lead,
+              status: 'discarded' as const,
+              discardedAt: new Date().toISOString(),
+              discardReason: reason,
+              discardedBy,
+              assignee: undefined, // 清空负责人，进入公海池
+            }
+          : lead
+      )
+    )
+  }
+
+  const handleClaimLead = (lead: Lead, newAssignee: string) => {
+    setLeads((prev) =>
+      prev.map((l) =>
+        l.id === lead.id
+          ? {
+              ...l,
+              status: 'new' as const,
+              assignee: newAssignee,
+              lastActionAt: new Date().toISOString(),
+              nextFollowDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 重置为7天后
+            }
+          : l
+      )
+    )
+  }
     <div className="flex h-screen overflow-hidden bg-white">
       {/* Pane 1 — primary nav (64px) */}
       <PrimarySidebar
@@ -274,6 +305,8 @@ export default function SalesHub() {
             onLeadDelete={handleDeleteLead}
             onConvertToOpportunity={handleConvertLeadToOpportunity}
             onAddLead={handleAddLead}
+            onDiscardLead={handleDiscardLead}
+            onClaimLead={handleClaimLead}
           />
         </>
       ) : activeNav === 'opportunities' ? (

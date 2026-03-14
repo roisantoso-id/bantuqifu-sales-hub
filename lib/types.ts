@@ -1,14 +1,33 @@
 // ─── Lead ────────────────────────────────────────────────────────────────────
-export type LeadSource = 'wechat' | 'referral' | 'cold_outreach'
-export type LeadStatus = 'new' | 'contacted' | 'no_interest' | 'ready_for_opportunity'
+export type LeadSource = 'wechat' | 'referral' | 'facebook' | 'website' | 'cold_outreach'
+export type LeadStatus = 'new' | 'contacted' | 'no_interest' | 'ready_for_opportunity' | 'discarded' | 'public_pool'
+export type LeadUrgency = '高' | '中' | '低'
+export type DiscardReason = '无法联系' | '需求不匹配' | '销售能力有限' | '其他'
+export type LeadCategory = '签证服务' | '公司注册' | '财务服务' | '准证服务' | '税务服务'
 
 export interface Lead {
   id: string // LEAD-系列ID
-  wechatName: string // 微信名/称呼
-  initialIntent: string // 初步意向（如：想办 B1 签证）
-  source: LeadSource // 来源：微信群、转介绍、冷拉
-  status: LeadStatus // 跟进状态：新线索、沟通中、无意向、待转商机
+  wechatName: string // 微信名/称呼（必填）
+  phone?: string // 联系电话
+  source: LeadSource // 来源：山海图微信群、老客户推荐、Facebook、官网
+  
+  // 业务画像
+  category?: LeadCategory // 意向分类
+  budget?: { min: number; max: number; currency: 'CNY' | 'IDR' } // 初步预算范围
+  urgency?: LeadUrgency // 紧迫度：高、中、低
+  initialIntent: string // 初步意向备注
+  
+  // 跟进逻辑
   assignee?: string // 负责人
+  nextFollowDate?: string // 下次跟进计划（关键字段，触发回收逻辑）
+  lastActionAt?: string // 最后一次行动时间
+  status: LeadStatus // 状态
+  
+  // 丢弃逻辑
+  discardedAt?: string // 丢弃时间
+  discardReason?: DiscardReason // 丢弃原因
+  discardedBy?: string // 谁丢弃的
+  
   createdAt: string
   updatedAt: string
   notes?: string // 备注
