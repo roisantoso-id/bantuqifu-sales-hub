@@ -42,6 +42,25 @@ const stageColors: Record<string, string> = {
   P8: 'bg-emerald-100 text-emerald-700',
 }
 
+const INDUSTRY_OPTIONS = [
+  { id: 'cross-border-ecommerce', zh: '跨境电商' },
+  { id: 'domestic-ecommerce', zh: '国内电商' },
+  { id: 'logistics', zh: '物流/货代' },
+  { id: 'trade', zh: '外贸/进出口' },
+  { id: 'manufacturing', zh: '生产制造' },
+  { id: 'retail', zh: '零售批发' },
+  { id: 'it-tech', zh: 'IT/科技' },
+  { id: 'finance', zh: '金融投资' },
+  { id: 'real-estate', zh: '房地产' },
+  { id: 'consulting', zh: '咨询服务' },
+  { id: 'education', zh: '教育培训' },
+  { id: 'medical', zh: '医疗健康' },
+  { id: 'food-beverage', zh: '餐饮食品' },
+  { id: 'tourism', zh: '旅游酒店' },
+  { id: 'media', zh: '媒体/广告' },
+  { id: 'other', zh: '其他' },
+]
+
 function ListSkeleton() {
   return (
     <div className="flex flex-col gap-0">
@@ -589,7 +608,10 @@ const result = await createCustomerAction({
   </div>
   <div>
   <label className="block text-[12px] text-[#6b7280] mb-1">行业 *</label>
-  <input type="text" value={createForm.industry} onChange={(e) => setCreateForm((f) => ({ ...f, industry: e.target.value }))} className="w-full h-8 px-2 text-[12px] border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb]" placeholder="例如：跨境电商、物流、贸易" />
+  <select value={createForm.industry} onChange={(e) => setCreateForm((f) => ({ ...f, industry: e.target.value }))} className="w-full h-8 px-2 text-[12px] border border-[#e5e7eb] rounded-sm outline-none focus:border-[#2563eb] bg-white">
+  <option value="">请选择行业</option>
+  {INDUSTRY_OPTIONS.map((ind) => <option key={ind.id} value={ind.id}>{ind.zh}</option>)}
+  </select>
   </div>
   <div>
   <label className="block text-[12px] text-[#6b7280] mb-1">客户等级</label>
