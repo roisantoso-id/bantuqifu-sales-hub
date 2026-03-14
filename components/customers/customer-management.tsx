@@ -1,4 +1,5 @@
 'use client'
+// Customer Management - v2.1 with contacts tab support
 
 import { useState, useMemo, useEffect } from 'react'
 import { Search, Plus, Edit2, Archive, ChevronRight, Lock, Users, RefreshCw, X, Building2, Calendar, Globe, User, Phone, Mail, MessageCircle } from 'lucide-react'

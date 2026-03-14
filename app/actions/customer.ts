@@ -1,4 +1,5 @@
 'use server'
+// Customer Actions - v2.1 with contacts and proper null handling for operatorId
 
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
