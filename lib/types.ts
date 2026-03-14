@@ -1,10 +1,10 @@
 // ─── Customer Level ──────────────────────────────────────────────────────────
 export const CUSTOMER_LEVELS = [
-  { id: 'L1', zh: '央企总部和龙头企业', id_: 'BUMN Pusat & Perusahaan Unggulan' },
-  { id: 'L2', zh: '国有企业和上市公司', id_: 'Perusahaan Negara & Perusahaan Tbk' },
-  { id: 'L3', zh: '非上市品牌公司',    id_: 'Perusahaan Merek Non-Tbk' },
-  { id: 'L4', zh: '中小型企业',        id_: 'Usaha Kecil & Menengah (UKM)' },
-  { id: 'L5', zh: '个人创业小公司',    id_: 'Wirausaha & Perusahaan Rintisan' },
+  { id: 'L2', zh: '央企总部和龙头企业', id_: 'BUMN Pusat & Perusahaan Unggulan', weight: 5 },
+  { id: 'L3', zh: '国有企业和上市公司', id_: 'Perusahaan Negara & Perusahaan Tbk', weight: 4 },
+  { id: 'L4', zh: '非上市品牌公司',    id_: 'Perusahaan Merek Non-Tbk', weight: 3 },
+  { id: 'L5', zh: '中小型企业',        id_: 'Usaha Kecil & Menengah (UKM)', weight: 2 },
+  { id: 'L6', zh: '个人创业小公司',    id_: 'Wirausaha & Perusahaan Rintisan', weight: 1 },
 ] as const
 export type CustomerLevelId = typeof CUSTOMER_LEVELS[number]['id']
 
