@@ -47,6 +47,11 @@ function formatAmount(amount: number | undefined, currency: string) {
       ? `¥${(amount / 10000).toFixed(amount % 10000 === 0 ? 0 : 1)}万`
       : `¥${amount.toLocaleString()}`
   }
+  if (currency === 'IDR') {
+    return amount >= 1000000
+      ? `${(amount / 1000000).toFixed(amount % 1000000 === 0 ? 0 : 1)}jt`
+      : `${amount.toLocaleString()}`
+  }
   return `${currency} ${amount.toLocaleString()}`
 }
 
@@ -195,14 +200,17 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect, onToggle
                   <span className="absolute inset-y-0 left-0 w-0.5 rounded-r-sm bg-[#f59e0b]" />
                 )}
 
-                {/* Row 1: name + amount + pin button */}
+                {/* Row 1: wechat group id + wechat group name + amount + pin button */}
                 <div className="flex items-center justify-between gap-1">
-                  <div className="flex min-w-0 flex-1 items-center gap-1">
+                  <div className="flex min-w-0 flex-1 items-center gap-0">
                     {isPinned && (
-                      <Pin size={10} className="shrink-0 text-[#f59e0b]" style={{ fill: '#f59e0b' }} />
+                      <Pin size={10} className="shrink-0 text-[#f59e0b] mr-1.5" style={{ fill: '#f59e0b' }} />
                     )}
+                    <span className="font-mono text-[13px] text-[#6b7280] shrink-0">
+                      {opp.wechatGroupId}
+                    </span>
                     <span className="truncate text-[13px] font-medium text-[#111827]">
-                      {opp.customer.name}
+                      {opp.wechatGroupName}
                     </span>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
@@ -219,26 +227,17 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect, onToggle
                         {isPinned ? <PinOff size={10} /> : <Pin size={10} />}
                       </span>
                     )}
-                    <span className="font-mono text-[12px] text-[#374151]">
+                    <span className="font-mono text-[14px] font-medium text-[#374151]">
                       {formatAmount(opp.estimatedAmount, opp.currency)}
                     </span>
                   </div>
                 </div>
 
-                {/* Row 2: opportunity code + wechat group or requirements */}
-                <div className="mt-0.5 flex items-center justify-between gap-2">
-                  <span className="font-mono text-[11px] text-[#9ca3af] shrink-0">
-                    {opp.customer.passportNo}
+                {/* Row 2: customer name */}
+                <div className="mt-0.5">
+                  <span className="truncate text-[11px] text-[#6b7280]">
+                    {opp.customer.name}
                   </span>
-                  {opp.wechatGroupId ? (
-                    <span className="truncate text-[11px] text-[#6b7280]">
-                      {opp.wechatGroupId}{opp.wechatGroupName ? opp.wechatGroupName.slice(0, 10) : ''}
-                    </span>
-                  ) : (
-                    <span className="truncate text-[11px] text-[#6b7280]">
-                      {opp.requirements ? opp.requirements.slice(0, 20) : '—'}
-                    </span>
-                  )}
                 </div>
 
                 {/* Row 3: service badge + stage pill + assignee */}

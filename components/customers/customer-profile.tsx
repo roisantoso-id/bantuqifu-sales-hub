@@ -533,7 +533,7 @@ function OpportunitiesTab({ opportunities }: { opportunities: CustomerOpportunit
         <table className="w-full">
           <thead>
             <tr className="border-b border-[#e5e7eb] bg-[#f9fafb]">
-              {['商机编号', '产品/服务', '阶段', '金额', '状态', '创建日期'].map((h) => (
+              {['商机编号', '产品/服务', '阶段', '金额', '状态', '关联企微群', '创建日期'].map((h) => (
                 <th key={h} className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">{h}</th>
               ))}
             </tr>
@@ -557,6 +557,9 @@ function OpportunitiesTab({ opportunities }: { opportunities: CustomerOpportunit
                   }`}>
                     {opp.status === 'active' ? '活跃' : opp.status === 'won' ? '成交' : '丢失'}
                   </span>
+                </td>
+                <td className="px-3 py-2 text-[11px] text-[#6b7280]">
+                  {opp.wechatGroupId ? `${opp.wechatGroupId}${opp.wechatGroupName || ''}` : '—'}
                 </td>
                 <td className="px-3 py-2 font-mono text-[11px] text-[#9ca3af]">
                   {new Date(opp.createdAt).toLocaleDateString('zh-CN')}

@@ -40,6 +40,8 @@ export interface CustomerOpportunityRow {
   estimatedAmount: number
   currency: string
   requirements: string | null
+  wechatGroupId?: number | null
+  wechatGroupName?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -126,6 +128,8 @@ export async function getCustomerDetailAction(customerDbId: string): Promise<{
       estimatedAmount,
       currency,
       requirements,
+      wechatGroupId,
+      wechatGroupName,
       createdAt,
       updatedAt
     `)
@@ -147,6 +151,8 @@ export async function getCustomerDetailAction(customerDbId: string): Promise<{
     estimatedAmount: Number(o.estimatedAmount ?? 0),
     currency: o.currency ?? 'IDR',
     requirements: o.requirements ?? null,
+    wechatGroupId: o.wechatGroupId ?? null,
+    wechatGroupName: o.wechatGroupName ?? null,
     createdAt: o.createdAt,
     updatedAt: o.updatedAt,
   }))

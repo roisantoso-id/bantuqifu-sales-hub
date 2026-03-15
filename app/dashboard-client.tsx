@@ -45,6 +45,7 @@ export function DashboardClient({
     if (initialOpportunities && initialOpportunities.length > 0) {
       return initialOpportunities.map(opp => ({
         id: opp.id,
+        opportunityCode: opp.opportunityCode,
         customerId: opp.customerId,
         customerName: opp.customer?.customerName || '未知客户',
         customer: {
@@ -66,6 +67,8 @@ export function DashboardClient({
         currency: (opp.currency as Currency) || 'IDR',
         requirements: opp.requirements || undefined,
         notes: opp.notes || undefined,
+        wechatGroupId: opp.wechatGroupId || undefined,
+        wechatGroupName: opp.wechatGroupName || undefined,
         destination: undefined,
         travelDate: undefined,
         assignee: '',
@@ -77,20 +80,20 @@ export function DashboardClient({
         pinnedByUsers: opp.pinnedByUsers || [],
       } as any))
     }
-    return mockOpportunities
+    return []
   })
   const [leads, setLeads] = useState<Lead[]>(mockLeads)
   const [selectedId, setSelectedId] = useState<string>(() => {
     if (initialOpportunities && initialOpportunities.length > 0) {
       return initialOpportunities[0].id
     }
-    return mockOpportunities[0].id
+    return ''
   })
   const [viewingStage, setViewingStage] = useState<StageId>(() => {
     if (initialOpportunities && initialOpportunities.length > 0) {
       return initialOpportunities[0].stageId as StageId
     }
-    return mockOpportunities[0].stageId
+    return 'P1'
   })
   const [actionLogs, setActionLogs] = useState<Record<string, ActionLog[]>>(mockActionLogs)
   const [showAuditRail, setShowAuditRail] = useState(true)

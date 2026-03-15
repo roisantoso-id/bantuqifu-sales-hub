@@ -17,7 +17,7 @@ export interface LeadRow {
   sourceDetail?: string | null
   category: string
   urgency: string
-  status: 'NEW' | 'PUSHING' | 'converted' | 'LOST'
+  status: 'new' | 'contacted' | 'no_interest' | 'ready_for_opportunity' | 'converted' | 'discarded' | 'public_pool'
   assigneeId?: string | null
   nextFollowDate?: string | null
   discardReason?: string | null
@@ -25,14 +25,18 @@ export interface LeadRow {
   discardedById?: string | null
   notes?: string | null
   createdAt: string
-  createdById?: string | null
   updatedAt: string
-  updatedById?: string | null
   convertedOpportunityId?: string | null
   budgetMin?: number | null
   budgetMax?: number | null
   budgetCurrency?: string | null
   initialIntent?: string | null
+  wechatName?: string | null
+  wechatGroupId?: string | null
+  wechatGroupName?: string | null
+  lastActionAt?: string | null
+  customerId?: string | null
+  customer?: { id: string; customerName: string } | null
 }
 
 export interface LeadFollowUpRow {
@@ -200,7 +204,7 @@ export async function createLeadAction(input: {
 // ─── updateLeadStatusAction ────────────────────────────────────────────────────
 export async function updateLeadStatusAction(
   leadId: string,
-  status: 'NEW' | 'PUSHING' | 'converted' | 'LOST',
+  status: 'new' | 'contacted' | 'no_interest' | 'ready_for_opportunity' | 'converted' | 'discarded' | 'public_pool',
 ): Promise<LeadRow | null> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -351,11 +355,11 @@ export async function advanceLeadStatusAction(
   return { success: true }
 }
 
-// ─── discardLeadAction ─────────────────────────────────────────────────────────
-// 退回公海：清空责任人，状态重置为 new
-export async function discardLeadAction(
+// ─── returnToPoolAction ────────────────────────────────────────────────────────
+// 退回公海：清空责任人，状态改为 public_pool
+export async function returnToPoolAction(
   leadId: string,
-  discardReason?: string
+  reason: string
 ): Promise<LeadRow | null> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -363,9 +367,37 @@ export async function discardLeadAction(
   const { data, error } = await supabase
     .from('leads')
     .update({
-      assigneeId: null, // 清空责任人
-      status: 'new', // 状态重置为新线索
-      discardReason: discardReason === 'return_to_pool' ? 'RETURN_TO_POOL' : 'OTHER',
+      assigneeId: null,
+      status: 'public_pool',
+      discardReason: reason,
+      updatedAt: new Date().toISOString(),
+    })
+    .eq('id', leadId)
+    .select('*')
+    .single()
+
+  if (error) {
+    console.error('[returnToPoolAction] Error:', error.message)
+    return null
+  }
+
+  return data as LeadRow
+}
+
+// ─── discardLeadAction ─────────────────────────────────────────────────────────
+// 彻底丢弃：标记为 discarded，不再进入公海
+export async function discardLeadAction(
+  leadId: string,
+  reason: string
+): Promise<LeadRow | null> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const { data, error } = await supabase
+    .from('leads')
+    .update({
+      status: 'discarded',
+      discardReason: reason,
       discardedAt: new Date().toISOString(),
       discardedById: user?.id,
       updatedAt: new Date().toISOString(),
@@ -545,7 +577,7 @@ export async function autoRecycleLeadsAction(): Promise<{ success: boolean; coun
     .from('leads')
     .select('id, leadCode, personName, createdAt')
     .eq('organizationId', tenantId)
-    .eq('status', 'NEW')
+    .eq('status', 'new')
     .not('assigneeId', 'is', null)
     .lt('createdAt', sevenDaysAgo.toISOString())
 
@@ -595,87 +627,69 @@ export async function convertLeadToOpportunityAction(
 
   const supabase = await createClient()
   const tenantId = await getCurrentTenantId()
-
   const { data: { user } } = await supabase.auth.getUser()
   const userId = user?.id
 
-  if (!userId) {
-    console.error('[convertLeadToOpportunityAction] No user ID')
-    return { success: false, error: '用户未登录' }
-  }
+  if (!userId) return { success: false, error: '用户未登录' }
+  if (!tenantId) return { success: false, error: '租户信息缺失' }
 
-  if (!tenantId) {
-    console.error('[convertLeadToOpportunityAction] No tenant ID')
-    return { success: false, error: '租户信息缺失' }
-  }
-
-  console.log('[convertLeadToOpportunityAction] User and tenant:', { userId, tenantId })
-
-  // 1. 查询线索信息（包含关联的客户ID）
+  // 1. 查询线索信息
   const { data: lead, error: leadError } = await supabase
     .from('leads')
     .select('*, customerId')
-    .select('*')
     .eq('id', leadId)
     .single()
 
-  if (leadError || !lead) {
-    console.error('[convertLeadToOpportunityAction] Lead query error:', leadError)
-    return { success: false, error: '线索不存在' }
-  }
+  if (leadError || !lead) return { success: false, error: '线索不存在' }
+  if (lead.status === 'converted') return { success: false, error: '该线索已被转化过' }
 
-  console.log('[convertLeadToOpportunityAction] Lead found:', lead.leadCode, 'status:', lead.status)
-
-  if (lead.status === 'converted') {
-    return { success: false, error: '该线索已被转化过' }
-  }
-
-  // 优先使用线索关联的客户ID，如果没有则使用传入的客户ID
   const finalCustomerId = lead.customerId || customerId
+  if (!finalCustomerId) return { success: false, error: '必须关联客户才能转化为商机' }
 
-  if (!finalCustomerId) {
-    return { success: false, error: '必须关联客户才能转化为商机' }
-  }
-
-  // 2. 生成商机编号（格式：OPP-YYMMDD-XXXX）
+  // 2. 生成商机编号 (OPP-YYMMDD-XXXX)
   const today = new Date().toISOString().slice(2, 10).replace(/-/g, '')
   const randomSuffix = Math.random().toString().slice(2, 6)
   const opportunityCode = `OPP-${today}-${randomSuffix}`
 
-  console.log('[convertLeadToOpportunityAction] Generated opportunity code:', opportunityCode)
-
-  // 3. 使用线索的企微群信息（如果线索没有，则生成新的）
+  // 3. 处理企微群分配
   let wechatGroupId = lead.wechatGroupId
   let finalWechatGroupName = lead.wechatGroupName || wechatGroupName
 
   if (!wechatGroupId) {
-    // 如果线索没有企微群ID，则生成新的
     const { data: groupRow, error: groupError } = await supabase
       .from('wechat_group_sequences')
       .insert({})
       .select('id')
       .single()
 
-    if (groupError || !groupRow) {
-      console.error('[convertLeadToOpportunityAction] Wechat group alloc error:', groupError)
-      return { success: false, error: '分配企微群编号失败，请稍后重试' }
-    }
-
+    if (groupError || !groupRow) return { success: false, error: '分配企微群编号失败' }
     wechatGroupId = groupRow.id
     finalWechatGroupName = wechatGroupName.trim()
   }
 
+  // 服务类型的中文映射字典
+  const categoryLabels: Record<string, string> = {
+    VISA: '签证服务',
+    COMPANY_REGISTRATION: '公司注册',
+    FINANCIAL_SERVICES: '财务服务',
+    PERMIT_SERVICES: '许可证服务',
+    TAX_SERVICES: '税务服务',
+    FACTORY_SETUP: '工厂落地',
+    IMMIGRATION: '移民服务',
+    OTHER: '其他'
+  }
+
   // 4. 创建商机
   const opportunityData = {
-    id: opportunityCode,
+    id: crypto.randomUUID(),
     organizationId: tenantId,
-    opportunityCode,
+    opportunityCode: opportunityCode,
     customerId: finalCustomerId,
     convertedFromLeadId: leadId,
     stageId: 'P1',
     status: 'active',
     serviceType: lead.category || 'VISA',
-    serviceTypeLabel: lead.category || '签证服务',
+    serviceTypeLabel: categoryLabels[lead.category || 'VISA'] || '其他',
     estimatedAmount: lead.budgetMin || 0,
     currency: lead.budgetCurrency || 'IDR',
     requirements: lead.initialIntent || '',
@@ -687,8 +701,6 @@ export async function convertLeadToOpportunityAction(
     updatedAt: new Date().toISOString(),
   }
 
-  console.log('[convertLeadToOpportunityAction] Creating opportunity with data:', opportunityData)
-
   const { data: opportunity, error: oppError } = await supabase
     .from('opportunities')
     .insert(opportunityData)
@@ -696,36 +708,27 @@ export async function convertLeadToOpportunityAction(
     .single()
 
   if (oppError || !opportunity) {
-    console.error('[convertLeadToOpportunityAction] Create opportunity error:', oppError)
+    console.error('[convertLeadToOpportunityAction] Create opp error:', oppError)
     return { success: false, error: '创建商机失败，请稍后重试' }
   }
 
-  console.log('[convertLeadToOpportunityAction] Opportunity created:', opportunity)
-
-  console.log('[convertLeadToOpportunityAction] Opportunity created:', opportunity)
-
-  // 4. 更新线索状态为已转化
+  // 5. 更新线索状态
   const { error: updateError } = await supabase
     .from('leads')
     .update({
       status: 'converted',
       convertedOpportunityId: opportunity.id,
+      customerId: finalCustomerId,
       wechatGroupId: wechatGroupId,
       wechatGroupName: finalWechatGroupName,
       updatedAt: new Date().toISOString(),
-      updatedById: userId,
     })
     .eq('id', leadId)
 
   if (updateError) {
     console.error('[convertLeadToOpportunityAction] Update lead error:', updateError)
-    return { success: false, error: '更新线索状态失败，请稍后重试' }
+    return { success: false, error: '商机已创建，但更新线索状态失败' }
   }
-
-  console.log('[convertLeadToOpportunityAction] ✅ Conversion successful!')
-
-  // 5. 创建系统跟进记录（可选）
-  // 如果您有 interactions 表，可以在这里记录转化事件
 
   return {
     success: true,

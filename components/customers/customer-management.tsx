@@ -478,7 +478,7 @@ const result = await createCustomerAction({
               {detailLoading ? <DetailSkeleton /> : activeTab === 'opportunities' ? (
                 detailOpportunities.length === 0 ? <div className="py-12 text-center text-[12px] text-[#9ca3af]">暂无关联商机</div> : (
                   <table className="w-full text-[12px]">
-                    <thead><tr className="border-b border-[#e5e7eb] bg-[#f9fafb] text-[11px] text-[#6b7280]"><th className="px-4 py-2 text-left font-semibold">商机编号</th><th className="px-4 py-2 text-left font-semibold">服务类型</th><th className="px-4 py-2 text-left font-semibold">阶段</th><th className="px-4 py-2 text-left font-semibold">金额</th><th className="px-4 py-2 text-left font-semibold">状态</th></tr></thead>
+                    <thead><tr className="border-b border-[#e5e7eb] bg-[#f9fafb] text-[11px] text-[#6b7280]"><th className="px-4 py-2 text-left font-semibold">商机编号</th><th className="px-4 py-2 text-left font-semibold">服务类型</th><th className="px-4 py-2 text-left font-semibold">阶段</th><th className="px-4 py-2 text-left font-semibold">金额</th><th className="px-4 py-2 text-left font-semibold">状态</th><th className="px-4 py-2 text-left font-semibold">关联企微群</th></tr></thead>
                     <tbody className="divide-y divide-[#f3f4f6]">
                       {detailOpportunities.map((opp) => (
                         <tr key={opp.id} className="hover:bg-[#f9fafb]">
@@ -487,6 +487,7 @@ const result = await createCustomerAction({
                           <td className="px-4 py-2"><span className={`px-1.5 py-0.5 rounded-sm text-[11px] font-semibold ${stageColors[opp.stageId] ?? 'bg-slate-100 text-slate-600'}`}>{opp.stageId}</span></td>
                           <td className="px-4 py-2 font-mono text-[#111827]">{opp.currency} {opp.estimatedAmount.toLocaleString()}</td>
                           <td className="px-4 py-2"><span className={`px-1.5 py-0.5 rounded-sm text-[11px] font-semibold ${opp.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>{opp.status === 'active' ? '进行中' : opp.status}</span></td>
+                          <td className="px-4 py-2 text-[#6b7280]">{opp.wechatGroupId ? `${opp.wechatGroupId}${opp.wechatGroupName || ''}` : '—'}</td>
                         </tr>
                       ))}
                     </tbody>
