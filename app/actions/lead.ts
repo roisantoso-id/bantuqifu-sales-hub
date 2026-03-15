@@ -272,6 +272,8 @@ export async function updateLeadAction(
     urgency?: string
     initialIntent?: string
     notes?: string
+    customerId?: string
+    nextFollowDate?: string
   }
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient()

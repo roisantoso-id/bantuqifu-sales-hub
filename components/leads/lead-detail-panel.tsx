@@ -26,8 +26,12 @@ import {
   Send,
   Edit,
   Save,
+  User,
+  Calendar,
+  DollarSign,
 } from 'lucide-react'
 import { getLeadFollowUpsAction, addLeadFollowUpAction, updateLeadAction, advanceLeadStatusAction, type LeadRow, type LeadFollowUpRow } from '@/app/actions/lead'
+import { getCustomersAction, type CustomerRow } from '@/app/actions/customer'
 import { toast } from 'sonner'
 import {
   getLeadStatusLabel,
@@ -49,11 +53,20 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
   const [followUpNote, setFollowUpNote] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
+  const [customers, setCustomers] = useState<CustomerRow[]>([])
   const [editForm, setEditForm] = useState({
     wechatName: '',
     phone: '',
+    source: '',
+    category: '',
+    budgetMin: '',
+    budgetMax: '',
+    budgetCurrency: 'CNY',
+    urgency: 'MEDIUM',
     initialIntent: '',
     notes: '',
+    customerId: '',
+    nextFollowDate: '',
   })
 
   // 判断是否已转化为商机（只读模式）
@@ -66,16 +79,30 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
       setEditForm({
         wechatName: lead.wechatName || '',
         phone: lead.phone || '',
+        source: lead.source || '',
+        category: lead.category || '',
+        budgetMin: lead.budgetMin?.toString() || '',
+        budgetMax: lead.budgetMax?.toString() || '',
+        budgetCurrency: lead.budgetCurrency || 'CNY',
+        urgency: lead.urgency || 'MEDIUM',
         initialIntent: lead.initialIntent || '',
         notes: lead.notes || '',
+        customerId: lead.customerId || '',
+        nextFollowDate: lead.nextFollowDate || '',
       })
-      getLeadFollowUpsAction(lead.id)
-        .then(data => {
-          setFollowUps(data)
+      
+      // 并行加载跟进记录和客户列表
+      Promise.all([
+        getLeadFollowUpsAction(lead.id),
+        getCustomersAction()
+      ])
+        .then(([followUpsData, customersData]) => {
+          setFollowUps(followUpsData)
+          setCustomers(customersData)
           setIsLoading(false)
         })
         .catch(error => {
-          console.error('Failed to load follow-ups:', error)
+          console.error('Failed to load data:', error)
           setIsLoading(false)
         })
     }
@@ -118,7 +145,20 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
 
     setIsSaving(true)
     try {
-      const result = await updateLeadAction(lead.id, editForm)
+      const result = await updateLeadAction(lead.id, {
+        wechatName: editForm.wechatName,
+        phone: editForm.phone,
+        source: editForm.source,
+        category: editForm.category,
+        budgetMin: editForm.budgetMin ? parseFloat(editForm.budgetMin) : undefined,
+        budgetMax: editForm.budgetMax ? parseFloat(editForm.budgetMax) : undefined,
+        budgetCurrency: editForm.budgetCurrency,
+        urgency: editForm.urgency,
+        initialIntent: editForm.initialIntent,
+        notes: editForm.notes,
+        customerId: editForm.customerId || undefined,
+        nextFollowDate: editForm.nextFollowDate || undefined,
+      })
       if (result.success) {
         toast.success('线索信息已更新')
         setIsEditing(false)
@@ -263,6 +303,36 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
               )}
             </div>
 
+            {/* 关联客户 */}
+            <div className="space-y-1">
+              <div className="text-[10px] text-[#9ca3af]">关联客户</div>
+              {isEditing ? (
+                <Select
+                  value={editForm.customerId || 'none'}
+                  onValueChange={(v) => setEditForm({...editForm, customerId: v === 'none' ? '' : v})}
+                >
+                  <SelectTrigger className="h-7 text-[12px]">
+                    <SelectValue placeholder="选择客户" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">不关联客户</SelectItem>
+                    {customers.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.customerName} ({c.customerCode || c.customerId})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="flex items-center gap-2 text-[12px]">
+                  <User className="h-3 w-3 text-[#9ca3af]" />
+                  <span className="text-[#6b7280]">
+                    {lead.customer?.customerName || '未关联'}
+                  </span>
+                </div>
+              )}
+            </div>
+
             {/* 初步意向 */}
             <div className="space-y-1">
               <div className="text-[10px] text-[#9ca3af]">初步意向</div>
@@ -285,26 +355,159 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
           {/* 线索属性 - 紧凑标签 */}
           <div className="px-4 py-3">
             <div className="text-[11px] font-medium text-[#6b7280] mb-2">线索属性</div>
-            <div className="flex flex-wrap gap-1.5">
-              <div className="inline-flex items-center gap-1 px-2 py-1 bg-[#f3f4f6] rounded-sm">
-                <span className="text-[10px] text-[#9ca3af]">意向</span>
-                <span className="text-[11px] text-[#111827] font-medium">
-                  {getLeadCategoryLabel(lead.category)}
-                </span>
+            
+            {isEditing ? (
+              <div className="space-y-2">
+                {/* 意向分类 */}
+                <div className="space-y-1">
+                  <div className="text-[10px] text-[#9ca3af]">意向分类</div>
+                  <Select
+                    value={editForm.category}
+                    onValueChange={(v) => setEditForm({...editForm, category: v})}
+                  >
+                    <SelectTrigger className="h-7 text-[12px]">
+                      <SelectValue placeholder="选择分类" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="VISA">签证服务</SelectItem>
+                      <SelectItem value="COMPANY_REGISTRATION">公司注册</SelectItem>
+                      <SelectItem value="TAX_SERVICES">税务服务</SelectItem>
+                      <SelectItem value="FINANCIAL_SERVICES">财务服务</SelectItem>
+                      <SelectItem value="PERMIT_SERVICES">许可证服务</SelectItem>
+                      <SelectItem value="OTHER">其他</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* 来源渠道 */}
+                <div className="space-y-1">
+                  <div className="text-[10px] text-[#9ca3af]">来源渠道</div>
+                  <Select
+                    value={editForm.source}
+                    onValueChange={(v) => setEditForm({...editForm, source: v})}
+                  >
+                    <SelectTrigger className="h-7 text-[12px]">
+                      <SelectValue placeholder="选择来源" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="wechat">山海图微信群</SelectItem>
+                      <SelectItem value="referral">老客户推荐</SelectItem>
+                      <SelectItem value="facebook">Facebook</SelectItem>
+                      <SelectItem value="website">官网</SelectItem>
+                      <SelectItem value="cold_outreach">冷拉</SelectItem>
+                      <SelectItem value="other">其他</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* 紧迫度 */}
+                <div className="space-y-1">
+                  <div className="text-[10px] text-[#9ca3af]">紧迫度</div>
+                  <Select
+                    value={editForm.urgency}
+                    onValueChange={(v) => setEditForm({...editForm, urgency: v})}
+                  >
+                    <SelectTrigger className="h-7 text-[12px]">
+                      <SelectValue placeholder="选择紧迫度" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="HIGH">高</SelectItem>
+                      <SelectItem value="MEDIUM">中</SelectItem>
+                      <SelectItem value="LOW">低</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* 预算范围 */}
+                <div className="space-y-1">
+                  <div className="text-[10px] text-[#9ca3af]">预算范围</div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      value={editForm.budgetMin}
+                      onChange={(e) => setEditForm({...editForm, budgetMin: e.target.value})}
+                      placeholder="最低"
+                      className="h-7 text-[12px] w-24"
+                    />
+                    <span className="text-[10px] text-[#9ca3af]">-</span>
+                    <Input
+                      type="number"
+                      value={editForm.budgetMax}
+                      onChange={(e) => setEditForm({...editForm, budgetMax: e.target.value})}
+                      placeholder="最高"
+                      className="h-7 text-[12px] w-24"
+                    />
+                    <Select
+                      value={editForm.budgetCurrency}
+                      onValueChange={(v) => setEditForm({...editForm, budgetCurrency: v})}
+                    >
+                      <SelectTrigger className="h-7 text-[12px] w-20">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="CNY">CNY</SelectItem>
+                        <SelectItem value="IDR">IDR</SelectItem>
+                        <SelectItem value="USD">USD</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* 下次跟进日期 */}
+                <div className="space-y-1">
+                  <div className="text-[10px] text-[#9ca3af]">下次跟进日期</div>
+                  <Input
+                    type="date"
+                    value={editForm.nextFollowDate}
+                    onChange={(e) => setEditForm({...editForm, nextFollowDate: e.target.value})}
+                    className="h-7 text-[12px]"
+                  />
+                </div>
               </div>
-              <div className="inline-flex items-center gap-1 px-2 py-1 bg-[#f3f4f6] rounded-sm">
-                <span className="text-[10px] text-[#9ca3af]">来源</span>
-                <span className="text-[11px] text-[#111827] font-medium">
-                  {getLeadSourceLabel(lead.source)}
-                </span>
-              </div>
-              <div className="inline-flex items-center gap-1 px-2 py-1 bg-[#f3f4f6] rounded-sm">
-                <span className="text-[10px] text-[#9ca3af]">状态</span>
-                <span className="text-[11px] text-[#111827] font-medium">
-                  {getLeadStatusLabel(lead.status)}
-                </span>
-              </div>
-            </div>
+            ) : (
+              <>
+                <div className="flex flex-wrap gap-1.5">
+                  <div className="inline-flex items-center gap-1 px-2 py-1 bg-[#f3f4f6] rounded-sm">
+                    <span className="text-[10px] text-[#9ca3af]">意向</span>
+                    <span className="text-[11px] text-[#111827] font-medium">
+                      {getLeadCategoryLabel(lead.category)}
+                    </span>
+                  </div>
+                  <div className="inline-flex items-center gap-1 px-2 py-1 bg-[#f3f4f6] rounded-sm">
+                    <span className="text-[10px] text-[#9ca3af]">来源</span>
+                    <span className="text-[11px] text-[#111827] font-medium">
+                      {getLeadSourceLabel(lead.source)}
+                    </span>
+                  </div>
+                  <div className="inline-flex items-center gap-1 px-2 py-1 bg-[#f3f4f6] rounded-sm">
+                    <span className="text-[10px] text-[#9ca3af]">状态</span>
+                    <span className="text-[11px] text-[#111827] font-medium">
+                      {getLeadStatusLabel(lead.status)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 预算范围显示 */}
+                {(lead.budgetMin || lead.budgetMax) && (
+                  <div className="mt-2 flex items-center gap-2 text-[11px]">
+                    <DollarSign className="h-3 w-3 text-[#9ca3af]" />
+                    <span className="text-[#6b7280]">
+                      预算: {lead.budgetMin || 0} - {lead.budgetMax || 0} {lead.budgetCurrency || 'CNY'}
+                    </span>
+                  </div>
+                )}
+
+                {/* 下次跟进日期显示 */}
+                {lead.nextFollowDate && (
+                  <div className="mt-2 flex items-center gap-2 text-[11px]">
+                    <Calendar className="h-3 w-3 text-[#9ca3af]" />
+                    <span className="text-[#6b7280]">
+                      下次跟进: {new Date(lead.nextFollowDate).toLocaleDateString('zh-CN')}
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
 
             {/* 企业微信群信息 */}
             {lead.wechatGroupId && (
