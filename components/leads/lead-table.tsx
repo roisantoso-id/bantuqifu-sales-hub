@@ -13,6 +13,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import { claimLeadAction, discardLeadAction, type LeadRow } from '@/app/actions/lead'
 import { ConvertToOppDialog } from './convert-to-opp-dialog'
@@ -66,6 +76,8 @@ export function LeadTable({
   const [claiming, setClaiming] = useState<string | null>(null)
   const [convertDialogOpen, setConvertDialogOpen] = useState(false)
   const [leadToConvert, setLeadToConvert] = useState<LeadRow | null>(null)
+  const [returnDialogOpen, setReturnDialogOpen] = useState(false)
+  const [leadToReturn, setLeadToReturn] = useState<LeadRow | null>(null)
 
   // 根据 selectedLeadId 找到选中的线索
   const selectedLead = selectedLeadId ? leads.find(l => l.id === selectedLeadId) : null
@@ -101,13 +113,15 @@ export function LeadTable({
 
   const handleReturnToPool = async (lead: LeadRow, e: React.MouseEvent) => {
     e.stopPropagation()
+    setLeadToReturn(lead)
+    setReturnDialogOpen(true)
+  }
 
-    if (!confirm(`确定要将线索 ${lead.leadCode} 退回公海吗？`)) {
-      return
-    }
+  const confirmReturnToPool = async () => {
+    if (!leadToReturn) return
 
     try {
-      const result = await discardLeadAction(lead.id, 'return_to_pool')
+      const result = await discardLeadAction(leadToReturn.id, 'return_to_pool')
       if (result) {
         toast.success('线索已退回公海')
         onRefresh?.()
@@ -117,6 +131,9 @@ export function LeadTable({
     } catch (error) {
       toast.error('操作失败，请重试')
       console.error('Return to pool error:', error)
+    } finally {
+      setReturnDialogOpen(false)
+      setLeadToReturn(null)
     }
   }
 
@@ -343,6 +360,29 @@ export function LeadTable({
           onRefresh?.()
         }}
       />
+
+      {/* 退回公海确认对话框 */}
+      <AlertDialog open={returnDialogOpen} onOpenChange={setReturnDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认退回公海</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要将线索 <span className="font-semibold text-slate-900">{leadToReturn?.leadCode}</span> 退回公海吗？
+              <br />
+              退回后，该线索将重新进入公海池，其他销售可以认领。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmReturnToPool}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              确认退回
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

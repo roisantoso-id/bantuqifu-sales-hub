@@ -1,12 +1,13 @@
 'use client'
 
-import { useCallback, useTransition } from 'react'
+import { useCallback, useState, useTransition } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { Plus, Search, RefreshCw } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { LeadTable } from './lead-table'
+import { CreateLeadDialog } from './create-lead-dialog'
 import { toast } from 'sonner'
 import type { LeadRow } from '@/app/actions/lead'
 
@@ -27,6 +28,7 @@ export function LeadManagementClient({
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
 
   // 从 URL 读取状态
   const activeTab = (searchParams.get('tab') || initialTab) as 'my_leads' | 'pool'
@@ -140,7 +142,7 @@ export function LeadManagementClient({
 
           <Button
             size="sm"
-            onClick={() => toast.info('新增线索功能开发中')}
+            onClick={() => setCreateDialogOpen(true)}
             className="h-9 gap-2 text-[12px] bg-blue-600 hover:bg-blue-700"
           >
             <Plus className="h-3.5 w-3.5" /> 新增线索
@@ -170,6 +172,13 @@ export function LeadManagementClient({
           />
         )}
       </div>
+
+      {/* 新增线索对话框 */}
+      <CreateLeadDialog
+        isOpen={createDialogOpen}
+        onClose={() => setCreateDialogOpen(false)}
+        onSuccess={handleRefresh}
+      />
     </div>
   )
 }
