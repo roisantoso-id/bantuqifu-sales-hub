@@ -529,15 +529,7 @@ export async function getLeadByIdAction(leadId: string): Promise<LeadRow | null>
 
   const { data, error } = await supabase
     .from('leads')
-    .select(`
-      *,
-      customer:customers!leads_customerId_fkey (
-        id,
-        customerName,
-        customerId,
-        customerCode
-      )
-    `)
+    .select('*, customer:customers(id, customerName, customerId, customerCode)')
     .eq('id', leadId)
     .single()
 
