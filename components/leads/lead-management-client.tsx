@@ -7,7 +7,6 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { LeadTable } from './lead-table'
-import { CreateLeadDialog } from './create-lead-dialog'
 import { toast } from 'sonner'
 import type { LeadRow } from '@/app/actions/lead'
 
@@ -22,108 +21,93 @@ export function LeadManagementClient({
   initialLeads,
   initialTab,
   initialSearch,
-  initialLeadId,
 }: LeadManagementClientProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
-  const [createDialogOpen, setCreateDialogOpen] = useState(false)
 
-  // 从 URL 读取状态
+  // Read state from URL
   const activeTab = (searchParams.get('tab') || initialTab) as 'my_leads' | 'pool'
   const searchQuery = searchParams.get('q') || initialSearch
-  const selectedLeadId = searchParams.get('leadId') || initialLeadId
 
-  // 创建 URL 查询字符串
   const createQueryString = useCallback(
     (updates: Record<string, string | null>) => {
       const params = new URLSearchParams(searchParams.toString())
-
       Object.entries(updates).forEach(([key, value]) => {
-        if (value) {
-          params.set(key, value)
-        } else {
-          params.delete(key)
-        }
+        if (value) params.set(key, value)
+        else params.delete(key)
       })
-
       return params.toString()
     },
     [searchParams]
   )
 
-  // 切换 Tab
   const handleTabChange = (tab: string) => {
     startTransition(() => {
-      router.push(`${pathname}?${createQueryString({ tab, q: null, leadId: null })}`)
+      router.push(`${pathname}?${createQueryString({ tab, q: null })}`)
     })
   }
 
-  // 搜索（使用 replace 避免历史记录堆积）
   const handleSearch = (value: string) => {
     startTransition(() => {
       router.replace(`${pathname}?${createQueryString({ q: value || null })}`)
     })
   }
 
-  // 选择线索
-  const handleSelectLead = (lead: LeadRow) => {
-    router.push(`${pathname}?${createQueryString({ leadId: lead.id })}`)
-  }
-
-  // 刷新数据
   const handleRefresh = () => {
     router.refresh()
   }
 
-  // 数据统计
+  // Stats
   const stats = {
     total: initialLeads.length,
-    new: initialLeads.filter(l => l.status === 'new').length,
-    pushing: initialLeads.filter(l => l.status === 'contacted' || l.status === 'ready_for_opportunity').length,
+    new: initialLeads.filter((l) => l.status === 'new').length,
+    pushing: initialLeads.filter(
+      (l) => l.status === 'contacted' || l.status === 'ready_for_opportunity'
+    ).length,
   }
 
   return (
     <div className="flex h-full flex-col bg-white">
-      {/* ── 顶部工具栏 ── */}
-      <div className="flex items-center justify-between border-b px-6 py-3 bg-slate-50/50">
-        <div className="flex items-center gap-6">
-          <h1 className="text-sm font-bold text-slate-900">线索管理</h1>
+      {/* ── Toolbar ── */}
+      <div className="flex items-center justify-between border-b border-[#e5e7eb] bg-[#fafafa] px-6 py-3">
+        <div className="flex items-center gap-5">
+          <h1 className="text-[13px] font-bold text-[#111827]">线索管理</h1>
 
-          {/* 视图切换 Tabs */}
-          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-auto">
-            <TabsList className="h-8 bg-slate-100 p-0.5">
-              <TabsTrigger value="my_leads" className="text-[12px] px-4 h-7">
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
+            <TabsList className="h-8 bg-[#f3f4f6] p-0.5">
+              <TabsTrigger value="my_leads" className="h-7 px-4 text-[12px]">
                 我的跟进
               </TabsTrigger>
-              <TabsTrigger value="pool" className="text-[12px] px-4 h-7">
+              <TabsTrigger value="pool" className="h-7 px-4 text-[12px]">
                 待分配（公海）
               </TabsTrigger>
             </TabsList>
           </Tabs>
 
-          {/* 数据统计 */}
-          <div className="flex items-center gap-4 text-[12px] text-slate-600">
+          <div className="flex items-center gap-4 text-[12px] text-[#6b7280]">
             <span>
-              总计: <strong className="text-slate-900">{stats.total}</strong>
+              总计:{' '}
+              <strong className="text-[#111827]">{stats.total}</strong>
             </span>
             <span>
-              新线索: <strong className="text-blue-600">{stats.new}</strong>
+              新线索:{' '}
+              <strong className="text-[#2563eb]">{stats.new}</strong>
             </span>
             <span>
-              跟进中: <strong className="text-amber-600">{stats.pushing}</strong>
+              跟进中:{' '}
+              <strong className="text-amber-600">{stats.pushing}</strong>
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* 搜索框 */}
-          <div className="relative w-64">
-            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+        <div className="flex items-center gap-2.5">
+          <div className="relative w-60">
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-[#9ca3af]" />
             <Input
-              placeholder="搜索线索编号、姓名、公司..."
-              className="h-9 pl-8 text-[12px] bg-white"
+              placeholder="搜索线索编号、姓名..."
+              className="h-8 pl-8 text-[12px] bg-white border-[#e5e7eb]"
               defaultValue={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
             />
@@ -132,7 +116,7 @@ export function LeadManagementClient({
           <Button
             variant="outline"
             size="sm"
-            className="h-9 gap-2 text-[12px]"
+            className="h-8 gap-1.5 text-[12px] border-[#e5e7eb]"
             onClick={handleRefresh}
             disabled={isPending}
           >
@@ -142,43 +126,46 @@ export function LeadManagementClient({
 
           <Button
             size="sm"
-            onClick={() => setCreateDialogOpen(true)}
-            className="h-9 gap-2 text-[12px] bg-blue-600 hover:bg-blue-700"
+            className="h-8 gap-1.5 bg-[#2563eb] text-[12px] hover:bg-[#1d4ed8]"
+            onClick={() => router.push('/leads/new')}
           >
-            <Plus className="h-3.5 w-3.5" /> 新增线索
+            <Plus className="h-3.5 w-3.5" />
+            新增线索
           </Button>
         </div>
       </div>
 
-      {/* ── 全屏表格区 ── */}
+      {/* ── Table area ── */}
       <div className="flex-1 overflow-auto px-6 py-4">
         {isPending ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-slate-400">加载中...</div>
+          <div className="flex h-64 items-center justify-center">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-[#e5e7eb] border-t-[#2563eb]" />
           </div>
         ) : initialLeads.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-            <div className="text-4xl mb-2">📭</div>
-            <div>暂无线索数据</div>
-            {searchQuery && <div className="text-sm mt-2">尝试修改搜索条件</div>}
+          <div className="flex h-64 flex-col items-center justify-center text-center">
+            <p className="text-[13px] text-[#6b7280]">暂无线索数据</p>
+            {searchQuery && (
+              <p className="mt-1 text-[12px] text-[#9ca3af]">尝试修改搜索条件</p>
+            )}
+            {!searchQuery && (
+              <Button
+                size="sm"
+                className="mt-4 h-8 bg-[#2563eb] text-[12px] hover:bg-[#1d4ed8]"
+                onClick={() => router.push('/leads/new')}
+              >
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                添加第一条线索
+              </Button>
+            )}
           </div>
         ) : (
           <LeadTable
             leads={initialLeads}
             viewMode={activeTab === 'pool' ? 'public_pool' : 'my_leads'}
-            onSelect={handleSelectLead}
             onRefresh={handleRefresh}
-            selectedLeadId={selectedLeadId}
           />
         )}
       </div>
-
-      {/* 新增线索对话框 */}
-      <CreateLeadDialog
-        isOpen={createDialogOpen}
-        onClose={() => setCreateDialogOpen(false)}
-        onSuccess={handleRefresh}
-      />
     </div>
   )
 }

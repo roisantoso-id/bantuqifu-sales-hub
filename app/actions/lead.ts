@@ -488,8 +488,6 @@ export async function addLeadFollowUpAction(input: {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  console.log('[addLeadFollowUpAction] user:', user?.id)
-
   const tenantId = await getCurrentTenantId()
 
   if (!tenantId) {
@@ -523,6 +521,32 @@ export async function addLeadFollowUpAction(input: {
   }
 
   return data as LeadFollowUpRow
+}
+
+// ─── getLeadByIdAction ────────────────────────────────────────────────────────
+export async function getLeadByIdAction(leadId: string): Promise<LeadRow | null> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('leads')
+    .select(`
+      *,
+      customer:customers!leads_customerId_fkey (
+        id,
+        customerName,
+        customerId,
+        customerCode
+      )
+    `)
+    .eq('id', leadId)
+    .single()
+
+  if (error) {
+    console.error('[getLeadByIdAction] Error:', error.message)
+    return null
+  }
+
+  return data as LeadRow
 }
 
 // ─── getLeadFollowUpsAction ───────────────────────────────────────────────────
