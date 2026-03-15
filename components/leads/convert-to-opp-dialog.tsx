@@ -87,8 +87,6 @@ export function ConvertToOppDialog({
     }
   }
 
-  if (!lead) return null
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]">
@@ -99,7 +97,8 @@ export function ConvertToOppDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="my-4 space-y-4">
+        {lead && (
+          <div className="my-4 space-y-4">
           {/* 线索信息摘要 */}
           <Alert className="bg-slate-50">
             <AlertCircle className="h-4 w-4" />
@@ -174,6 +173,7 @@ export function ConvertToOppDialog({
             </AlertDescription>
           </Alert>
         </div>
+        )}
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={isSubmitting}>

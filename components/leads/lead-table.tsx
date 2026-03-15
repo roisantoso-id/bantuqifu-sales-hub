@@ -127,8 +127,10 @@ export function LeadTable({
 
   const handleConvertToOpp = (lead: LeadRow, e: React.MouseEvent) => {
     e.stopPropagation()
+    console.log('🚀 Converting lead to opportunity:', lead.leadCode)
     setLeadToConvert(lead)
     setConvertDialogOpen(true)
+    console.log('Dialog state:', { convertDialogOpen: true, leadToConvert: lead })
   }
 
   return (
