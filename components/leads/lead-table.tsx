@@ -1,13 +1,20 @@
 'use client'
 
 import { useState } from 'react'
-import { Flame, Thermometer, Snowflake, AlertCircle, Clock, UserPlus } from 'lucide-react'
+import { Flame, Thermometer, Snowflake, AlertCircle, Clock, UserPlus, MoreHorizontal } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
-import { claimLeadAction, type LeadRow } from '@/app/actions/lead'
+import { claimLeadAction, discardLeadAction, type LeadRow } from '@/app/actions/lead'
 
 function getUrgencyIcon(urgency: string) {
   const map: Record<string, { icon: React.ReactNode; cls: string }> = {
@@ -45,23 +52,26 @@ export function LeadTable({
   leads,
   viewMode,
   onSelect,
-  onRefresh
+  onRefresh,
+  selectedLeadId,
 }: {
   leads: LeadRow[]
   viewMode: 'my_leads' | 'public_pool'
   onSelect?: (lead: LeadRow) => void
   onRefresh?: () => void
+  selectedLeadId?: string | null
 }) {
-  const [selectedLead, setSelectedLead] = useState<LeadRow | null>(null)
   const [followUpNote, setFollowUpNote] = useState('')
   const [claiming, setClaiming] = useState<string | null>(null)
+
+  // 根据 selectedLeadId 找到选中的线索
+  const selectedLead = selectedLeadId ? leads.find(l => l.id === selectedLeadId) : null
 
   const handleRowClick = (lead: LeadRow, e: React.MouseEvent) => {
     // 如果点击的是按钮，不触发行点击
     if ((e.target as HTMLElement).closest('button')) {
       return
     }
-    setSelectedLead(lead)
     onSelect?.(lead)
   }
 
@@ -86,6 +96,38 @@ export function LeadTable({
     }
   }
 
+  const handleReturnToPool = async (lead: LeadRow, e: React.MouseEvent) => {
+    e.stopPropagation()
+
+    if (!confirm(`确定要将线索 ${lead.leadCode} 退回公海吗？`)) {
+      return
+    }
+
+    try {
+      const result = await discardLeadAction(lead.id, 'return_to_pool')
+      if (result) {
+        toast.success('线索已退回公海')
+        onRefresh?.()
+      } else {
+        toast.error('操作失败')
+      }
+    } catch (error) {
+      toast.error('操作失败，请重试')
+      console.error('Return to pool error:', error)
+    }
+  }
+
+  const handleWriteFollowUp = (lead: LeadRow, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedLead(lead)
+    toast.info('跟进功能开发中')
+  }
+
+  const handleConvertToOpp = (lead: LeadRow, e: React.MouseEvent) => {
+    e.stopPropagation()
+    toast.info('转商机功能开发中')
+  }
+
   return (
     <>
       <div className="border rounded-lg overflow-hidden">
@@ -102,9 +144,7 @@ export function LeadTable({
                 <th className="text-left py-2 px-3 font-medium text-slate-600">回收倒计时</th>
               )}
               <th className="text-left py-2 px-3 font-medium text-slate-600">创建时间</th>
-              {viewMode === 'public_pool' && (
-                <th className="text-center py-2 px-3 font-medium text-slate-600">操作</th>
-              )}
+              <th className="text-center py-2 px-3 font-medium text-slate-600">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -164,8 +204,8 @@ export function LeadTable({
                   <td className="py-2.5 px-3 text-slate-500">
                     {new Date(lead.createdAt).toLocaleDateString('zh-CN')}
                   </td>
-                  {viewMode === 'public_pool' && (
-                    <td className="py-2.5 px-3 text-center">
+                  <td className="py-2.5 px-3 text-center">
+                    {viewMode === 'public_pool' ? (
                       <Button
                         size="sm"
                         variant="outline"
@@ -176,8 +216,36 @@ export function LeadTable({
                         <UserPlus className="h-3 w-3" />
                         {claiming === lead.id ? '认领中...' : '认领'}
                       </Button>
-                    </td>
-                  )}
+                    ) : (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={(e) => handleWriteFollowUp(lead, e)}>
+                            ✍️ 写跟进
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => handleConvertToOpp(lead, e)}>
+                            🚀 转为商机
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={(e) => handleReturnToPool(lead, e)}
+                            className="text-red-600"
+                          >
+                            ♻️ 退回公海
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </td>
                 </tr>
               )
             })}
@@ -185,8 +253,17 @@ export function LeadTable({
         </table>
       </div>
 
-      {/* 右侧抽屉 */}
-      <Sheet open={!!selectedLead} onOpenChange={() => setSelectedLead(null)}>
+      {/* 右侧抽屉 - 受 URL 控制 */}
+      <Sheet
+        open={!!selectedLead}
+        onOpenChange={(open) => {
+          if (!open) {
+            // 关闭抽屉时，通过 onSelect(null) 清除 URL 中的 leadId
+            // 实际的 URL 更新由父组件处理
+            window.history.back()
+          }
+        }}
+      >
         <SheetContent className="w-[500px]">
           <SheetHeader>
             <SheetTitle>线索详情 - {selectedLead?.leadCode}</SheetTitle>
@@ -201,8 +278,26 @@ export function LeadTable({
                   {selectedLead.phone && <div>电话: {selectedLead.phone}</div>}
                   {selectedLead.email && <div>邮箱: {selectedLead.email}</div>}
                   {selectedLead.wechat && <div>微信: {selectedLead.wechat}</div>}
+                  {selectedLead.company && <div>公司: {selectedLead.company}</div>}
                 </div>
               </div>
+
+              <div className="space-y-2">
+                <div className="text-sm font-medium">线索信息</div>
+                <div className="text-sm text-slate-600">
+                  <div>意向: {selectedLead.category}</div>
+                  <div>紧迫度: {selectedLead.urgency}</div>
+                  <div>来源: {selectedLead.source}</div>
+                  <div>状态: {selectedLead.status}</div>
+                </div>
+              </div>
+
+              {selectedLead.notes && (
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">备注</div>
+                  <div className="text-sm text-slate-600">{selectedLead.notes}</div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <div className="text-sm font-medium">快速跟进</div>

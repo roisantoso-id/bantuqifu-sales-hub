@@ -51,7 +51,7 @@ async function getCurrentTenantId(): Promise<string> {
 // ─── getLeadsAction ────────────────────────────────────────────────────────────
 export async function getLeadsAction(
   viewMode: 'my_leads' | 'pool',
-  filters?: { status?: string; urgency?: string; searchText?: string },
+  filters?: { status?: string; urgency?: string; search?: string },
 ): Promise<LeadRow[]> {
   const supabase = await createClient()
 
@@ -87,6 +87,14 @@ export async function getLeadsAction(
   }
   if (filters?.urgency) {
     query = query.eq('urgency', filters.urgency)
+  }
+
+  // Apply search filter (server-side)
+  if (filters?.search) {
+    const searchTerm = `%${filters.search}%`
+    query = query.or(
+      `personName.ilike.${searchTerm},leadCode.ilike.${searchTerm},company.ilike.${searchTerm},phone.ilike.${searchTerm}`
+    )
   }
 
   // Exclude discarded
@@ -235,20 +243,26 @@ export async function claimLeadAction(leadId: string): Promise<LeadRow | null> {
     return null
   }
 
+  // 使用原子操作确保并发安全：只有当 assignedToId 为 null 时才能更新
   const { data, error } = await supabase
     .from('leads')
     .update({
       assignedToId: user.id,
       updatedById: user.id,
       updatedAt: new Date().toISOString(),
+      status: 'PUSHING', // 认领后自动变为跟进中
     })
     .eq('id', leadId)
-    .is('assignedToId', null)
+    .is('assignedToId', null) // 并发核心：确保它真的是公海的无主线索
     .select('*')
     .single()
 
   if (error) {
     console.error('[claimLeadAction] Error:', error.message)
+    // 如果是因为 assignedToId 不为 null 导致的失败，返回特殊错误
+    if (error.code === 'PGRST116') {
+      console.warn('[claimLeadAction] Lead already claimed by another user')
+    }
     return null
   }
 
