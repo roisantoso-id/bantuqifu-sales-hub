@@ -145,12 +145,38 @@ export async function createLeadAction(input: {
     return null
   }
 
-  // Generate lead code using Supabase RPC
-  const { data: leadCode, error: codeError } = await supabase.rpc('generate_business_code', { doc_prefix: 'LEAD' })
+  // Generate lead code with retry logic for duplicate handling
+  let leadCode: string | null = null
+  let retryCount = 0
+  const maxRetries = 3
 
-  if (codeError || !leadCode) {
-    console.error('[createLeadAction] Generate lead code error:', codeError)
-    return null
+  while (!leadCode && retryCount < maxRetries) {
+    const { data: generatedCode, error: codeError } = await supabase.rpc('generate_business_code', { doc_prefix: 'LEAD' })
+    
+    if (codeError) {
+      console.error('[createLeadAction] Generate lead code error:', codeError)
+      retryCount++
+      continue
+    }
+    
+    // Check if code already exists
+    const { data: existing } = await supabase
+      .from('leads')
+      .select('id')
+      .eq('leadCode', generatedCode)
+      .maybeSingle()
+    
+    if (!existing) {
+      leadCode = generatedCode
+    } else {
+      retryCount++
+    }
+  }
+
+  if (!leadCode) {
+    // Fallback: generate unique code with random UUID suffix to ensure uniqueness
+    const randomSuffix = crypto.randomUUID().slice(0, 8).toUpperCase()
+    leadCode = `LEAD-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${randomSuffix}`
   }
 
   // 生成企业微信群ID和名称
@@ -488,8 +514,6 @@ export async function addLeadFollowUpAction(input: {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  console.log('[addLeadFollowUpAction] user:', user?.id)
-
   const tenantId = await getCurrentTenantId()
 
   if (!tenantId) {
@@ -523,6 +547,24 @@ export async function addLeadFollowUpAction(input: {
   }
 
   return data as LeadFollowUpRow
+}
+
+// ─── getLeadByIdAction ────────────────────────────────────────────────────────
+export async function getLeadByIdAction(leadId: string): Promise<LeadRow | null> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('leads')
+    .select('*')
+    .eq('id', leadId)
+    .single()
+
+  if (error) {
+    console.error('[getLeadByIdAction] Error:', error.message)
+    return null
+  }
+
+  return data as LeadRow
 }
 
 // ─── getLeadFollowUpsAction ───────────────────────────────────────────────────
@@ -644,12 +686,38 @@ export async function convertLeadToOpportunityAction(
   const finalCustomerId = lead.customerId || customerId
   if (!finalCustomerId) return { success: false, error: '必须关联客户才能转化为商机' }
 
-  // 2. 生成商机编号 (OPP-YYMMDD-XXXX)
-  const { data: opportunityCode, error: codeError } = await supabase.rpc('generate_business_code', { doc_prefix: 'OPP' })
+  // 2. 生成商机编号 (OPP-YYMMDD-XXXX) - 带重试逻辑
+  let opportunityCode: string | null = null
+  let retryCount = 0
+  const maxRetries = 3
 
-  if (codeError || !opportunityCode) {
-    console.error('[convertLeadToOpportunityAction] Generate opportunity code error:', codeError)
-    return { success: false, error: '生成商机编号失败' }
+  while (!opportunityCode && retryCount < maxRetries) {
+    const { data: generatedCode, error: codeError } = await supabase.rpc('generate_business_code', { doc_prefix: 'OPP' })
+    
+    if (codeError) {
+      console.error('[convertLeadToOpportunityAction] Generate opportunity code error:', codeError)
+      retryCount++
+      continue
+    }
+    
+    // Check if code already exists
+    const { data: existing } = await supabase
+      .from('opportunities')
+      .select('id')
+      .eq('opportunityCode', generatedCode)
+      .maybeSingle()
+    
+    if (!existing) {
+      opportunityCode = generatedCode
+    } else {
+      retryCount++
+    }
+  }
+
+  if (!opportunityCode) {
+    // Fallback: generate unique code with random suffix to ensure uniqueness
+    const randomSuffix = crypto.randomUUID().slice(0, 8).toUpperCase()
+    opportunityCode = `OPP-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${randomSuffix}`
   }
 
   // 3. 处理企微群分配

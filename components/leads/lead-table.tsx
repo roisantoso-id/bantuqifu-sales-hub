@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Flame, Thermometer, Snowflake, AlertCircle, Clock, UserPlus, MoreHorizontal } from 'lucide-react'
+import { Flame, Thermometer, Snowflake, Clock, UserPlus, MoreHorizontal } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -24,7 +24,6 @@ import {
 import { toast } from 'sonner'
 import { claimLeadAction, discardLeadAction, type LeadRow } from '@/app/actions/lead'
 import { ConvertToOppDialog } from './convert-to-opp-dialog'
-import { LeadDetailPanel } from './lead-detail-panel'
 import {
   getLeadStatusLabel,
   getLeadSourceLabel,
@@ -58,7 +57,7 @@ function isStagnant(lead: LeadRow): boolean {
 }
 
 function getRecycleCountdown(lead: LeadRow): { hours: number; isUrgent: boolean } | null {
-  // 已转化的线索不显示倒计时 (注意这里必须是小写 converted)
+  // 已转化的线索不显示倒计时
   if (lead.convertedOpportunityId || lead.status === 'converted') return null
 
   // 只有已分配的线索才有回收倒计时
@@ -92,9 +91,6 @@ export function LeadTable({
   const [leadToConvert, setLeadToConvert] = useState<LeadRow | null>(null)
   const [returnDialogOpen, setReturnDialogOpen] = useState(false)
   const [leadToReturn, setLeadToReturn] = useState<LeadRow | null>(null)
-
-  // 根据 selectedLeadId 找到选中的线索
-  const selectedLead = selectedLeadId ? leads.find(l => l.id === selectedLeadId) : null
 
   const handleRowClick = (lead: LeadRow, e: React.MouseEvent) => {
     // 如果点击的是按钮，不触发行点击
@@ -158,10 +154,19 @@ export function LeadTable({
 
   const handleConvertToOpp = (lead: LeadRow, e: React.MouseEvent) => {
     e.stopPropagation()
-    console.log('🚀 Converting lead to opportunity:', lead.leadCode)
     setLeadToConvert(lead)
     setConvertDialogOpen(true)
-    console.log('Dialog state:', { convertDialogOpen: true, leadToConvert: lead })
+  }
+
+  if (leads.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+        <div className="text-4xl mb-3">📭</div>
+        <p className="text-sm">
+          {viewMode === 'public_pool' ? '公海暂无可认领线索' : '暂无线索，点击右上角按钮新增'}
+        </p>
+      </div>
+    )
   }
 
   return (
@@ -191,6 +196,7 @@ export function LeadTable({
               const countdown = getRecycleCountdown(lead)
               const urgency = getUrgencyIcon(lead.urgency)
               const isConverted = lead.status === 'converted' || lead.convertedOpportunityId
+              const isSelected = selectedLeadId === lead.id
 
               return (
                 <tr
@@ -198,7 +204,7 @@ export function LeadTable({
                   onClick={(e) => handleRowClick(lead, e)}
                   className={`border-b hover:bg-slate-50 cursor-pointer transition-colors ${
                     stagnant ? 'bg-red-50/50' : ''
-                  } ${isConverted ? 'opacity-60 bg-slate-50' : ''}`}
+                  } ${isConverted ? 'opacity-60 bg-slate-50' : ''} ${isSelected ? 'bg-blue-50' : ''}`}
                 >
                   <td className="py-2.5 px-3">
                     <button className="text-blue-600 hover:underline font-mono">
@@ -239,7 +245,7 @@ export function LeadTable({
                     {lead.customer?.customerName || '—'}
                   </td>
                   <td className="py-2.5 px-3 text-slate-600 text-[11px]">
-                    {lead.wechatGroupId ? `${lead.wechatGroupId}${lead.wechatGroupName}` : '—'}
+                    {lead.wechatGroupId ? `${lead.wechatGroupName || lead.wechatGroupId}` : '—'}
                   </td>
                   {viewMode === 'my_leads' && (
                     <td className="py-2.5 px-3">
@@ -261,7 +267,7 @@ export function LeadTable({
                         variant="outline"
                         className="h-7 text-[11px] gap-1"
                         onClick={(e) => handleClaimLead(lead, e)}
-                        disabled={claiming === lead.id || isConverted}
+                        disabled={claiming === lead.id || !!isConverted}
                       >
                         <UserPlus className="h-3 w-3" />
                         {claiming === lead.id ? '认领中...' : '认领'}
@@ -283,18 +289,18 @@ export function LeadTable({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={(e) => handleWriteFollowUp(lead, e)}>
-                            ✍️ 写跟进
+                          <DropdownMenuItem onClick={(e) => handleWriteFollowUp(lead, e as unknown as React.MouseEvent)}>
+                            写跟进
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => handleConvertToOpp(lead, e)}>
-                            🚀 转为商机
+                          <DropdownMenuItem onClick={(e) => handleConvertToOpp(lead, e as unknown as React.MouseEvent)}>
+                            转为商机
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
-                            onClick={(e) => handleReturnToPool(lead, e)}
+                            onClick={(e) => handleReturnToPool(lead, e as unknown as React.MouseEvent)}
                             className="text-red-600"
                           >
-                            ♻️ 退回公海
+                            退回公海
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -306,13 +312,6 @@ export function LeadTable({
           </tbody>
         </table>
       </div>
-
-      {/* 右侧抽屉 - 使用新的 LeadDetailPanel 组件 */}
-      <LeadDetailPanel
-        lead={selectedLead}
-        isOpen={!!selectedLead}
-        onClose={() => window.history.back()}
-      />
 
       {/* 转商机对话框 */}
       <ConvertToOppDialog
