@@ -3,20 +3,20 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# 复制 package 文件
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# 安装依赖
 RUN npm ci
 
-# 复制源代码
 COPY . .
 
-# 生成 Prisma Client
-RUN npx prisma generate
+# 构建时注入 NEXT_PUBLIC_* 变量（这些变量会被打包进前端代码）
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-# 构建 Next.js 应用
+RUN npx prisma generate
 RUN npm run build
 
 # 生产阶段
@@ -24,22 +24,18 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-# 设置环境变量
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# 创建非 root 用户
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# 复制必要文件
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
-# 设置权限
 RUN chown -R nextjs:nodejs /app
 
 USER nextjs

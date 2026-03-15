@@ -1,25 +1,20 @@
 version: '3.8'
 
 services:
-  # Next.js 应用
   nextjs:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
     container_name: bantuqifu-nextjs
     restart: unless-stopped
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=${DATABASE_URL}
-      - DIRECT_URL=${DIRECT_URL}
-      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
-      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    env_file:
+      - .env
     networks:
       - bantuqifu-network
-    depends_on:
-      - nginx
 
-  # Nginx 反向代理
   nginx:
     image: nginx:alpine
     container_name: bantuqifu-nginx
@@ -32,9 +27,13 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
       - ./nginx/logs:/var/log/nginx
+      - ./nginx/certbot:/var/www/certbot:ro
+    depends_on:
+      - nextjs
     networks:
       - bantuqifu-network
 
 networks:
   bantuqifu-network:
     driver: bridge
+

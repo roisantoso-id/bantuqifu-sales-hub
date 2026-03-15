@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense } from 'react'
+import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, EyeOff, ArrowRight, ChevronDown, MessageCircle } from 'lucide-react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 
-// 初始化 Supabase 客户端
 const supabase = createClient()
 
 const TENANTS = [
@@ -20,7 +20,7 @@ const LANGUAGES = [
   { code: 'en', label: 'EN' },
 ]
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [selectedTenant, setSelectedTenant] = useState(TENANTS[0])
@@ -32,7 +32,6 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // 获取重定向路径
   const redirectPath = searchParams.get('redirect') || '/'
 
   const handleLogin = async () => {
@@ -54,17 +53,12 @@ export default function LoginPage() {
       }
 
       if (data?.session) {
-        // 设置 tenant 信息到 cookie（用于服务端）
         document.cookie = `selectedTenant=${selectedTenant.id}; path=/; max-age=86400`
-
-        // 同时保存到 localStorage（用于客户端）
         localStorage.setItem('selectedTenant', selectedTenant.id)
         localStorage.setItem('selectedTenantName', selectedTenant.name)
         localStorage.setItem('currentSite', selectedTenant.site)
-
-        // 重定向到原页面或首页
         router.push(redirectPath)
-        router.refresh() // 刷新服务端组件
+        router.refresh()
       }
     } catch (err) {
       console.error('Login error:', err)
@@ -87,7 +81,7 @@ export default function LoginPage() {
           <div className="absolute top-20 left-20 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
           <div className="absolute bottom-40 right-20 w-96 h-96 bg-white/5 rounded-full blur-3xl" />
         </div>
-        
+
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           <div className="flex items-center gap-3">
             <Image
@@ -299,5 +293,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   )
 }
