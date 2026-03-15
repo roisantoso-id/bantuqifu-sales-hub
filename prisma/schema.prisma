@@ -30,6 +30,7 @@ model Organization {
   products          Product[]
   users             UserOrganization[]
   customerFollowups CustomerFollowup[]
+  interactions      Interaction[]
   
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
@@ -88,6 +89,7 @@ model User {
   
   // Relations
   followups     CustomerFollowup[] @relation("FollowupOperator")
+  interactions  Interaction[] @relation("InteractionOperator")
   
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
@@ -197,6 +199,7 @@ model Lead {
   // Relations
   convertedOpportunityId String?
   convertedOpportunity   Opportunity? @relation("LeadToOpportunity")
+  interactions           Interaction[]
   
   @@index([organizationId])
   @@index([status])
@@ -206,7 +209,7 @@ model Lead {
   @@map("leads")
 }
 
-// ════════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════���═════════════════════════════════
 // ── CUSTOMER ──────────────────────────────────────────────────────────────────
 // ════════════════════════════════════════════════════════════════════════════════
 
@@ -249,6 +252,7 @@ model Customer {
   foreignEntities ForeignCompanyEntity[]
   contacts        CustomerContact[]
   followups       CustomerFollowup[]
+  interactions    Interaction[]
   
   @@index([organizationId])
   @@index([levelDictId])
@@ -486,6 +490,7 @@ model Opportunity {
   
   // Relations
   actionLogs              ActionLog[]
+  interactions            Interaction[]
   
   @@index([organizationId])
   @@index([customerId])
@@ -825,4 +830,73 @@ model SystemCounter {
   updatedAt DateTime @updatedAt
   
   @@map("system_counters")
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// ── UNIFIED INTERACTION (统一互动/跟进记录) ──────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════════
+
+enum InteractionType {
+  NOTE          // 备注
+  CALL          // 电话
+  VISIT         // 拜访
+  MEETING       // 会议
+  EMAIL         // 邮件
+  STAGE_CHANGE  // 阶段变更（自动触发）
+  SYSTEM        // 系统日志
+}
+
+model Interaction {
+  id              String          @id @default(cuid())
+  organizationId  String
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // 核心关联：至少关联一个客户，可选关联线索或商机
+  customerId      String
+  customer        Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  leadId          String?         // 如果是线索阶段的跟进
+  lead            Lead?           @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  
+  opportunityId   String?         // 如果已转商机，记录关联商机
+  opportunity     Opportunity?    @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+
+  // 操作人
+  operatorId      String?
+  operator        User?           @relation("InteractionOperator", fields: [operatorId], references: [id], onDelete: SetNull)
+
+  // 内容
+  type            InteractionType @default(NOTE)
+  content         String          // 跟进详细内容
+  
+  // 扩展字段：针对销售场景
+  nextAction      String?         // 下一步计划
+  nextActionDate  DateTime?       // 下次跟进时间
+  
+  // 附件关联
+  attachments     InteractionAttachment[]
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([organizationId])
+  @@index([customerId])
+  @@index([leadId])
+  @@index([opportunityId])
+  @@index([operatorId])
+  @@map("interactions")
+}
+
+model InteractionAttachment {
+  id              String      @id @default(cuid())
+  interactionId   String
+  interaction     Interaction @relation(fields: [interactionId], references: [id], onDelete: Cascade)
+  
+  fileName        String
+  fileUrl         String
+  fileSize        Int
+  
+  createdAt       DateTime    @default(now())
+  
+  @@map("interaction_attachments")
 }

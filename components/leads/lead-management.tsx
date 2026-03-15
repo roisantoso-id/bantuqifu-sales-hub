@@ -11,14 +11,10 @@ import {
   claimLeadAction,
   addLeadFollowUpAction,
   getLeadFollowUpsAction,
-  LEAD_SOURCES,
-  LEAD_CATEGORIES,
-  LEAD_URGENCY,
-  LEAD_STATUSES,
-  DISCARD_REASONS,
   type LeadRow,
   type LeadFollowUpRow,
 } from '@/app/actions/lead'
+import { LEAD_SOURCES, LEAD_CATEGORIES, LEAD_URGENCY, LEAD_STATUSES, DISCARD_REASONS } from '@/lib/constants/lead'
 
 // ─── 辅助函数 ─────────────────────────────────────────────────────────────────
 
