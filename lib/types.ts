@@ -58,6 +58,7 @@ export interface OpportunityRow {
   assigneeId?: string | null
   expectedCloseDate?: string | null
   actualCloseDate?: string | null
+  pinnedByUsers?: string[]
   createdAt: string
   updatedAt: string
   customer?: {

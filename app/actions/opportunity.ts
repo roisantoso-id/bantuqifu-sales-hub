@@ -20,6 +20,7 @@ export interface OpportunityRow {
   assigneeId?: string | null
   expectedCloseDate?: string | null
   actualCloseDate?: string | null
+  pinnedByUsers?: string[]
   createdAt: string
   updatedAt: string
   customer?: {
@@ -306,6 +307,68 @@ export async function updateOpportunityAction(
   if (error) {
     console.error('[updateOpportunityAction] Error:', error.message)
     return { success: false, error: error.message }
+  }
+
+  return { success: true }
+}
+
+// ─── toggleOpportunityPinAction ────────────────────────────────────────────────
+// 切换商机置顶状态
+export async function toggleOpportunityPinAction(
+  oppId: string,
+  isPinned: boolean
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  const userId = user?.id
+
+  if (!userId) {
+    return { success: false, error: '用户未登录' }
+  }
+
+  // 获取当前商机的 pinnedByUsers
+  const { data: opp, error: fetchError } = await supabase
+    .from('opportunities')
+    .select('pinnedByUsers')
+    .eq('id', oppId)
+    .eq('organizationId', tenantId)
+    .single()
+
+  if (fetchError || !opp) {
+    console.error('[toggleOpportunityPinAction] Fetch error:', fetchError)
+    return { success: false, error: '商机不存在' }
+  }
+
+  const currentPinnedUsers = (opp.pinnedByUsers as string[]) || []
+  let newPinnedUsers: string[]
+
+  if (isPinned) {
+    // 添加当前用户到置顶列表
+    if (!currentPinnedUsers.includes(userId)) {
+      newPinnedUsers = [...currentPinnedUsers, userId]
+    } else {
+      newPinnedUsers = currentPinnedUsers
+    }
+  } else {
+    // 从置顶列表移除当前用户
+    newPinnedUsers = currentPinnedUsers.filter(id => id !== userId)
+  }
+
+  // 更新数据库
+  const { error: updateError } = await supabase
+    .from('opportunities')
+    .update({
+      pinnedByUsers: newPinnedUsers,
+      updatedAt: new Date().toISOString(),
+    })
+    .eq('id', oppId)
+    .eq('organizationId', tenantId)
+
+  if (updateError) {
+    console.error('[toggleOpportunityPinAction] Update error:', updateError.message)
+    return { success: false, error: updateError.message }
   }
 
   return { success: true }

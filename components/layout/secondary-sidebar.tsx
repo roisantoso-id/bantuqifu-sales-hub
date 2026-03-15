@@ -8,6 +8,8 @@ interface SecondarySidebarProps {
   opportunities: Opportunity[]
   selectedId: string | null
   onSelect: (opp: Opportunity) => void
+  onTogglePin?: (oppId: string, isPinned: boolean) => void
+  currentUserId?: string
 }
 
 // 阶段颜色分组: 使用单一灰色方案
@@ -48,19 +50,21 @@ function formatAmount(amount: number | undefined, currency: string) {
   return `${currency} ${amount.toLocaleString()}`
 }
 
-export function SecondarySidebar({ opportunities, selectedId, onSelect }: SecondarySidebarProps) {
+export function SecondarySidebar({ opportunities, selectedId, onSelect, onTogglePin, currentUserId }: SecondarySidebarProps) {
   const [query, setQuery] = useState('')
   const [groupFilter, setGroupFilter] = useState<string | null>(null)
-  const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set())
   const [hoveredId, setHoveredId] = useState<string | null>(null)
 
-  const togglePin = (e: React.MouseEvent, id: string) => {
+  // 从商机数据中获取置顶状态
+  const isPinnedByUser = (opp: Opportunity) => {
+    if (!currentUserId) return false
+    return (opp as any).pinnedByUsers?.includes(currentUserId) || false
+  }
+
+  const togglePin = async (e: React.MouseEvent, opp: Opportunity) => {
     e.stopPropagation()
-    setPinnedIds((prev) => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
+    const isPinned = isPinnedByUser(opp)
+    onTogglePin?.(opp.id, !isPinned)
   }
 
   const activeGroup = STAGE_GROUPS.find((g) => g.label === groupFilter)
@@ -77,8 +81,8 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect }: Second
   })
 
   // pinned first, then rest — preserve original order within each group
-  const pinned = filtered.filter((o) => pinnedIds.has(o.id))
-  const unpinned = filtered.filter((o) => !pinnedIds.has(o.id))
+  const pinned = filtered.filter((o) => isPinnedByUser(o))
+  const unpinned = filtered.filter((o) => !isPinnedByUser(o))
   const sorted = [...pinned, ...unpinned]
 
   return (
@@ -154,7 +158,7 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect }: Second
       <ul className="scrollable-container high-density-list flex-1 overflow-y-auto">
         {sorted.map((opp, idx) => {
           const isSelected = opp.id === selectedId
-          const isPinned = pinnedIds.has(opp.id)
+          const isPinned = isPinnedByUser(opp)
           const isHovered = hoveredId === opp.id
           const stageColor = STAGE_COLOR[opp.stageId] ?? STAGE_COLOR.P1
           // Divider between pinned and unpinned sections
@@ -196,8 +200,8 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect }: Second
                       <span
                         role="button"
                         tabIndex={0}
-                        onClick={(e) => togglePin(e, opp.id)}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') togglePin(e, opp.id) }}
+                        onClick={(e) => togglePin(e, opp)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') togglePin(e, opp) }}
                         className="flex h-4 w-4 items-center justify-center rounded-sm text-[#9ca3af] hover:bg-[#f3f4f6] hover:text-[#f59e0b] cursor-pointer"
                         title={isPinned ? '取消置顶' : '置顶'}
                       >

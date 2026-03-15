@@ -11,6 +11,7 @@ import { MyDashboard } from '@/components/dashboard/my-dashboard'
 import { AuditRail } from '@/components/audit-rail/audit-panel'
 import { mockOpportunities, mockProducts, mockActionLogs, mockUser, mockLeads } from '@/lib/mock-data'
 import { addAuditNote } from '@/app/actions/audit'
+import { toggleOpportunityPinAction, getOpportunitiesAction } from '@/app/actions/opportunity'
 import type { Opportunity, NavSection, StageId, ActionLog, Lead, LeadRow, OpportunityRow, OpportunityStatus, Currency } from '@/lib/types'
 
 interface DashboardClientProps {
@@ -71,7 +72,8 @@ export function DashboardClient({
           expectedCloseDate: opp.expectedCloseDate || undefined,
           products: [],
           quote: undefined,
-        }))
+          pinnedByUsers: opp.pinnedByUsers || [],
+        } as any))
       : mockOpportunities
   )
   const [leads, setLeads] = useState<Lead[]>(mockLeads)
@@ -207,6 +209,56 @@ export function DashboardClient({
     [selectedId]
   )
 
+  const handleTogglePin = useCallback(
+    async (oppId: string, isPinned: boolean) => {
+      try {
+        const result = await toggleOpportunityPinAction(oppId, isPinned)
+        if (result.success) {
+          // 重新加载商机列表以获取最新的置顶状态
+          const updatedOpps = await getOpportunitiesAction()
+          if (updatedOpps && updatedOpps.length > 0) {
+            setOpportunities(updatedOpps.map(opp => ({
+              id: opp.id,
+              customerId: opp.customerId,
+              customerName: opp.customer?.customerName || '未知客户',
+              customer: {
+                id: opp.customer?.id || opp.customerId,
+                name: opp.customer?.customerName || '未知客户',
+                passportNo: opp.customer?.customerId || '',
+                phone: '',
+                email: '',
+                wechat: '',
+                level: 'L5' as const,
+                industry: '',
+                country: 'Indonesia',
+              },
+              stageId: opp.stageId as StageId,
+              status: (opp.status as OpportunityStatus) || 'active',
+              serviceType: (opp.serviceType as 'VISA' | 'IMMIGRATION' | 'STUDY' | 'WORK') || 'VISA',
+              serviceTypeLabel: opp.serviceTypeLabel || opp.serviceType,
+              estimatedAmount: opp.estimatedAmount || 0,
+              currency: (opp.currency as Currency) || 'IDR',
+              requirements: opp.requirements || undefined,
+              notes: opp.notes || undefined,
+              destination: undefined,
+              travelDate: undefined,
+              assignee: '',
+              createdAt: opp.createdAt,
+              updatedAt: opp.updatedAt,
+              expectedCloseDate: opp.expectedCloseDate || undefined,
+              products: [],
+              quote: undefined,
+              pinnedByUsers: opp.pinnedByUsers || [],
+            } as any)))
+          }
+        }
+      } catch (err) {
+        console.error('[v0] Error toggling pin:', err)
+      }
+    },
+    []
+  )
+
   return (
     <div className="flex h-screen overflow-hidden bg-white">
       {/* Pane 1 — 主导航栏 (56px) */}
@@ -226,10 +278,11 @@ export function DashboardClient({
         <>
           {/* 商机列表 (280px) */}
           <SecondarySidebar
-            activeNav={activeNav}
             opportunities={opportunities}
             selectedId={selectedId}
             onSelect={handleSelectOpportunity}
+            onTogglePin={handleTogglePin}
+            currentUserId={mockUser.id}
           />
 
           {/* 工作区 (flex-1) */}

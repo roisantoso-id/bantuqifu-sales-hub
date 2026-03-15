@@ -471,7 +471,10 @@ model Opportunity {
   
   assigneeId              String
   assignee                User @relation("OpportunityAssignee", fields: [assigneeId], references: [id])
-  
+
+  // 置顶功能：存储置顶该商机的用户ID列表
+  pinnedByUsers           String[] @default([])
+
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
   
