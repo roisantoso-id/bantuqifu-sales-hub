@@ -4,6 +4,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Search, Plus, Edit2, Archive, ChevronRight, Lock, Users, RefreshCw, X, Building2, Calendar, Globe, User, Phone, Mail, MessageCircle } from 'lucide-react'
 import { CUSTOMER_LEVELS } from '@/lib/types'
+import { CreateOpportunityDialog } from '@/components/opportunities/create-opportunity-dialog'
 import {
   getCustomersAction,
   getCustomerDetailAction,
@@ -120,6 +121,9 @@ export function CustomerManagement({ onSelectCustomer }: CustomerManagementProps
   const [contacts, setContacts] = useState<CustomerContactRow[]>([])
   const [contactsLoading, setContactsLoading] = useState(false)
   const [showAddContact, setShowAddContact] = useState(false)
+
+  // Create Opportunity state
+  const [showCreateOpportunity, setShowCreateOpportunity] = useState(false)
   const [newContactForm, setNewContactForm] = useState({ contactName: '', position: '', phone: '', email: '', wechat: '', isPrimary: false, notes: '' })
   const [addingContact, setAddingContact] = useState(false)
 
@@ -429,6 +433,13 @@ const result = await createCustomerAction({
                   <span className="font-mono text-[12px] text-[#2563eb]">{selectedCustomer.customerId}</span>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowCreateOpportunity(true)}
+                    className="h-7 px-3 rounded-sm bg-[#2563eb] text-white text-[11px] font-medium hover:bg-[#1d4ed8] flex items-center gap-1"
+                  >
+                    <Plus size={12} />
+                    新建商机
+                  </button>
                   <button className="h-7 px-2 rounded-sm border border-[#e5e7eb] text-[11px] text-[#6b7280] hover:bg-[#f9fafb]"><Edit2 size={12} /></button>
                   <button className="h-7 px-2 rounded-sm border border-[#e5e7eb] text-[11px] text-[#6b7280] hover:bg-[#f9fafb]"><Archive size={12} /></button>
                 </div>
@@ -757,6 +768,23 @@ const result = await createCustomerAction({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Create Opportunity Dialog */}
+      {selectedCustomer && (
+        <CreateOpportunityDialog
+          customerId={selectedCustomer.id}
+          customerName={selectedCustomer.customerName}
+          isOpen={showCreateOpportunity}
+          onClose={() => setShowCreateOpportunity(false)}
+          onSuccess={() => {
+            setShowCreateOpportunity(false)
+            // 刷新商机列表
+            if (selectedCustomer) {
+              loadCustomerDetail(selectedCustomer.id)
+            }
+          }}
+        />
       )}
     </div>
   )
