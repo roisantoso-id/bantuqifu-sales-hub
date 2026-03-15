@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Clock, UserPlus, MoreHorizontal, AlertCircle } from 'lucide-react'
+import { UserPlus, MoreHorizontal, AlertCircle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -150,6 +150,7 @@ export function LeadTable({
               <th className="text-center py-2 px-3 text-[11px] font-semibold text-slate-600 uppercase tracking-wide">紧迫度</th>
               <th className="text-center py-2 px-3 text-[11px] font-semibold text-slate-600 uppercase tracking-wide">状态</th>
               <th className="text-center py-2 px-3 text-[11px] font-semibold text-slate-600 uppercase tracking-wide">停滞天数</th>
+              <th className="text-left py-2 px-3 text-[11px] font-semibold text-slate-600 uppercase tracking-wide">企微群</th>
               <th className="text-right py-2 px-3 text-[11px] font-semibold text-slate-600 uppercase tracking-wide w-[40px]"></th>
             </tr>
           </thead>
@@ -243,16 +244,6 @@ export function LeadTable({
                   <td className="py-2.5 px-3 text-slate-600 text-[11px]">
                     {lead.wechatGroupId ? `${lead.wechatGroupId}${lead.wechatGroupName ? ' ' + lead.wechatGroupName : ''}` : '—'}
                   </td>
-                  {viewMode === 'my_leads' && (
-                    <td className="py-2.5 px-3">
-                      {countdown && (
-                        <div className={`flex items-center gap-1 ${countdown.isUrgent ? 'text-red-600' : 'text-amber-600'}`}>
-                          <Clock className="h-3 w-3" />
-                          <span>{countdown.hours}h</span>
-                        </div>
-                      )}
-                    </td>
-                  )}
                   <td className="py-2.5 px-3 text-slate-500">
                     {new Date(lead.createdAt).toLocaleDateString('zh-CN')}
                   </td>
