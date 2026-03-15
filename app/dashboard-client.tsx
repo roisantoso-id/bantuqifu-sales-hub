@@ -41,50 +41,57 @@ export function DashboardClient({
   const activeNav = (searchParams.get('nav') || initialNav) as NavSection
 
   // 商机相关状态 - 使用真实数据或 mock 数据
-  const [opportunities, setOpportunities] = useState<Opportunity[]>(
-    initialOpportunities && initialOpportunities.length > 0
-      ? initialOpportunities.map(opp => ({
-          id: opp.id,
-          customerId: opp.customerId,
-          customerName: opp.customer?.customerName || '未知客户',
-          customer: {
-            id: opp.customer?.id || opp.customerId,
-            name: opp.customer?.customerName || '未知客户',
-            passportNo: opp.customer?.customerId || '',
-            phone: '',
-            email: '',
-            wechat: '',
-            level: 'L5' as const,
-            industry: '',
-            country: 'Indonesia',
-          },
-          stageId: opp.stageId as StageId,
-          status: (opp.status as OpportunityStatus) || 'active',
-          serviceType: (opp.serviceType as 'VISA' | 'IMMIGRATION' | 'STUDY' | 'WORK') || 'VISA',
-          serviceTypeLabel: opp.serviceTypeLabel || opp.serviceType,
-          estimatedAmount: opp.estimatedAmount || 0,
-          currency: (opp.currency as Currency) || 'IDR',
-          requirements: opp.requirements || undefined,
-          notes: opp.notes || undefined,
-          destination: undefined,
-          travelDate: undefined,
-          assignee: '',
-          createdAt: opp.createdAt,
-          updatedAt: opp.updatedAt,
-          expectedCloseDate: opp.expectedCloseDate || undefined,
-          products: [],
-          quote: undefined,
-          pinnedByUsers: opp.pinnedByUsers || [],
-        } as any))
-      : mockOpportunities
-  )
+  const [opportunities, setOpportunities] = useState<Opportunity[]>(() => {
+    if (initialOpportunities && initialOpportunities.length > 0) {
+      return initialOpportunities.map(opp => ({
+        id: opp.id,
+        customerId: opp.customerId,
+        customerName: opp.customer?.customerName || '未知客户',
+        customer: {
+          id: opp.customer?.id || opp.customerId,
+          name: opp.customer?.customerName || '未知客户',
+          passportNo: opp.customer?.customerId || '',
+          phone: '',
+          email: '',
+          wechat: '',
+          level: 'L5' as const,
+          industry: '',
+          country: 'Indonesia',
+        },
+        stageId: opp.stageId as StageId,
+        status: (opp.status as OpportunityStatus) || 'active',
+        serviceType: (opp.serviceType as 'VISA' | 'IMMIGRATION' | 'STUDY' | 'WORK') || 'VISA',
+        serviceTypeLabel: opp.serviceTypeLabel || opp.serviceType,
+        estimatedAmount: opp.estimatedAmount || 0,
+        currency: (opp.currency as Currency) || 'IDR',
+        requirements: opp.requirements || undefined,
+        notes: opp.notes || undefined,
+        destination: undefined,
+        travelDate: undefined,
+        assignee: '',
+        createdAt: opp.createdAt,
+        updatedAt: opp.updatedAt,
+        expectedCloseDate: opp.expectedCloseDate || undefined,
+        products: [],
+        quote: undefined,
+        pinnedByUsers: opp.pinnedByUsers || [],
+      } as any))
+    }
+    return mockOpportunities
+  })
   const [leads, setLeads] = useState<Lead[]>(mockLeads)
-  const [selectedId, setSelectedId] = useState<string>(
-    (initialOpportunities && initialOpportunities.length > 0 ? initialOpportunities[0].id : mockOpportunities[0].id)
-  )
-  const [viewingStage, setViewingStage] = useState<StageId>(
-    (initialOpportunities && initialOpportunities.length > 0 ? initialOpportunities[0].stageId : mockOpportunities[0].stageId) as StageId
-  )
+  const [selectedId, setSelectedId] = useState<string>(() => {
+    if (initialOpportunities && initialOpportunities.length > 0) {
+      return initialOpportunities[0].id
+    }
+    return mockOpportunities[0].id
+  })
+  const [viewingStage, setViewingStage] = useState<StageId>(() => {
+    if (initialOpportunities && initialOpportunities.length > 0) {
+      return initialOpportunities[0].stageId as StageId
+    }
+    return mockOpportunities[0].stageId
+  })
   const [actionLogs, setActionLogs] = useState<Record<string, ActionLog[]>>(mockActionLogs)
   const [showAuditRail, setShowAuditRail] = useState(true)
 
