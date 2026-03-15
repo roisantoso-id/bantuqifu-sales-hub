@@ -27,20 +27,23 @@ export const LEAD_SOURCE_LABELS: Record<string, string> = {
   // 数据库枚举值（小写）
   wechat: '微信',
   referral: '转介绍',
-  facebook: 'Facebook',
+  facebook: '社交媒体',
   website: '官网',
   cold_outreach: '陌生开发',
+  exhibition: '展会',
+  other: '其他',
 
   // 大写兼容
   WECHAT: '微信',
   REFERRAL: '转介绍',
-  FACEBOOK: 'Facebook',
+  FACEBOOK: '社交媒体',
   WEBSITE: '官网',
   COLD_OUTREACH: '陌生开发',
   CUSTOMER_REF: '客户推荐',
   PARTNER: '合作伙伴',
   EXHIBITION: '展会',
   ONLINE_AD: '线上广告',
+  OTHER: '其他',
 }
 
 // 紧迫度标签

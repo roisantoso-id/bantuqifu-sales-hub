@@ -208,12 +208,12 @@ export function CreateLeadDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="VISA">🛂 签证服务</SelectItem>
-                    <SelectItem value="COMPANY_REGISTRATION">🏢 公司注册</SelectItem>
-                    <SelectItem value="TAX_SERVICES">💰 税务服务</SelectItem>
-                    <SelectItem value="FINANCIAL_SERVICES">📊 财务服务</SelectItem>
-                    <SelectItem value="PERMIT_SERVICES">📋 许可证服务</SelectItem>
-                    <SelectItem value="referral">📌 其他</SelectItem>
+                    <SelectItem value="VISA">签证服务</SelectItem>
+                    <SelectItem value="COMPANY_REGISTRATION">公司注册</SelectItem>
+                    <SelectItem value="TAX_SERVICES">税务服务</SelectItem>
+                    <SelectItem value="FINANCIAL_SERVICES">财务服务</SelectItem>
+                    <SelectItem value="PERMIT_SERVICES">许可证服务</SelectItem>
+                    <SelectItem value="OTHER">其他</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -244,9 +244,9 @@ export function CreateLeadDialog({
                     <SelectItem value="referral">转介绍</SelectItem>
                     <SelectItem value="website">官网</SelectItem>
                     <SelectItem value="facebook">社交媒体</SelectItem>
-                    <SelectItem value="facebook">展会</SelectItem>
+                    <SelectItem value="exhibition">展会</SelectItem>
                     <SelectItem value="cold_outreach">陌生拜访</SelectItem>
-                    <SelectItem value="referral">其他</SelectItem>
+                    <SelectItem value="other">其他</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
