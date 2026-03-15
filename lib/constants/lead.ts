@@ -25,14 +25,10 @@ export const LEAD_URGENCY = [
 ]
 
 export const LEAD_STATUSES = [
-  { value: 'NEW',         label: '新线索',   color: 'bg-slate-100 text-slate-600' },
-  { value: 'CONTACTED',   label: '已联系',   color: 'bg-blue-100 text-blue-700' },
-  { value: 'INTERESTED',  label: '有意向',   color: 'bg-violet-100 text-violet-700' },
-  { value: 'QUALIFIED',   label: '已确认',   color: 'bg-indigo-100 text-indigo-700' },
-  { value: 'PROPOSAL',    label: '已报价',   color: 'bg-amber-100 text-amber-700' },
-  { value: 'NEGOTIATION', label: '谈判中',   color: 'bg-orange-100 text-orange-700' },
-  { value: 'CONVERTED',   label: '已转化',   color: 'bg-green-100 text-green-700' },
-  { value: 'DISCARDED',   label: '已废弃',   color: 'bg-red-100 text-red-500' },
+  { value: 'NEW',       label: '新建',   color: 'bg-slate-100 text-slate-600' },
+  { value: 'PUSHING',   label: '推进',   color: 'bg-blue-100 text-blue-700' },
+  { value: 'CONVERTED', label: '转化商机', color: 'bg-green-100 text-green-700' },
+  { value: 'LOST',      label: '丢失',   color: 'bg-red-100 text-red-500' },
 ]
 
 export const DISCARD_REASONS = [
