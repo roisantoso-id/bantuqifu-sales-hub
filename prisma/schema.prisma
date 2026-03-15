@@ -83,17 +83,20 @@ model User {
   email         String             @unique
   name          String
   isActive      Boolean            @default(true)
-  
+
   // 关联多个租户
   organizations UserOrganization[]
-  
+
   // Relations
   followups     CustomerFollowup[] @relation("FollowupOperator")
   interactions  Interaction[] @relation("InteractionOperator")
-  
+  leads         Lead[] @relation("LeadAssignee")
+  opportunities Opportunity[] @relation("OpportunityAssignee")
+  actionLogs    ActionLog[]
+
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
-  
+
   @@map("users_auth")
 }
 
@@ -197,7 +200,7 @@ model Lead {
   notes                 String?
   
   // Relations
-  convertedOpportunityId String?
+  convertedOpportunityId String? @unique
   convertedOpportunity   Opportunity? @relation("LeadToOpportunity")
   interactions           Interaction[]
   
@@ -487,7 +490,7 @@ model Opportunity {
   updatedAt               DateTime @updatedAt
   
   // Lead conversion
-  convertedFromLeadId     String?
+  convertedFromLeadId     String? @unique
   convertedFromLead       Lead? @relation("LeadToOpportunity", fields: [convertedFromLeadId], references: [id])
   
   // Stage-specific data
