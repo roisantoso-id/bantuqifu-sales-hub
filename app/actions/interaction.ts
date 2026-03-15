@@ -274,3 +274,39 @@ export async function deleteInteractionAttachmentAction(data: {
     return { success: false, error: String(err) }
   }
 }
+
+// ─── getOpportunityTimelineWithLeadHistoryAction ───────────────────────────────
+// 获取商机的完整时间轴（包含线索阶段的历史记录）
+export async function getOpportunityTimelineWithLeadHistoryAction(data: {
+  organizationId: string
+  opportunityId: string
+  leadId?: string | null
+}): Promise<{ success: boolean; data?: InteractionRow[]; error?: string }> {
+  const supabase = await createClient()
+
+  try {
+    let query = supabase
+      .from('interactions')
+      .select('*')
+      .eq('organizationId', data.organizationId)
+
+    // 构建 OR 条件：商机ID 或 线索ID（如果存在）
+    if (data.leadId) {
+      query = query.or(`opportunityId.eq.${data.opportunityId},leadId.eq.${data.leadId}`)
+    } else {
+      query = query.eq('opportunityId', data.opportunityId)
+    }
+
+    const { data: interactions, error } = await query.order('createdAt', { ascending: false })
+
+    if (error) {
+      console.error('[getOpportunityTimelineWithLeadHistoryAction] query error:', error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true, data: interactions || [] }
+  } catch (err) {
+    console.error('[getOpportunityTimelineWithLeadHistoryAction] exception:', err)
+    return { success: false, error: String(err) }
+  }
+}
