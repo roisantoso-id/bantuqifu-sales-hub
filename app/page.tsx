@@ -1,4 +1,5 @@
 import { getLeadsAction } from '@/app/actions/lead'
+import { getOpportunitiesAction } from '@/app/actions/opportunity'
 import { DashboardClient } from '@/app/dashboard-client'
 
 export default async function DashboardPage({
@@ -15,19 +16,24 @@ export default async function DashboardPage({
   const leadSearch = params.q || ''
   const selectedLeadId = params.leadId || null
 
-  // 如果是线索模块，服务端预加载数据
+  // 根据导航模块预加载数据
   let initialLeads = null
+  let initialOpportunities = null
+
   if (activeNav === 'leads') {
     const viewMode = leadTab === 'pool' ? 'pool' : 'my_leads'
     initialLeads = await getLeadsAction(viewMode, {
       search: leadSearch,
     })
+  } else if (activeNav === 'opportunities') {
+    initialOpportunities = await getOpportunitiesAction()
   }
 
   return (
     <DashboardClient
       initialNav={activeNav}
       initialLeads={initialLeads}
+      initialOpportunities={initialOpportunities}
       initialLeadTab={leadTab}
       initialLeadSearch={leadSearch}
       selectedLeadId={selectedLeadId}

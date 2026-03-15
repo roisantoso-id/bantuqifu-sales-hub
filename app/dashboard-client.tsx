@@ -7,15 +7,17 @@ import { SecondarySidebar } from '@/components/layout/secondary-sidebar'
 import { WorkspacePane } from '@/components/workspace/workspace-pane'
 import { CustomerManagement } from '@/components/customers/customer-management'
 import { LeadManagementClient } from '@/components/leads/lead-management-client'
+import { OpportunityManagementClient } from '@/components/opportunities/opportunity-management-client'
 import { MyDashboard } from '@/components/dashboard/my-dashboard'
 import { AuditRail } from '@/components/audit-rail/audit-panel'
 import { mockOpportunities, mockProducts, mockActionLogs, mockUser, mockLeads } from '@/lib/mock-data'
 import { addAuditNote } from '@/app/actions/audit'
-import type { Opportunity, NavSection, StageId, ActionLog, Lead, LeadRow } from '@/lib/types'
+import type { Opportunity, NavSection, StageId, ActionLog, Lead, LeadRow, OpportunityRow } from '@/lib/types'
 
 interface DashboardClientProps {
   initialNav: NavSection
   initialLeads: LeadRow[] | null
+  initialOpportunities: OpportunityRow[] | null
   initialLeadTab: string
   initialLeadSearch: string
   selectedLeadId: string | null
@@ -24,6 +26,7 @@ interface DashboardClientProps {
 export function DashboardClient({
   initialNav,
   initialLeads,
+  initialOpportunities,
   initialLeadTab,
   initialLeadSearch,
   selectedLeadId,
@@ -182,36 +185,11 @@ export function DashboardClient({
           />
         </div>
       ) : activeNav === 'opportunities' ? (
-        <>
-          {/* 商机列表 (280px) */}
-          <SecondarySidebar
-            activeNav={activeNav}
-            opportunities={opportunities}
-            selectedId={selectedId}
-            onSelect={handleSelectOpportunity}
+        <div className="flex-1 overflow-hidden">
+          <OpportunityManagementClient
+            initialOpportunities={initialOpportunities || []}
           />
-
-          {/* 工作区 (flex-1) */}
-          <WorkspacePane
-            opportunity={selectedOpportunity}
-            allProducts={mockProducts}
-            viewingStage={viewingStage}
-            onViewingStageChange={setViewingStage}
-            onOpportunityUpdate={handleOpportunityUpdate}
-            onSave={handleSave}
-            onAdvanceStage={handleAdvanceStage}
-            onQuoteSent={handleQuoteSent}
-          />
-
-          {/* 审计栏 (256px) */}
-          <AuditRail
-            visible={showAuditRail}
-            onToggle={setShowAuditRail}
-            opportunity={selectedOpportunity}
-            logs={currentLogs}
-            onAddNote={handleAddNote}
-          />
-        </>
+        </div>
       ) : activeNav === 'customers' ? (
         <div className="flex-1 overflow-hidden">
           <CustomerManagement />

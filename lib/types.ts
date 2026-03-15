@@ -33,11 +33,34 @@ export const CUSTOMER_LEVELS = [
 ] as const
 export type CustomerLevelId = typeof CUSTOMER_LEVELS[number]['id']
 
-// ─── Lead ────────────────────────────────────────────────────────────────────export type LeadSource = 'wechat' | 'referral' | 'facebook' | 'website' | 'cold_outreach'
+// ─── Lead ────────────────────────────────────────────────────────────────────
+export type LeadSource = 'wechat' | 'referral' | 'facebook' | 'website' | 'cold_outreach'
 export type LeadStatus = 'new' | 'contacted' | 'no_interest' | 'ready_for_opportunity' | 'discarded' | 'public_pool'
 export type LeadUrgency = '高' | '中' | '低'
 export type DiscardReason = '无法联系' | '需求不匹配' | '销售能力有限' | '其他'
 export type LeadCategory = '签证服务' | '公司注册' | '财务服务' | '准证服务' | '税务服务'
+
+// ─── OpportunityRow (from database) ──────────────────────────────────────────
+export interface OpportunityRow {
+  id: string
+  organizationId: string
+  opportunityCode: string
+  customerId: string
+  convertedFromLeadId?: string | null
+  stageId: string
+  status: string
+  serviceType: string
+  serviceTypeLabel?: string | null
+  estimatedAmount: number
+  currency: string
+  requirements?: string | null
+  notes?: string | null
+  assigneeId?: string | null
+  expectedCloseDate?: string | null
+  actualCloseDate?: string | null
+  createdAt: string
+  updatedAt: string
+}
 
 export interface Lead {
   id: string // LEAD-系列ID
