@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import { claimLeadAction, discardLeadAction, type LeadRow } from '@/app/actions/lead'
+import { ConvertToOppDialog } from './convert-to-opp-dialog'
 
 function getUrgencyIcon(urgency: string) {
   const map: Record<string, { icon: React.ReactNode; cls: string }> = {
@@ -63,6 +64,8 @@ export function LeadTable({
 }) {
   const [followUpNote, setFollowUpNote] = useState('')
   const [claiming, setClaiming] = useState<string | null>(null)
+  const [convertDialogOpen, setConvertDialogOpen] = useState(false)
+  const [leadToConvert, setLeadToConvert] = useState<LeadRow | null>(null)
 
   // 根据 selectedLeadId 找到选中的线索
   const selectedLead = selectedLeadId ? leads.find(l => l.id === selectedLeadId) : null
@@ -119,13 +122,13 @@ export function LeadTable({
 
   const handleWriteFollowUp = (lead: LeadRow, e: React.MouseEvent) => {
     e.stopPropagation()
-    setSelectedLead(lead)
-    toast.info('跟进功能开发中')
+    onSelect?.(lead) // 打开详情面板
   }
 
   const handleConvertToOpp = (lead: LeadRow, e: React.MouseEvent) => {
     e.stopPropagation()
-    toast.info('转商机功能开发中')
+    setLeadToConvert(lead)
+    setConvertDialogOpen(true)
   }
 
   return (
@@ -315,6 +318,19 @@ export function LeadTable({
           )}
         </SheetContent>
       </Sheet>
+
+      {/* 转商机对话框 */}
+      <ConvertToOppDialog
+        lead={leadToConvert}
+        isOpen={convertDialogOpen}
+        onClose={() => {
+          setConvertDialogOpen(false)
+          setLeadToConvert(null)
+        }}
+        onSuccess={() => {
+          onRefresh?.()
+        }}
+      />
     </>
   )
 }

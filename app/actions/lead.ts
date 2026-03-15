@@ -28,6 +28,11 @@ export interface LeadRow {
   createdById?: string | null
   updatedAt: string
   updatedById?: string | null
+  convertedOpportunityId?: string | null
+  budgetMin?: number | null
+  budgetMax?: number | null
+  budgetCurrency?: string | null
+  initialIntent?: string | null
 }
 
 export interface LeadFollowUpRow {
@@ -355,4 +360,164 @@ export async function getLeadFollowUpsAction(leadId: string): Promise<LeadFollow
   }
 
   return (data ?? []) as LeadFollowUpRow[]
+}
+
+// ─── autoRecycleLeadsAction ───────────────────────────────────────────────────
+// 自动回收7天未跟进的线索到公海池
+// 由定时任务（Cron Job）或系统触发器调用
+export async function autoRecycleLeadsAction(): Promise<{ success: boolean; count: number }> {
+  const SYSTEM_USER_ID = 'bantu-system-001'
+  const supabase = await createClient()
+
+  // 计算7天前的时间节点
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+  const tenantId = await getCurrentTenantId()
+
+  if (!tenantId) {
+    console.error('[autoRecycleLeadsAction] No tenantId found')
+    return { success: false, count: 0 }
+  }
+
+  // 查询需要回收的线索：
+  // 1. 状态为 NEW（新线索）
+  // 2. 已分配给销售（assignedToId 不为空）
+  // 3. 创建时间超过7天
+  // 4. 不是已转化或已丢弃的
+  const { data: leadsToRecycle, error: queryError } = await supabase
+    .from('leads')
+    .select('id, leadCode, personName, createdAt')
+    .eq('organizationId', tenantId)
+    .eq('status', 'NEW')
+    .not('assignedToId', 'is', null)
+    .lt('createdAt', sevenDaysAgo.toISOString())
+
+  if (queryError) {
+    console.error('[autoRecycleLeadsAction] Query error:', queryError.message)
+    return { success: false, count: 0 }
+  }
+
+  if (!leadsToRecycle || leadsToRecycle.length === 0) {
+    console.log('[autoRecycleLeadsAction] No leads to recycle')
+    return { success: true, count: 0 }
+  }
+
+  // 批量更新：将线索退回公海
+  const leadIds = leadsToRecycle.map(l => l.id)
+
+  const { error: updateError } = await supabase
+    .from('leads')
+    .update({
+      assignedToId: null, // 清空负责人
+      discardReason: 'SYSTEM_AUTO_RECYCLE',
+      discardedAt: new Date().toISOString(),
+      discardedById: SYSTEM_USER_ID,
+      updatedAt: new Date().toISOString(),
+      updatedById: SYSTEM_USER_ID,
+    })
+    .in('id', leadIds)
+
+  if (updateError) {
+    console.error('[autoRecycleLeadsAction] Update error:', updateError.message)
+    return { success: false, count: 0 }
+  }
+
+  console.log(`[autoRecycleLeadsAction] Successfully recycled ${leadsToRecycle.length} leads`)
+
+  return { success: true, count: leadsToRecycle.length }
+}
+
+// ─── convertLeadToOpportunityAction ───────────────────────────────────────────
+// 将线索转化为商机，强制关联客户
+export async function convertLeadToOpportunityAction(
+  leadId: string,
+  customerId: string
+): Promise<{ success: boolean; opportunityId?: string; error?: string }> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  const userId = user?.id
+
+  if (!userId) {
+    return { success: false, error: '用户未登录' }
+  }
+
+  if (!tenantId) {
+    return { success: false, error: '租户信息缺失' }
+  }
+
+  // 1. 查询线索信息
+  const { data: lead, error: leadError } = await supabase
+    .from('leads')
+    .select('*')
+    .eq('id', leadId)
+    .single()
+
+  if (leadError || !lead) {
+    return { success: false, error: '线索不存在' }
+  }
+
+  if (lead.status === 'CONVERTED') {
+    return { success: false, error: '该线索已被转化过' }
+  }
+
+  // 2. 生成商机编号（格式：OPP-YYMMDD-XXXX）
+  const today = new Date().toISOString().slice(2, 10).replace(/-/g, '')
+  const randomSuffix = Math.random().toString().slice(2, 6)
+  const opportunityCode = `OPP-${today}-${randomSuffix}`
+
+  // 3. 创建商机
+  const { data: opportunity, error: oppError } = await supabase
+    .from('opportunities')
+    .insert({
+      id: crypto.randomUUID(),
+      organizationId: tenantId,
+      opportunityCode,
+      customerId,
+      convertedFromLeadId: leadId,
+      stageId: 'P1', // 默认进入 P1 初步接触阶段
+      status: 'active',
+      serviceType: lead.category || 'VISA',
+      serviceTypeLabel: lead.category || '签证服务',
+      estimatedAmount: lead.budgetMin || 0,
+      currency: lead.budgetCurrency || 'IDR',
+      requirements: lead.initialIntent || '',
+      notes: lead.notes || '',
+      assigneeId: userId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    })
+    .select('id, opportunityCode')
+    .single()
+
+  if (oppError || !opportunity) {
+    console.error('[convertLeadToOpportunityAction] Create opportunity error:', oppError)
+    return { success: false, error: '创建商机失败' }
+  }
+
+  // 4. 更新线索状态为已转化
+  const { error: updateError } = await supabase
+    .from('leads')
+    .update({
+      status: 'CONVERTED',
+      convertedOpportunityId: opportunity.id,
+      updatedAt: new Date().toISOString(),
+      updatedById: userId,
+    })
+    .eq('id', leadId)
+
+  if (updateError) {
+    console.error('[convertLeadToOpportunityAction] Update lead error:', updateError)
+    return { success: false, error: '更新线索状态失败' }
+  }
+
+  // 5. 创建系统跟进记录（可选）
+  // 如果您有 interactions 表，可以在这里记录转化事件
+
+  return {
+    success: true,
+    opportunityId: opportunity.opportunityCode,
+  }
 }
