@@ -2,25 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Loader2 } from 'lucide-react'
+  Sheet,
+  SheetContent,
+} from '@/components/ui/sheet'
+import { Loader2, X } from 'lucide-react'
 import { createLeadAction } from '@/app/actions/lead'
 import { getCustomersAction } from '@/app/actions/customer'
 import { toast } from 'sonner'
@@ -30,6 +15,8 @@ interface CreateLeadDialogProps {
   onClose: () => void
   onSuccess: () => void
 }
+
+const URGENCIES = ['高', '中', '低'] as const
 
 export function CreateLeadDialog({
   isOpen,
@@ -46,10 +33,11 @@ export function CreateLeadDialog({
     budgetMin: '',
     budgetMax: '',
     budgetCurrency: 'CNY',
-    urgency: 'MEDIUM',
+    urgency: '中' as '高' | '中' | '低',
     initialIntent: '',
     customerId: '',
-    notes: '',
+    nextFollowDate: '',
+    assignee: '',
   })
 
   useEffect(() => {
@@ -58,20 +46,16 @@ export function CreateLeadDialog({
     }
   }, [isOpen])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
+  const handleSubmit = async () => {
     if (!formData.wechatName.trim()) {
       toast.error('请输入微信名/称呼')
       return
     }
 
-    if (!formData.initialIntent.trim()) {
-      toast.error('请输入初步意向')
-      return
-    }
-
     setIsSubmitting(true)
+
+    // Map urgency to API format
+    const urgencyMap = { '高': 'HIGH', '中': 'MEDIUM', '低': 'LOW' } as const
 
     try {
       const result = await createLeadAction({
@@ -82,10 +66,10 @@ export function CreateLeadDialog({
         budgetMin: formData.budgetMin ? parseFloat(formData.budgetMin) : undefined,
         budgetMax: formData.budgetMax ? parseFloat(formData.budgetMax) : undefined,
         budgetCurrency: formData.budgetCurrency,
-        urgency: formData.urgency,
-        initialIntent: formData.initialIntent,
+        urgency: urgencyMap[formData.urgency],
+        initialIntent: formData.initialIntent || undefined,
         customerId: formData.customerId || undefined,
-        notes: formData.notes || undefined,
+        notes: undefined,
       })
 
       if (result) {
@@ -99,10 +83,11 @@ export function CreateLeadDialog({
           budgetMin: '',
           budgetMax: '',
           budgetCurrency: 'CNY',
-          urgency: 'MEDIUM',
+          urgency: '中',
           initialIntent: '',
           customerId: '',
-          notes: '',
+          nextFollowDate: '',
+          assignee: '',
         })
         onSuccess()
         onClose()
@@ -122,204 +107,202 @@ export function CreateLeadDialog({
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>新增线索</DialogTitle>
-          <DialogDescription>
-            填写线索基本信息，创建后将自动分配给您
-          </DialogDescription>
-        </DialogHeader>
+    <Sheet open={isOpen} onOpenChange={onClose}>
+      <SheetContent side="right" className="w-[360px] p-0 flex flex-col" aria-describedby={undefined}>
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-[#e5e7eb] px-5 py-2.5">
+          <h2 className="text-[14px] font-semibold text-[#111827]">录入新线索</h2>
+          <button
+            onClick={onClose}
+            className="rounded p-1 text-[#9ca3af] hover:bg-[#f3f4f6] hover:text-[#6b7280]"
+          >
+            <X size={16} />
+          </button>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 py-4">
-          {/* 基本信息 */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-medium text-slate-900">基本信息</h3>
+        {/* Form Content */}
+        <div className="flex-1 overflow-y-auto px-5 py-3">
+          <div className="space-y-4">
+            {/* 区块 A: 基础身份 */}
+            <div>
+              <h4 className="mb-2 text-[12px] font-semibold text-[#111827]">A. 基础身份</h4>
+              <div className="space-y-2">
+                <div>
+                  <label className="mb-1 block text-[11px] text-[#6b7280]">微信 ID / 群称呼*</label>
+                  <input
+                    type="text"
+                    value={formData.wechatName}
+                    onChange={(e) => handleChange('wechatName', e.target.value)}
+                    placeholder="如：21231231山海图-王总"
+                    className="h-8 w-full border-b border-[#e5e7eb] bg-transparent px-0 text-[12px] text-[#111827] outline-none placeholder-[#9ca3af] focus:border-[#2563eb]"
+                  />
+                </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="wechatName">
-                  微信名/称呼 <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="wechatName"
-                  value={formData.wechatName}
-                  onChange={(e) => handleChange('wechatName', e.target.value)}
-                  placeholder="请输入微信名或称呼"
-                  required
-                />
-              </div>
+                <div>
+                  <label className="mb-1 block text-[11px] text-[#6b7280]">联系电话</label>
+                  <input
+                    type="text"
+                    value={formData.phone}
+                    onChange={(e) => handleChange('phone', e.target.value)}
+                    placeholder="手机号 / 微信号"
+                    className="h-8 w-full border-b border-[#e5e7eb] bg-transparent px-0 text-[12px] text-[#111827] outline-none placeholder-[#9ca3af] focus:border-[#2563eb]"
+                  />
+                </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="phone">电话</Label>
-                <Input
-                  id="phone"
-                  value={formData.phone}
-                  onChange={(e) => handleChange('phone', e.target.value)}
-                  placeholder="联系电话"
-                />
+                <div>
+                  <label className="mb-1 block text-[11px] text-[#6b7280]">线索来源*</label>
+                  <select
+                    value={formData.source}
+                    onChange={(e) => handleChange('source', e.target.value)}
+                    className="h-8 w-full border-b border-[#e5e7eb] bg-transparent px-0 text-[12px] text-[#111827] outline-none focus:border-[#2563eb]"
+                  >
+                    <option value="wechat">山海图微信群</option>
+                    <option value="referral">老客户推荐</option>
+                    <option value="facebook">Facebook</option>
+                    <option value="website">官网</option>
+                    <option value="cold_outreach">冷拉</option>
+                    <option value="other">其他</option>
+                  </select>
+                </div>
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="customerId">关联客户（可选）</Label>
-              <Select
-                value={formData.customerId || undefined}
-                onValueChange={(v) => handleChange('customerId', v === 'none' ? '' : v)}
-              >
-                <SelectTrigger id="customerId">
-                  <SelectValue placeholder="选择客户（可选）" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">不关联客户</SelectItem>
-                  {customers.map((customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
-                      {customer.customerName} ({customer.customerId})
-                    </SelectItem>
+            {/* 区块 B: 业务画像 */}
+            <div>
+              <h4 className="mb-2 text-[12px] font-semibold text-[#111827]">B. 业务画像</h4>
+              <div className="space-y-2">
+                <div>
+                  <label className="mb-1 block text-[11px] text-[#6b7280]">意向分类</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => handleChange('category', e.target.value)}
+                    className="h-8 w-full border-b border-[#e5e7eb] bg-transparent px-0 text-[12px] text-[#111827] outline-none focus:border-[#2563eb]"
+                  >
+                    <option value="">请选择</option>
+                    <option value="VISA">签证服务</option>
+                    <option value="COMPANY_REGISTRATION">公司注册</option>
+                    <option value="TAX_SERVICES">税务服务</option>
+                    <option value="FINANCIAL_SERVICES">财务服务</option>
+                    <option value="PERMIT_SERVICES">许可证服务</option>
+                    <option value="OTHER">其他</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-[11px] text-[#6b7280]">预算范围 (最低)</label>
+                    <input
+                      type="number"
+                      value={formData.budgetMin}
+                      onChange={(e) => handleChange('budgetMin', e.target.value)}
+                      placeholder="0"
+                      className="h-8 w-full border-b border-[#e5e7eb] bg-transparent px-0 text-[12px] text-[#111827] outline-none placeholder-[#9ca3af] focus:border-[#2563eb]"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] text-[#6b7280]">预算范围 (最高)</label>
+                    <input
+                      type="number"
+                      value={formData.budgetMax}
+                      onChange={(e) => handleChange('budgetMax', e.target.value)}
+                      placeholder="0"
+                      className="h-8 w-full border-b border-[#e5e7eb] bg-transparent px-0 text-[12px] text-[#111827] outline-none placeholder-[#9ca3af] focus:border-[#2563eb]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-[11px] text-[#6b7280]">币种</label>
+                  <select
+                    value={formData.budgetCurrency}
+                    onChange={(e) => handleChange('budgetCurrency', e.target.value)}
+                    className="h-8 w-full border-b border-[#e5e7eb] bg-transparent px-0 text-[12px] text-[#111827] outline-none focus:border-[#2563eb]"
+                  >
+                    <option value="CNY">RMB</option>
+                    <option value="IDR">IDR</option>
+                    <option value="USD">USD</option>
+                  </select>
+                </div>
+
+                {/* 紧急程度 Toggle */}
+                <div className="flex overflow-hidden rounded border border-[#e5e7eb]">
+                  {URGENCIES.map((u) => (
+                    <button
+                      key={u}
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, urgency: u }))}
+                      className={`flex-1 py-1.5 text-[12px] font-medium transition-colors ${
+                        formData.urgency === u
+                          ? 'bg-[#2563eb] text-white'
+                          : 'bg-white text-[#6b7280] hover:bg-[#f9fafb]'
+                      }`}
+                    >
+                      {u}
+                    </button>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="initialIntent">
-                初步意向 <span className="text-red-500">*</span>
-              </Label>
-              <Textarea
-                id="initialIntent"
-                value={formData.initialIntent}
-                onChange={(e) => handleChange('initialIntent', e.target.value)}
-                placeholder="请描述客户的初步意向"
-                className="min-h-[80px]"
-                required
-              />
-            </div>
-          </div>
-
-          {/* 线索信息 */}
-          <div className="space-y-3 pt-2 border-t">
-            <h3 className="text-sm font-medium text-slate-900">线索信息</h3>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="category">意向分类</Label>
-                <Select value={formData.category} onValueChange={(v) => handleChange('category', v)}>
-                  <SelectTrigger id="category">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="VISA">签证服务</SelectItem>
-                    <SelectItem value="COMPANY_REGISTRATION">公司注册</SelectItem>
-                    <SelectItem value="TAX_SERVICES">税务服务</SelectItem>
-                    <SelectItem value="FINANCIAL_SERVICES">财务服务</SelectItem>
-                    <SelectItem value="PERMIT_SERVICES">许可证服务</SelectItem>
-                    <SelectItem value="OTHER">其他</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="urgency">紧迫度</Label>
-                <Select value={formData.urgency} onValueChange={(v) => handleChange('urgency', v)}>
-                  <SelectTrigger id="urgency">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="HIGH">🔥 HOT - 急迫</SelectItem>
-                    <SelectItem value="MEDIUM">🌡️ WARM - 一般</SelectItem>
-                    <SelectItem value="LOW">❄️ COLD - 不急</SelectItem>
-                  </SelectContent>
-                </Select>
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="source">来源渠道</Label>
-                <Select value={formData.source} onValueChange={(v) => handleChange('source', v)}>
-                  <SelectTrigger id="source">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="referral">转介绍</SelectItem>
-                    <SelectItem value="website">官网</SelectItem>
-                    <SelectItem value="facebook">社交媒体</SelectItem>
-                    <SelectItem value="exhibition">展会</SelectItem>
-                    <SelectItem value="cold_outreach">陌生拜访</SelectItem>
-                    <SelectItem value="other">其他</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            {/* 区块 C: 跟进上下文 */}
+            <div>
+              <h4 className="mb-2 text-[12px] font-semibold text-[#111827]">C. 跟进上下文</h4>
+              <div className="space-y-2">
+                <div>
+                  <label className="mb-1 block text-[11px] text-[#6b7280]">首条需求备注</label>
+                  <textarea
+                    value={formData.initialIntent}
+                    onChange={(e) => handleChange('initialIntent', e.target.value)}
+                    placeholder="记录客户的初步需求、特殊情况等"
+                    rows={2}
+                    className="w-full border-b border-[#e5e7eb] bg-transparent px-0 py-1.5 text-[12px] text-[#111827] placeholder-[#9ca3af] outline-none focus:border-[#2563eb] resize-none leading-relaxed"
+                  />
+                </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="budgetCurrency">预算币种</Label>
-                <Select value={formData.budgetCurrency} onValueChange={(v) => handleChange('budgetCurrency', v)}>
-                  <SelectTrigger id="budgetCurrency">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="CNY">CNY - 人民币</SelectItem>
-                    <SelectItem value="IDR">IDR - 印尼盾</SelectItem>
-                    <SelectItem value="USD">USD - 美元</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+                <div>
+                  <label className="mb-1 block text-[11px] text-[#6b7280]">下次跟进计划* (关键)</label>
+                  <input
+                    type="date"
+                    value={formData.nextFollowDate}
+                    onChange={(e) => handleChange('nextFollowDate', e.target.value)}
+                    className="h-8 w-full border-b border-[#e5e7eb] bg-transparent px-0 text-[12px] text-[#111827] outline-none focus:border-[#2563eb]"
+                  />
+                  <p className="mt-0.5 text-[10px] text-[#9ca3af]">7天未更新将自动回收至公海池</p>
+                </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="budgetMin">预算最小值</Label>
-                <Input
-                  id="budgetMin"
-                  type="number"
-                  value={formData.budgetMin}
-                  onChange={(e) => handleChange('budgetMin', e.target.value)}
-                  placeholder="最小预算"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="budgetMax">预算最大值</Label>
-                <Input
-                  id="budgetMax"
-                  type="number"
-                  value={formData.budgetMax}
-                  onChange={(e) => handleChange('budgetMax', e.target.value)}
-                  placeholder="最大预算"
-                />
+                <div>
+                  <label className="mb-1 block text-[11px] text-[#6b7280]">负责人 (选填)</label>
+                  <input
+                    type="text"
+                    value={formData.assignee}
+                    onChange={(e) => handleChange('assignee', e.target.value)}
+                    placeholder="销售人员名字"
+                    className="h-8 w-full border-b border-[#e5e7eb] bg-transparent px-0 text-[12px] text-[#111827] outline-none placeholder-[#9ca3af] focus:border-[#2563eb]"
+                  />
+                </div>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* 备注 */}
-          <div className="space-y-1.5 pt-2 border-t">
-            <Label htmlFor="notes">备注</Label>
-            <Textarea
-              id="notes"
-              value={formData.notes}
-              onChange={(e) => handleChange('notes', e.target.value)}
-              placeholder="添加备注信息..."
-              className="min-h-[80px]"
-            />
-          </div>
-        </form>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
-            取消
-          </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting}>
+        {/* Footer */}
+        <div className="border-t border-[#e5e7eb] bg-white px-5 py-2.5">
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="h-8 w-full rounded bg-[#2563eb] text-[12px] font-medium text-white hover:bg-[#1d4ed8] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+          >
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 创建中...
               </>
             ) : (
-              '创建线索'
+              '录入线索'
             )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </button>
+        </div>
+      </SheetContent>
+    </Sheet>
   )
 }

@@ -214,10 +214,10 @@ export function CreateOpportunityDialog({
               id="wechatGroupName"
               value={formData.wechatGroupName}
               onChange={(e) => handleChange('wechatGroupName', e.target.value)}
-              placeholder="例如：山海图代理商"
+              placeholder="例如：米雪冰城落地"
               required
             />
-            <p className="text-[11px] text-slate-400">系统自动分配编号，如 2026010山海图代理商</p>
+            <p className="text-[11px] text-slate-400">系统自动分配商机编号如：2026789米雪冰城落地 并创建企微群聊</p>
           </div>
 
           {/* 需求描述 */}

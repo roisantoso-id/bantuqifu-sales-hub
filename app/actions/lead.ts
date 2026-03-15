@@ -102,7 +102,7 @@ export async function getLeadsAction(
   if (filters?.search) {
     const searchTerm = `%${filters.search}%`
     query = query.or(
-      `personName.ilike.${searchTerm},leadCode.ilike.${searchTerm},company.ilike.${searchTerm},phone.ilike.${searchTerm}`
+      `wechatName.ilike.${searchTerm},leadCode.ilike.${searchTerm},phone.ilike.${searchTerm},initialIntent.ilike.${searchTerm}`
     )
   }
 
@@ -179,20 +179,6 @@ export async function createLeadAction(input: {
     leadCode = `LEAD-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${randomSuffix}`
   }
 
-  // 生成企业微信群ID和名称
-  const { data: groupRow, error: groupError } = await supabase
-    .from('wechat_group_sequences')
-    .insert({})
-    .select('id')
-    .single()
-
-  if (groupError || !groupRow) {
-    console.error('[createLeadAction] Wechat group alloc error:', groupError)
-    return null
-  }
-
-  const wechatGroupName = `${input.wechatName || '线索'}-${leadCode}`
-
   const { data, error } = await supabase
     .from('leads')
     .insert([
@@ -213,8 +199,6 @@ export async function createLeadAction(input: {
         status: 'new',
         assigneeId: userId, // 自动分配给创建人
         lastActionAt: new Date().toISOString(),
-        wechatGroupId: groupRow.id,
-        wechatGroupName: wechatGroupName,
         notes: input.notes || null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -272,6 +256,8 @@ export async function updateLeadAction(
     urgency?: string
     initialIntent?: string
     notes?: string
+    customerId?: string
+    nextFollowDate?: string
   }
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient()
@@ -594,7 +580,7 @@ export async function getLeadFollowUpsAction(leadId: string): Promise<LeadFollow
 
 // ─── autoRecycleLeadsAction ───────────────────────────────────────────────────
 // 自动回收7天未跟进的线索到公海池
-// 由定时任务（Cron Job）或系统触发器调用
+// 由定时任务（Cron Job）或系统触发���调用
 export async function autoRecycleLeadsAction(): Promise<{ success: boolean; count: number }> {
   const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000001' // 系统用户固定 UUID
   const supabase = await createClient()

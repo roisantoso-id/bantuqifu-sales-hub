@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState, useTransition } from 'react'
+import { useCallback, useState, useTransition, useEffect } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { Plus, Search, RefreshCw } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -40,6 +40,28 @@ export function LeadManagementClient({
   // Read state from URL
   const activeTab = (searchParams.get('tab') || initialTab) as 'my_leads' | 'pool'
   const searchQuery = searchParams.get('q') || initialSearch
+
+  // 本地输入框状态（用于防抖）
+  const [inputValue, setInputValue] = useState(searchQuery)
+
+  // 防抖搜索逻辑
+  useEffect(() => {
+    if (inputValue !== searchQuery) {
+      const timeoutId = setTimeout(() => {
+        startTransition(() => {
+          const params = new URLSearchParams(searchParams.toString())
+          if (inputValue) {
+            params.set('q', inputValue)
+          } else {
+            params.delete('q')
+          }
+          router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+        })
+      }, 500) // 500ms 延迟
+
+      return () => clearTimeout(timeoutId)
+    }
+  }, [inputValue, searchQuery, pathname, router, searchParams])
 
   const createQueryString = useCallback(
     (updates: Record<string, string | null>) => {
@@ -139,11 +161,14 @@ export function LeadManagementClient({
           <div className="relative w-60">
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-[#9ca3af]" />
             <Input
-              placeholder="搜索线索编号、姓名..."
+              placeholder="搜索线索编号、微信名..."
               className="h-8 pl-8 text-[12px] bg-white border-[#e5e7eb]"
-              defaultValue={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
             />
+            {isPending && (
+              <div className="absolute right-2.5 top-2.5 h-3.5 w-3.5 animate-spin rounded-full border border-[#e5e7eb] border-t-[#2563eb]" />
+            )}
           </div>
 
           <Button
@@ -179,16 +204,6 @@ export function LeadManagementClient({
             <p className="text-[13px] text-[#6b7280]">暂无线索数据</p>
             {searchQuery && (
               <p className="mt-1 text-[12px] text-[#9ca3af]">尝试修改搜索条件</p>
-            )}
-            {!searchQuery && (
-              <Button
-                size="sm"
-                className="mt-4 h-8 bg-[#2563eb] text-[12px] hover:bg-[#1d4ed8]"
-                onClick={() => setCreateDialogOpen(true)}
-              >
-                <Plus className="mr-1.5 h-3.5 w-3.5" />
-                添加第一条线索
-              </Button>
             )}
           </div>
         ) : (

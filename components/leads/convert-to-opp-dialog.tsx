@@ -255,12 +255,12 @@ export function ConvertToOppDialog({
                   id="group-name"
                   value={wechatGroupName}
                   onChange={(e) => setWechatGroupName(e.target.value)}
-                  placeholder="例如：山海图代理商"
+                  placeholder="例如：米雪冰城落地"
                   className="h-9 text-[12px]"
                   autoFocus
                 />
                 <p className="text-[11px] text-[#9ca3af]">
-                  系统将自动分配商机编号，如 OP-2025-0001-山海图代理商
+                  系统自动分配商机编号如：2026789米雪冰城落地 并创建企微群聊
                 </p>
               </div>
 

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Select,
   SelectContent,
@@ -18,16 +18,14 @@ import {
   Loader2,
   X,
   Phone,
-  Mail,
-  MessageCircle,
-  Building2,
-  Briefcase,
   Clock,
   Send,
-  Edit,
   Save,
+  ArrowRight,
+  RotateCcw,
 } from 'lucide-react'
 import { getLeadFollowUpsAction, addLeadFollowUpAction, updateLeadAction, advanceLeadStatusAction, type LeadRow, type LeadFollowUpRow } from '@/app/actions/lead'
+import { getCustomersAction, type CustomerRow } from '@/app/actions/customer'
 import { toast } from 'sonner'
 import {
   getLeadStatusLabel,
@@ -41,19 +39,30 @@ interface LeadDetailPanelProps {
   lead: LeadRow | null
   isOpen: boolean
   onClose: () => void
+  onConvertToOpportunity?: (lead: LeadRow) => void
+  onReturnToPool?: (lead: LeadRow) => void
 }
 
-export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps) {
+export function LeadDetailPanel({ lead, isOpen, onClose, onConvertToOpportunity, onReturnToPool }: LeadDetailPanelProps) {
   const [followUps, setFollowUps] = useState<LeadFollowUpRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [followUpNote, setFollowUpNote] = useState('')
   const [isSaving, setIsSaving] = useState(false)
-  const [isEditing, setIsEditing] = useState(false)
+  const [customers, setCustomers] = useState<CustomerRow[]>([])
+  const [activeTab, setActiveTab] = useState('details')
   const [editForm, setEditForm] = useState({
     wechatName: '',
     phone: '',
+    source: '',
+    category: '',
+    budgetMin: '',
+    budgetMax: '',
+    budgetCurrency: 'IDR',
+    urgency: 'MEDIUM',
     initialIntent: '',
     notes: '',
+    customerId: '',
+    nextFollowDate: '',
   })
 
   // 判断是否已转化为商机（只读模式）
@@ -62,20 +71,33 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
   useEffect(() => {
     if (isOpen && lead?.id) {
       setIsLoading(true)
-      setIsEditing(false)
+      setActiveTab('details')
       setEditForm({
         wechatName: lead.wechatName || '',
         phone: lead.phone || '',
+        source: lead.source || '',
+        category: lead.category || '',
+        budgetMin: lead.budgetMin?.toString() || '',
+        budgetMax: lead.budgetMax?.toString() || '',
+        budgetCurrency: lead.budgetCurrency || 'IDR',
+        urgency: lead.urgency || 'MEDIUM',
         initialIntent: lead.initialIntent || '',
         notes: lead.notes || '',
+        customerId: lead.customerId || '',
+        nextFollowDate: lead.nextFollowDate || '',
       })
-      getLeadFollowUpsAction(lead.id)
-        .then(data => {
-          setFollowUps(data)
+      
+      Promise.all([
+        getLeadFollowUpsAction(lead.id),
+        getCustomersAction()
+      ])
+        .then(([followUpsData, customersData]) => {
+          setFollowUps(followUpsData)
+          setCustomers(customersData)
           setIsLoading(false)
         })
         .catch(error => {
-          console.error('Failed to load follow-ups:', error)
+          console.error('Failed to load data:', error)
           setIsLoading(false)
         })
     }
@@ -88,7 +110,6 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
     }
 
     setIsSaving(true)
-
     try {
       const result = await addLeadFollowUpAction({
         leadId: lead.id,
@@ -99,7 +120,6 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
       if (result) {
         toast.success('跟进记录已保存')
         setFollowUpNote('')
-        // 重新加载跟进记录
         const updatedFollowUps = await getLeadFollowUpsAction(lead.id)
         setFollowUps(updatedFollowUps)
       } else {
@@ -118,11 +138,22 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
 
     setIsSaving(true)
     try {
-      const result = await updateLeadAction(lead.id, editForm)
+      const result = await updateLeadAction(lead.id, {
+        wechatName: editForm.wechatName,
+        phone: editForm.phone,
+        source: editForm.source,
+        category: editForm.category,
+        budgetMin: editForm.budgetMin ? parseFloat(editForm.budgetMin) : undefined,
+        budgetMax: editForm.budgetMax ? parseFloat(editForm.budgetMax) : undefined,
+        budgetCurrency: editForm.budgetCurrency,
+        urgency: editForm.urgency,
+        initialIntent: editForm.initialIntent,
+        notes: editForm.notes,
+        customerId: editForm.customerId || undefined,
+        nextFollowDate: editForm.nextFollowDate || undefined,
+      })
       if (result.success) {
         toast.success('线索信息已更新')
-        setIsEditing(false)
-        // 刷新页面以显示最新数据
         window.location.reload()
       } else {
         toast.error(result.error || '更新失败')
@@ -135,23 +166,33 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
     }
   }
 
-  const handleAdvanceStatus = async (newStatus: 'contacted' | 'ready_for_opportunity' | 'no_interest') => {
-    if (!lead?.id) return
+  const getStatusBadgeStyle = (status: string) => {
+    switch (status) {
+      case 'new':
+        return 'bg-blue-500 text-white border-0'
+      case 'contacted':
+        return 'bg-amber-500 text-white border-0'
+      case 'ready_for_opportunity':
+        return 'bg-green-500 text-white border-0'
+      case 'converted':
+        return 'bg-slate-500 text-white border-0'
+      case 'no_interest':
+        return 'bg-slate-300 text-slate-700 border-0'
+      default:
+        return 'bg-slate-100 text-slate-700 border-0'
+    }
+  }
 
-    setIsSaving(true)
-    try {
-      const result = await advanceLeadStatusAction(lead.id, newStatus)
-      if (result.success) {
-        toast.success('状态已更新')
-        window.location.reload()
-      } else {
-        toast.error(result.error || '更新失败')
-      }
-    } catch (error) {
-      console.error('Advance status error:', error)
-      toast.error('更新失败，请重试')
-    } finally {
-      setIsSaving(false)
+  const getUrgencyBadgeStyle = (urgency: string) => {
+    switch (urgency) {
+      case 'HIGH':
+        return 'border-red-500 text-red-600 bg-transparent'
+      case 'MEDIUM':
+        return 'border-amber-500 text-amber-600 bg-transparent'
+      case 'LOW':
+        return 'border-slate-300 text-slate-500 bg-transparent'
+      default:
+        return 'border-slate-300 text-slate-500 bg-transparent'
     }
   }
 
@@ -159,248 +200,260 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent className="w-[500px] sm:max-w-[500px] p-0 overflow-hidden flex flex-col">
+      <SheetContent className="w-[500px] sm:max-w-[500px] p-0 flex flex-col border-l border-slate-200 bg-white">
         {/* 可访问性标题 - 视觉隐藏 */}
         <SheetHeader className="sr-only">
           <SheetTitle>线索详情 - {lead.leadCode}</SheetTitle>
           <SheetDescription>
-            查看和编辑线索 {lead.personName} 的详细信息
+            查看和编辑线索 {lead.wechatName} 的详细信息
           </SheetDescription>
         </SheetHeader>
 
-        {/* 极简头部 */}
-        <div className="border-b border-[#e5e7eb] bg-white px-4 py-3">
+        {/* 紧凑头部 */}
+        <div className="border-b border-slate-200 px-4 py-3">
+          {/* 第一行：ID + 状态 + 紧迫度 */}
+          <div className="flex items-center gap-2 mb-1">
+            <span className="font-mono text-[11px] text-slate-500">{lead.leadCode}</span>
+            <Badge className={`h-4 px-1.5 text-[10px] font-medium ${getStatusBadgeStyle(lead.status)}`}>
+              {getLeadStatusLabel(lead.status)}
+            </Badge>
+            <Badge variant="outline" className={`h-4 px-1.5 text-[10px] font-medium ${getUrgencyBadgeStyle(lead.urgency)}`}>
+              {getLeadUrgencyLabel(lead.urgency)}
+            </Badge>
+          </div>
+          {/* 第二行：客户名 */}
           <div className="flex items-center justify-between">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-0.5">
-                <h2 className="text-[13px] font-semibold text-[#111827] truncate">
-                  {lead.wechatName}
-                </h2>
-                {isReadOnly && (
-                  <Badge className="h-4 text-[10px] bg-[#dbeafe] text-[#1e40af] border-0">
-                    已转化
-                  </Badge>
-                )}
-              </div>
-              <p className="text-[11px] text-[#6b7280] font-mono">{lead.leadCode}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge className="h-5 text-[10px] bg-[#f3f4f6] text-[#374151] border-0">
-                {getLeadUrgencyLabel(lead.urgency)}
-              </Badge>
-              {!isReadOnly && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-[#6b7280] hover:text-[#111827] hover:bg-[#f3f4f6]"
-                  onClick={() => isEditing ? handleSaveEdit() : setIsEditing(true)}
-                  disabled={isSaving}
-                >
-                  {isSaving ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : isEditing ? (
-                    <Save className="h-3 w-3" />
-                  ) : (
-                    <Edit className="h-3 w-3" />
-                  )}
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-[#6b7280] hover:text-[#111827] hover:bg-[#f3f4f6]"
-                onClick={onClose}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+            <h2 className="text-lg font-bold text-slate-900 truncate">{lead.wechatName}</h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              onClick={onClose}
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </div>
         </div>
 
-        {/* 高密度信息区 */}
-        <div className="flex-1 overflow-y-auto">
-          {/* 转化提示 */}
-          {isReadOnly && (
-            <div className="mx-4 mt-3 mb-2 px-3 py-2 bg-[#eff6ff] border border-[#bfdbfe] rounded-sm">
-              <p className="text-[11px] text-[#1e40af]">
-                该线索已转化为商机，基础信息不可修改
-              </p>
-            </div>
-          )}
+        {/* Tabs 导航 */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+          <div className="px-4 pt-2">
+            <TabsList className="h-8 bg-slate-100/50 p-0.5 w-full">
+              <TabsTrigger value="details" className="text-xs flex-1 h-7 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                详细信息
+              </TabsTrigger>
+              <TabsTrigger value="followups" className="text-xs flex-1 h-7 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                跟进记录 {followUps.length > 0 && `(${followUps.length})`}
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-          {/* 基本信息 - 紧凑布局 */}
-          <div className="px-4 py-3 space-y-2">
-            <div className="text-[11px] font-medium text-[#6b7280] mb-2">基本信息</div>
+          {/* 详细信息 Tab */}
+          <TabsContent value="details" className="flex-1 overflow-y-auto mt-0 px-4 py-3">
+            {isReadOnly && (
+              <div className="mb-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded">
+                <p className="text-[11px] text-blue-700">该线索已转化为商机，基础信息不可修改</p>
+              </div>
+            )}
 
-            {/* 微信名 */}
-            <div className="space-y-1">
-              <div className="text-[10px] text-[#9ca3af]">微信名/称呼</div>
-              {isEditing ? (
+            {/* 高密度表单区 - Grid 布局 */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* 微信昵称 */}
+              <div className="space-y-1">
+                <label className="text-[11px] text-slate-500">微信昵称</label>
                 <Input
                   value={editForm.wechatName}
                   onChange={(e) => setEditForm({...editForm, wechatName: e.target.value})}
-                  className="h-7 text-[12px]"
+                  className="h-8 text-xs focus-visible:ring-0 focus-visible:border-blue-500"
+                  disabled={isReadOnly}
                 />
-              ) : (
-                <div className="text-[12px] text-[#6b7280]">{lead.wechatName || '—'}</div>
-              )}
-            </div>
+              </div>
 
-            {/* 电话 */}
-            <div className="space-y-1">
-              <div className="text-[10px] text-[#9ca3af]">电话</div>
-              {isEditing ? (
+              {/* 手机号码 */}
+              <div className="space-y-1">
+                <label className="text-[11px] text-slate-500">手机号码</label>
                 <Input
                   value={editForm.phone}
                   onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
-                  className="h-7 text-[12px]"
+                  className="h-8 text-xs font-mono focus-visible:ring-0 focus-visible:border-blue-500"
+                  disabled={isReadOnly}
+                  placeholder="—"
                 />
-              ) : (
-                <div className="flex items-center gap-2 text-[12px]">
-                  <Phone className="h-3 w-3 text-[#9ca3af]" />
-                  <span className="text-[#6b7280]">{lead.phone || '—'}</span>
-                </div>
-              )}
-            </div>
+              </div>
 
-            {/* 初步意向 */}
-            <div className="space-y-1">
-              <div className="text-[10px] text-[#9ca3af]">初步意向</div>
-              {isEditing ? (
+              {/* 意向服务 */}
+              <div className="space-y-1">
+                <label className="text-[11px] text-slate-500">意向服务</label>
+                <Select
+                  value={editForm.category}
+                  onValueChange={(v) => setEditForm({...editForm, category: v})}
+                  disabled={isReadOnly}
+                >
+                  <SelectTrigger className="h-8 text-xs focus:ring-0 focus:border-blue-500">
+                    <SelectValue placeholder="请选择" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="VISA">签证服务</SelectItem>
+                    <SelectItem value="COMPANY_REGISTRATION">公司注册</SelectItem>
+                    <SelectItem value="TAX_SERVICES">税务服务</SelectItem>
+                    <SelectItem value="FINANCIAL_SERVICES">财务服务</SelectItem>
+                    <SelectItem value="PERMIT_SERVICES">许可证服务</SelectItem>
+                    <SelectItem value="OTHER">其他</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* 线索来源 */}
+              <div className="space-y-1">
+                <label className="text-[11px] text-slate-500">线索来源</label>
+                <Select
+                  value={editForm.source}
+                  onValueChange={(v) => setEditForm({...editForm, source: v})}
+                  disabled={isReadOnly}
+                >
+                  <SelectTrigger className="h-8 text-xs focus:ring-0 focus:border-blue-500">
+                    <SelectValue placeholder="请选择" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="wechat">山海图微信群</SelectItem>
+                    <SelectItem value="referral">老客户推荐</SelectItem>
+                    <SelectItem value="facebook">Facebook</SelectItem>
+                    <SelectItem value="website">官网</SelectItem>
+                    <SelectItem value="cold_outreach">冷拉</SelectItem>
+                    <SelectItem value="other">其他</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* 预算下限 */}
+              <div className="space-y-1">
+                <label className="text-[11px] text-slate-500">预算下限</label>
+                <div className="relative">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-mono">
+                    {editForm.budgetCurrency}
+                  </span>
+                  <Input
+                    type="number"
+                    value={editForm.budgetMin}
+                    onChange={(e) => setEditForm({...editForm, budgetMin: e.target.value})}
+                    className="h-8 text-xs font-mono pl-9 focus-visible:ring-0 focus-visible:border-blue-500"
+                    disabled={isReadOnly}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+
+              {/* 预算上限 */}
+              <div className="space-y-1">
+                <label className="text-[11px] text-slate-500">预算上限</label>
+                <div className="relative">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-mono">
+                    {editForm.budgetCurrency}
+                  </span>
+                  <Input
+                    type="number"
+                    value={editForm.budgetMax}
+                    onChange={(e) => setEditForm({...editForm, budgetMax: e.target.value})}
+                    className="h-8 text-xs font-mono pl-9 focus-visible:ring-0 focus-visible:border-blue-500"
+                    disabled={isReadOnly}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+
+              {/* 紧迫度 */}
+              <div className="space-y-1">
+                <label className="text-[11px] text-slate-500">紧迫度</label>
+                <Select
+                  value={editForm.urgency}
+                  onValueChange={(v) => setEditForm({...editForm, urgency: v})}
+                  disabled={isReadOnly}
+                >
+                  <SelectTrigger className="h-8 text-xs focus:ring-0 focus:border-blue-500">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="HIGH">高 - 急迫</SelectItem>
+                    <SelectItem value="MEDIUM">中 - 一般</SelectItem>
+                    <SelectItem value="LOW">低 - 不急</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* 关联客户 */}
+              <div className="space-y-1">
+                <label className="text-[11px] text-slate-500">关联客户</label>
+                <Select
+                  value={editForm.customerId || 'none'}
+                  onValueChange={(v) => setEditForm({...editForm, customerId: v === 'none' ? '' : v})}
+                  disabled={isReadOnly}
+                >
+                  <SelectTrigger className="h-8 text-xs focus:ring-0 focus:border-blue-500">
+                    <SelectValue placeholder="选择客户" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">不关联</SelectItem>
+                    {customers.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.customerName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* 初始需求说明 - 全宽 */}
+              <div className="col-span-2 space-y-1">
+                <label className="text-[11px] text-slate-500">初始需求说明</label>
                 <Textarea
                   value={editForm.initialIntent}
                   onChange={(e) => setEditForm({...editForm, initialIntent: e.target.value})}
-                  className="min-h-[60px] text-[12px]"
+                  className="min-h-[80px] text-xs resize-none focus-visible:ring-0 focus-visible:border-blue-500"
+                  disabled={isReadOnly}
+                  placeholder="记录客户的初步需求..."
                 />
-              ) : (
-                <div className="text-[12px] text-[#6b7280] leading-relaxed">
-                  {lead.initialIntent || '—'}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* 线索属性 - 紧凑标签 */}
-          <div className="px-4 py-3">
-            <div className="text-[11px] font-medium text-[#6b7280] mb-2">线索属性</div>
-            <div className="flex flex-wrap gap-1.5">
-              <div className="inline-flex items-center gap-1 px-2 py-1 bg-[#f3f4f6] rounded-sm">
-                <span className="text-[10px] text-[#9ca3af]">意向</span>
-                <span className="text-[11px] text-[#111827] font-medium">
-                  {getLeadCategoryLabel(lead.category)}
-                </span>
               </div>
-              <div className="inline-flex items-center gap-1 px-2 py-1 bg-[#f3f4f6] rounded-sm">
-                <span className="text-[10px] text-[#9ca3af]">来源</span>
-                <span className="text-[11px] text-[#111827] font-medium">
-                  {getLeadSourceLabel(lead.source)}
-                </span>
-              </div>
-              <div className="inline-flex items-center gap-1 px-2 py-1 bg-[#f3f4f6] rounded-sm">
-                <span className="text-[10px] text-[#9ca3af]">状态</span>
-                <span className="text-[11px] text-[#111827] font-medium">
-                  {getLeadStatusLabel(lead.status)}
-                </span>
+
+              {/* 备注 - 全宽 */}
+              <div className="col-span-2 space-y-1">
+                <label className="text-[11px] text-slate-500">备注</label>
+                <Textarea
+                  value={editForm.notes}
+                  onChange={(e) => setEditForm({...editForm, notes: e.target.value})}
+                  className="min-h-[60px] text-xs resize-none focus-visible:ring-0 focus-visible:border-blue-500"
+                  disabled={isReadOnly}
+                  placeholder="其他备注信息..."
+                />
               </div>
             </div>
+          </TabsContent>
 
-            {/* 企业微信群信息 */}
-            {lead.wechatGroupId && (
-              <div className="mt-3 p-2 bg-green-50 rounded-sm">
-                <div className="text-[10px] text-[#9ca3af] mb-1">关联企微群</div>
-                <div className="text-[11px] text-[#374151]">
-                  {lead.wechatGroupId}{lead.wechatGroupName}
-                </div>
-              </div>
-            )}
-
-            {/* 状态管理 */}
-            {!isReadOnly && (
-              <div className="mt-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-[#9ca3af]">更改状态：</span>
-                  <Select
-                    value={lead.status}
-                    onValueChange={(value) => handleAdvanceStatus(value as any)}
-                    disabled={isSaving}
-                  >
-                    <SelectTrigger className="h-7 w-[140px] text-[11px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="new">新线索</SelectItem>
-                      <SelectItem value="contacted">已联系</SelectItem>
-                      <SelectItem value="ready_for_opportunity">准备转商机</SelectItem>
-                      <SelectItem value="no_interest">无意向</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
-
-            {(lead.notes || isEditing) && (
-              <div className="mt-3">
-                <div className="text-[10px] text-[#9ca3af] mb-1">备注</div>
-                {isEditing ? (
-                  <Textarea
-                    value={editForm.notes}
-                    onChange={(e) => setEditForm({...editForm, notes: e.target.value})}
-                    className="min-h-[60px] text-[11px]"
-                    placeholder="添加备注..."
-                  />
-                ) : (
-                  <p className="text-[11px] text-[#374151] leading-relaxed">
-                    {lead.notes}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-
-          <Separator />
-
-          {/* 跟进记录 - 高密度时间轴 */}
-          <div className="px-4 py-3">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-[11px] font-medium text-[#6b7280]">跟进记录</div>
-              {followUps.length > 0 && (
-                <span className="text-[10px] text-[#9ca3af]">
-                  {followUps.length} 条
-                </span>
-              )}
-            </div>
-
+          {/* 跟进记录 Tab */}
+          <TabsContent value="followups" className="flex-1 overflow-y-auto mt-0 px-4 py-3">
             {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-4 w-4 animate-spin text-[#9ca3af]" />
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
               </div>
             ) : followUps.length === 0 ? (
-              <div className="text-center py-8">
-                <Clock className="h-8 w-8 text-[#e5e7eb] mx-auto mb-2" />
-                <p className="text-[11px] text-[#9ca3af]">暂无跟进记录</p>
+              <div className="text-center py-12">
+                <Clock className="h-10 w-10 text-slate-200 mx-auto mb-2" />
+                <p className="text-xs text-slate-400">暂无跟进记录</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {followUps.map((followUp, index) => (
                   <div key={followUp.id} className="relative">
-                    {/* 时间轴线 */}
                     {index !== followUps.length - 1 && (
-                      <div className="absolute left-1 top-5 bottom-0 w-px bg-[#e5e7eb]" />
+                      <div className="absolute left-1 top-5 bottom-0 w-px bg-slate-200" />
                     )}
-
-                    <div className="flex gap-2">
-                      {/* 时间轴点 */}
-                      <div className="relative flex h-2.5 w-2.5 shrink-0 items-center justify-center rounded-full bg-[#2563eb] mt-1.5 ring-2 ring-white" />
-
-                      {/* 内容 */}
-                      <div className="flex-1 pb-2">
+                    <div className="flex gap-2.5">
+                      <div className="relative flex h-2.5 w-2.5 shrink-0 items-center justify-center rounded-full bg-blue-500 mt-1.5 ring-2 ring-white" />
+                      <div className="flex-1 pb-3">
                         <div className="flex items-center gap-2 mb-1">
-                          <Badge variant="outline" className="h-4 text-[10px] font-normal border-[#e5e7eb]">
+                          <Badge variant="outline" className="h-4 px-1.5 text-[10px] font-normal border-slate-200">
                             {getFollowupTypeLabel(followUp.followupType)}
                           </Badge>
-                          <span className="text-[10px] text-[#9ca3af]">
+                          <span className="text-[10px] text-slate-400">
                             {new Date(followUp.createdAt).toLocaleString('zh-CN', {
                               month: '2-digit',
                               day: '2-digit',
@@ -409,19 +462,17 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
                             })}
                           </span>
                           {followUp.operator && (
-                            <span className="text-[10px] text-[#6b7280]">
+                            <span className="text-[10px] text-slate-500">
                               · {followUp.operator.name || followUp.operator.email}
                             </span>
                           )}
                         </div>
-                        <p className="text-[11px] text-[#374151] leading-relaxed">
+                        <p className="text-[11px] text-slate-700 leading-relaxed">
                           {followUp.content}
                         </p>
                         {followUp.nextAction && (
-                          <div className="mt-1 pl-2 border-l-2 border-[#dbeafe]">
-                            <p className="text-[10px] text-[#6b7280]">
-                              下一步: {followUp.nextAction}
-                            </p>
+                          <div className="mt-1.5 pl-2 border-l-2 border-blue-100">
+                            <p className="text-[10px] text-slate-500">下一步: {followUp.nextAction}</p>
                           </div>
                         )}
                       </div>
@@ -430,43 +481,77 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
                 ))}
               </div>
             )}
-          </div>
 
-          {/* 快速跟进 */}
-          {!isReadOnly && (
-            <>
-              <Separator />
-              <div className="px-4 py-3">
-                <div className="text-[11px] font-medium text-[#6b7280] mb-2">快速跟进</div>
+            {/* 快速跟进输入 */}
+            {!isReadOnly && (
+              <div className="mt-4 pt-3 border-t border-slate-100">
+                <label className="text-[11px] text-slate-500 mb-1.5 block">新增跟进</label>
                 <Textarea
-                  placeholder="记录本次跟进..."
+                  placeholder="记录本次跟进内容..."
                   value={followUpNote}
                   onChange={(e) => setFollowUpNote(e.target.value)}
-                  className="min-h-[60px] text-[11px] resize-none mb-2"
+                  className="min-h-[60px] text-xs resize-none mb-2 focus-visible:ring-0 focus-visible:border-blue-500"
                   disabled={isSaving}
                 />
                 <Button
                   size="sm"
-                  className="w-full h-7 text-[11px] bg-[#2563eb] hover:bg-[#1d4ed8]"
+                  className="w-full h-8 text-xs bg-blue-600 hover:bg-blue-700"
                   onClick={handleSaveFollowUp}
                   disabled={isSaving || !followUpNote.trim()}
                 >
                   {isSaving ? (
-                    <>
-                      <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
-                      保存中...
-                    </>
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
                   ) : (
-                    <>
-                      <Send className="h-3 w-3 mr-1.5" />
-                      保存跟进
-                    </>
+                    <Send className="h-3.5 w-3.5 mr-1.5" />
                   )}
+                  保存跟进
                 </Button>
               </div>
-            </>
-          )}
-        </div>
+            )}
+          </TabsContent>
+        </Tabs>
+
+        {/* 固定底部操作区 */}
+        {!isReadOnly && (
+          <div className="border-t border-slate-200 bg-slate-50 px-4 py-3 flex items-center justify-between">
+            {/* 左侧：业务流转按钮 */}
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                className="h-8 text-xs bg-blue-600 hover:bg-blue-700"
+                onClick={() => onConvertToOpportunity?.(lead)}
+              >
+                <ArrowRight className="h-3.5 w-3.5 mr-1.5" />
+                转为商机
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                onClick={() => onReturnToPool?.(lead)}
+              >
+                <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                退回公海
+              </Button>
+            </div>
+
+            {/* 右侧：保存按钮 */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={handleSaveEdit}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <Save className="h-3.5 w-3.5 mr-1.5" />
+              )}
+              保存修改
+            </Button>
+          </div>
+        )}
       </SheetContent>
     </Sheet>
   )

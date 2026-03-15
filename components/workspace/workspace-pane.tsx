@@ -161,9 +161,10 @@ export function WorkspacePane({
       </div>
 
       {/* Footer action bar - Stage advance buttons */}
-      {!isHistorical && (
+      {/* P1 阶段的按钮在 P1RequirementForm 内部，此处不重复显示 */}
+      {!isHistorical && viewingStage !== 'P1' && (
         <div className="flex items-center justify-between border-t border-[#e5e7eb] bg-[#f9fafb] px-5 py-2">
-          {['P1', 'P2', 'P3'].includes(viewingStage) && (
+          {['P2', 'P3'].includes(viewingStage) && (
             <>
               <button
                 onClick={onSave}
