@@ -1,10 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import {
-  Flame, Thermometer, Snowflake, Clock,
-  UserPlus, MoreHorizontal, ArrowUpRight,
-} from 'lucide-react'
+import { Flame, Thermometer, Snowflake, Clock, UserPlus, MoreHorizontal, ArrowUpRight } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -24,12 +21,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 import { toast } from 'sonner'
 import { claimLeadAction, discardLeadAction, type LeadRow } from '@/app/actions/lead'
 import { ConvertToOppDialog } from './convert-to-opp-dialog'
@@ -40,24 +31,34 @@ import {
   getLeadCategoryLabel,
 } from '@/lib/lead-labels'
 
-// Urgency indicator
-const URGENCY_MAP: Record<string, { icon: React.ReactNode; cls: string; dot: string }> = {
-  HIGH:   { icon: <Flame className="h-3 w-3" />,       cls: 'text-red-600',   dot: 'bg-red-500'    },
-  HOT:    { icon: <Flame className="h-3 w-3" />,       cls: 'text-red-600',   dot: 'bg-red-500'    },
-  MEDIUM: { icon: <Thermometer className="h-3 w-3" />, cls: 'text-amber-600', dot: 'bg-amber-400'  },
-  WARM:   { icon: <Thermometer className="h-3 w-3" />, cls: 'text-amber-600', dot: 'bg-amber-400'  },
-  LOW:    { icon: <Snowflake className="h-3 w-3" />,   cls: 'text-blue-500',  dot: 'bg-blue-400'   },
-  COLD:   { icon: <Snowflake className="h-3 w-3" />,   cls: 'text-blue-500',  dot: 'bg-blue-400'   },
+// 紧迫度配色
+const URGENCY_COLORS: Record<string, string> = {
+  HIGH: 'text-red-600',
+  HOT: 'text-red-600',
+  MEDIUM: 'text-amber-600',
+  WARM: 'text-amber-600',
+  LOW: 'text-blue-500',
+  COLD: 'text-blue-500',
 }
 
-const STATUS_BADGE: Record<string, string> = {
-  new:                   'bg-[#eff6ff] text-[#2563eb] border-[#bfdbfe]',
-  contacted:             'bg-[#f0fdf4] text-[#16a34a] border-[#bbf7d0]',
-  ready_for_opportunity: 'bg-[#fefce8] text-[#ca8a04] border-[#fde68a]',
-  no_interest:           'bg-[#f9fafb] text-[#6b7280] border-[#e5e7eb]',
-  converted:             'bg-[#dbeafe] text-[#1e40af] border-[#93c5fd]',
-  discarded:             'bg-[#fef2f2] text-[#dc2626] border-[#fca5a5]',
-  public_pool:           'bg-[#f3f4f6] text-[#374151] border-[#d1d5db]',
+const URGENCY_ICONS: Record<string, React.ReactNode> = {
+  HIGH: <Flame className="h-3.5 w-3.5" />,
+  HOT: <Flame className="h-3.5 w-3.5" />,
+  MEDIUM: <Thermometer className="h-3.5 w-3.5" />,
+  WARM: <Thermometer className="h-3.5 w-3.5" />,
+  LOW: <Snowflake className="h-3.5 w-3.5" />,
+  COLD: <Snowflake className="h-3.5 w-3.5" />,
+}
+
+// 状态配色
+const STATUS_COLORS: Record<string, string> = {
+  new: 'bg-blue-50 text-blue-700 border-blue-200',
+  contacted: 'bg-green-50 text-green-700 border-green-200',
+  ready_for_opportunity: 'bg-amber-50 text-amber-700 border-amber-200',
+  no_interest: 'bg-slate-100 text-slate-600 border-slate-200',
+  converted: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  discarded: 'bg-red-50 text-red-600 border-red-200',
+  public_pool: 'bg-slate-50 text-slate-600 border-slate-200',
 }
 
 function isStagnant(lead: LeadRow): boolean {
@@ -78,7 +79,6 @@ function getRecycleCountdown(lead: LeadRow): { hours: number; isUrgent: boolean 
   return { hours: remaining, isUrgent: false }
 }
 
-// Component
 export function LeadTable({
   leads,
   viewMode,
@@ -139,175 +139,167 @@ export function LeadTable({
     }
   }
 
+  if (leads.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="text-4xl mb-3">📭</div>
+        <p className="text-sm text-slate-500">暂无线索数据</p>
+        <p className="text-xs text-slate-400 mt-1">尝试切换视图或修改搜索条件</p>
+      </div>
+    )
+  }
+
   return (
-    <TooltipProvider delayDuration={300}>
-      <div className="rounded-md border border-[#e5e7eb] overflow-hidden">
-        <table className="w-full text-[12px]">
-          <thead>
-            <tr className="border-b border-[#e5e7eb] bg-[#f9fafb]">
-              <th className="px-3 py-2.5 text-left text-[11px] font-semibold text-[#6b7280]" style={{ width: 128 }}>线索编号</th>
-              <th className="px-3 py-2.5 text-left text-[11px] font-semibold text-[#6b7280]" style={{ minWidth: 140 }}>联系人</th>
-              <th className="px-3 py-2.5 text-left text-[11px] font-semibold text-[#6b7280]" style={{ width: 110 }}>意向分类</th>
-              <th className="px-3 py-2.5 text-left text-[11px] font-semibold text-[#6b7280]" style={{ width: 72 }}>紧迫度</th>
-              <th className="px-3 py-2.5 text-left text-[11px] font-semibold text-[#6b7280]" style={{ width: 90 }}>状态</th>
-              <th className="px-3 py-2.5 text-left text-[11px] font-semibold text-[#6b7280]" style={{ width: 90 }}>来源</th>
+    <>
+      <div className="overflow-hidden rounded-lg border border-slate-200">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 border-b border-slate-200">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">线索编号</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">联系人</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">意向</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">紧迫度</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">状态</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">来源</th>
               {viewMode === 'my_leads' && (
-                <th className="px-3 py-2.5 text-left text-[11px] font-semibold text-[#6b7280]" style={{ width: 88 }}>回收倒计时</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">倒计时</th>
               )}
-              <th className="px-3 py-2.5 text-left text-[11px] font-semibold text-[#6b7280]" style={{ width: 90 }}>创建时间</th>
-              <th className="px-3 py-2.5 text-center text-[11px] font-semibold text-[#6b7280]" style={{ width: 64 }}>操作</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">创建时间</th>
+              <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">操作</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#f3f4f6]">
+          <tbody className="bg-white divide-y divide-slate-100">
             {leads.map((lead) => {
               const stagnant = isStagnant(lead)
               const countdown = getRecycleCountdown(lead)
-              const urgency = URGENCY_MAP[lead.urgency] ?? URGENCY_MAP['MEDIUM']
               const isConverted = lead.status === 'converted' || !!lead.convertedOpportunityId
               const isSelected = selectedLeadId === lead.id
+              const urgencyColor = URGENCY_COLORS[lead.urgency] ?? 'text-slate-500'
+              const urgencyIcon = URGENCY_ICONS[lead.urgency] ?? <Thermometer className="h-3.5 w-3.5" />
 
               return (
                 <tr
                   key={lead.id}
                   onClick={(e) => handleRowClick(lead, e)}
                   className={[
-                    'cursor-pointer transition-colors hover:bg-[#f9fafb]',
-                    stagnant ? 'bg-amber-50/60' : '',
-                    isConverted ? 'bg-[#f9fafb] opacity-70' : '',
-                    isSelected ? 'bg-[#eff6ff]' : '',
-                  ].join(' ')}
+                    'cursor-pointer transition-colors',
+                    isSelected ? 'bg-blue-50' : 'hover:bg-slate-50',
+                    stagnant && !isSelected ? 'bg-amber-50/50' : '',
+                    isConverted ? 'opacity-60' : '',
+                  ].filter(Boolean).join(' ')}
                 >
-                  {/* Lead code */}
-                  <td className="px-3 py-3">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="font-mono text-[12px] font-medium text-[#2563eb]">
-                        {lead.leadCode}
-                      </span>
-                      <div className="flex gap-1">
-                        {stagnant && (
-                          <span className="rounded-sm bg-amber-100 px-1 py-0.5 text-[9px] font-medium text-amber-700">
-                            停滞
-                          </span>
-                        )}
-                        {isConverted && (
-                          <span className="rounded-sm bg-blue-100 px-1 py-0.5 text-[9px] font-medium text-blue-700">
-                            已转化
-                          </span>
-                        )}
-                      </div>
+                  {/* 线索编号 */}
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-sm font-medium text-blue-600">{lead.leadCode}</span>
+                      {stagnant && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+                          停滞
+                        </span>
+                      )}
+                      {isConverted && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-700">
+                          已转化
+                        </span>
+                      )}
                     </div>
                   </td>
 
-                  {/* Contact */}
-                  <td className="px-3 py-3">
-                    <div className="font-medium text-[#111827]">{lead.wechatName || lead.personName}</div>
-                    {lead.customer?.customerName && (
-                      <div className="mt-0.5 text-[11px] text-[#9ca3af]">{lead.customer.customerName}</div>
+                  {/* 联系人 */}
+                  <td className="px-4 py-3">
+                    <div className="text-sm font-medium text-slate-900">{lead.wechatName || lead.personName || '—'}</div>
+                    {lead.phone && (
+                      <div className="text-xs text-slate-500">{lead.phone}</div>
                     )}
                   </td>
 
-                  {/* Category */}
-                  <td className="px-3 py-3 text-[#374151]">
-                    {getLeadCategoryLabel(lead.category)}
+                  {/* 意向分类 */}
+                  <td className="px-4 py-3 text-sm text-slate-700">
+                    {getLeadCategoryLabel(lead.category) || '—'}
                   </td>
 
-                  {/* Urgency */}
-                  <td className="px-3 py-3">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className={`flex items-center gap-1 ${urgency.cls}`}>
-                          <span className={`h-2 w-2 rounded-full ${urgency.dot}`} />
-                          <span>{getLeadUrgencyLabel(lead.urgency)}</span>
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">
-                        <p className="text-[11px]">紧迫度: {getLeadUrgencyLabel(lead.urgency)}</p>
-                      </TooltipContent>
-                    </Tooltip>
+                  {/* 紧迫度 */}
+                  <td className="px-4 py-3">
+                    <div className={`flex items-center gap-1.5 ${urgencyColor}`}>
+                      {urgencyIcon}
+                      <span className="text-sm">{getLeadUrgencyLabel(lead.urgency)}</span>
+                    </div>
                   </td>
 
-                  {/* Status */}
-                  <td className="px-3 py-3">
+                  {/* 状态 */}
+                  <td className="px-4 py-3">
                     <Badge
                       variant="outline"
-                      className={`h-5 text-[10px] font-normal ${STATUS_BADGE[lead.status] ?? STATUS_BADGE['new']}`}
+                      className={`text-xs font-normal ${STATUS_COLORS[lead.status] ?? STATUS_COLORS['new']}`}
                     >
                       {getLeadStatusLabel(lead.status)}
                     </Badge>
                   </td>
 
-                  {/* Source */}
-                  <td className="px-3 py-3 text-[#6b7280]">
-                    {getLeadSourceLabel(lead.source)}
+                  {/* 来源 */}
+                  <td className="px-4 py-3 text-sm text-slate-500">
+                    {getLeadSourceLabel(lead.source) || '—'}
                   </td>
 
-                  {/* Countdown (my_leads only) */}
+                  {/* 回收倒计时 (仅我的线索) */}
                   {viewMode === 'my_leads' && (
-                    <td className="px-3 py-3">
+                    <td className="px-4 py-3">
                       {countdown ? (
-                        <div className={`flex items-center gap-1 ${countdown.isUrgent ? 'text-red-600' : 'text-amber-600'}`}>
-                          <Clock className="h-3 w-3" />
+                        <div className={`flex items-center gap-1 text-sm ${countdown.isUrgent ? 'text-red-600 font-medium' : 'text-amber-600'}`}>
+                          <Clock className="h-3.5 w-3.5" />
                           <span className="tabular-nums">{countdown.hours}h</span>
                         </div>
                       ) : (
-                        <span className="text-[#d1d5db]">—</span>
+                        <span className="text-slate-300">—</span>
                       )}
                     </td>
                   )}
 
-                  {/* Created at */}
-                  <td className="px-3 py-3 text-[#9ca3af]">
-                    {new Date(lead.createdAt).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit', year: '2-digit' })}
+                  {/* 创建时间 */}
+                  <td className="px-4 py-3 text-sm text-slate-500">
+                    {new Date(lead.createdAt).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })}
                   </td>
 
-                  {/* Actions */}
-                  <td className="px-3 py-3 text-center">
+                  {/* 操作 */}
+                  <td className="px-4 py-3 text-center">
                     {viewMode === 'public_pool' ? (
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-7 gap-1 text-[11px]"
+                        className="h-8 gap-1.5 text-xs"
                         onClick={(e) => handleClaimLead(lead, e)}
                         disabled={claiming === lead.id || isConverted}
                       >
-                        <UserPlus className="h-3 w-3" />
-                        {claiming === lead.id ? '认领中' : '认领'}
+                        <UserPlus className="h-3.5 w-3.5" />
+                        {claiming === lead.id ? '认领中...' : '认领'}
                       </Button>
                     ) : isConverted ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 gap-1 text-[11px] text-[#2563eb]"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              onSelect?.(lead)
-                            }}
-                          >
-                            <ArrowUpRight className="h-3 w-3" />
-                            查看
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          <p className="text-[11px]">查看线索详情</p>
-                        </TooltipContent>
-                      </Tooltip>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 gap-1.5 text-xs text-blue-600 hover:text-blue-700"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onSelect?.(lead)
+                        }}
+                      >
+                        <ArrowUpRight className="h-3.5 w-3.5" />
+                        查看
+                      </Button>
                     ) : (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="h-7 w-7 p-0"
+                            className="h-8 w-8 p-0"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <MoreHorizontal className="h-4 w-4 text-[#9ca3af]" />
+                            <MoreHorizontal className="h-4 w-4 text-slate-400" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="text-[12px]">
+                        <DropdownMenuContent align="end" className="w-40">
                           <DropdownMenuItem
-                            className="text-[12px]"
                             onClick={(e) => {
                               e.stopPropagation()
                               onSelect?.(lead)
@@ -316,19 +308,18 @@ export function LeadTable({
                             查看详情
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            className="text-[12px]"
                             onClick={(e) => {
                               e.stopPropagation()
                               setLeadToConvert(lead)
                               setConvertDialogOpen(true)
                             }}
                           >
-                            <ArrowUpRight className="mr-1.5 h-3.5 w-3.5 text-[#2563eb]" />
+                            <ArrowUpRight className="mr-2 h-3.5 w-3.5 text-blue-600" />
                             转为商机
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
-                            className="text-[12px] text-red-600 focus:text-red-600"
+                            className="text-red-600 focus:text-red-600"
                             onClick={(e) => {
                               e.stopPropagation()
                               setLeadToReturn(lead)
@@ -346,16 +337,9 @@ export function LeadTable({
             })}
           </tbody>
         </table>
-
-        {leads.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <p className="text-[13px] text-[#6b7280]">暂无线索</p>
-            <p className="mt-1 text-[12px] text-[#9ca3af]">尝试切换视图或修改搜索条件</p>
-          </div>
-        )}
       </div>
 
-      {/* Convert dialog */}
+      {/* 转商机对话框 */}
       <ConvertToOppDialog
         lead={leadToConvert}
         isOpen={convertDialogOpen}
@@ -363,15 +347,13 @@ export function LeadTable({
         onSuccess={() => { onRefresh?.() }}
       />
 
-      {/* Return to pool confirm */}
+      {/* 退回公海确认 */}
       <AlertDialog open={returnDialogOpen} onOpenChange={setReturnDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>确认退回公海</AlertDialogTitle>
             <AlertDialogDescription>
-              确定要将线索{' '}
-              <span className="font-semibold text-[#111827]">{leadToReturn?.leadCode}</span>{' '}
-              退回公海吗？退回后其他销售可以认领该线索。
+              确定要将线索 <span className="font-semibold text-slate-900">{leadToReturn?.leadCode}</span> 退回公海吗？退回后其他销售可以认领该线索。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -385,6 +367,6 @@ export function LeadTable({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </TooltipProvider>
+    </>
   )
 }
