@@ -3,31 +3,33 @@
 import { createClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+
 export interface LeadRow {
   id: string
   organizationId: string
   leadCode: string
   personName: string
-  company?: string | null
-  position?: string | null
-  phone?: string | null
-  email?: string | null
-  wechat?: string | null
+  company: string | null
+  position: string | null
+  phone: string | null
+  email: string | null
+  wechat: string | null
   source: string
-  sourceDetail?: string | null
+  sourceDetail: string | null
   category: string
   urgency: string
-  status: 'NEW' | 'PUSHING' | 'CONVERTED' | 'LOST'
-  assignedToId?: string | null
-  nextFollowDate?: string | null
-  discardReason?: string | null
-  discardedAt?: string | null
-  discardedById?: string | null
-  notes?: string | null
+  status: string
+  assignedToId: string | null
+  nextFollowDate: string | null
+  discardReason: string | null
+  discardedAt: string | null
+  discardedById: string | null
+  notes: string | null
   createdAt: string
-  createdById?: string | null
+  createdById: string | null
   updatedAt: string
-  updatedById?: string | null
+  updatedById: string | null
 }
 
 export interface LeadFollowUpRow {
@@ -36,61 +38,40 @@ export interface LeadFollowUpRow {
   leadId: string
   followupType: string
   content: string
-  nextAction?: string | null
-  nextActionDate?: string | null
-  createdById?: string | null
+  nextAction: string | null
+  nextActionDate: string | null
+  createdById: string | null
   createdAt: string
 }
 
-// ─── getCurrentTenantId helper ─────────────────────────────────────────────────
+// ─── Helper Functions ────────────────────────────────────────────────────────
+
 async function getCurrentTenantId(): Promise<string> {
   const cookieStore = await cookies()
   return cookieStore.get('selectedTenant')?.value ?? 'org_bantu_id'
 }
 
-// ─── getLeadsAction ────────────────────────────────────────────────────────────
-export async function getLeadsAction(
-  viewMode: 'my_leads' | 'pool',
-  filters?: { status?: string; urgency?: string; searchText?: string },
-): Promise<LeadRow[]> {
+async function getCurrentUserId(): Promise<string | null> {
   const supabase = await createClient()
-
-  // Get current user
   const { data: { user } } = await supabase.auth.getUser()
-  const userId = user?.id
+  return user?.id ?? null
+}
 
-  // Get tenant from cookies
+// ─── Actions ─────────────────────────────────────────────────────────────────
+
+export async function getLeadsAction(viewMode: 'my_leads' | 'public_pool'): Promise<LeadRow[]> {
+  const supabase = await createClient()
   const tenantId = await getCurrentTenantId()
+  const userId = await getCurrentUserId()
 
-  if (!tenantId) {
-    console.error('[getLeadsAction] No tenantId found')
-    return []
-  }
+  let query = supabase.from('leads').select('*').eq('organizationId', tenantId)
 
-  let query = supabase
-    .from('leads')
-    .select('*')
-    .eq('organizationId', tenantId)
-
-  // Filter by view mode
   if (viewMode === 'my_leads') {
     if (!userId) return []
-    query = query.eq('assignedToId', userId)
+    query = query.eq('assignedToId', userId).neq('status', 'LOST')
   } else {
-    // 公海：无负责人的线索
-    query = query.is('assignedToId', null)
+    query = query.is('assignedToId', null).neq('status', 'LOST')
   }
-
-  // Apply filters
-  if (filters?.status) {
-    query = query.eq('status', filters.status)
-  }
-  if (filters?.urgency) {
-    query = query.eq('urgency', filters.urgency)
-  }
-
-  // Exclude discarded
-  query = query.neq('status', 'LOST')
 
   const { data, error } = await query.order('createdAt', { ascending: false })
 
@@ -102,88 +83,64 @@ export async function getLeadsAction(
   return (data ?? []) as LeadRow[]
 }
 
-// ─── createLeadAction ──────────────────────────────────────────────────────────
-export async function createLeadAction(input: {
+export async function createLeadAction(data: {
   personName: string
-  company?: string
-  position?: string
-  phone?: string
-  email?: string
-  wechat?: string
+  company?: string | null
+  position?: string | null
+  phone?: string | null
+  email?: string | null
+  wechat?: string | null
   source: string
-  sourceDetail?: string
+  sourceDetail?: string | null
   category: string
   urgency: string
-  notes?: string
+  notes?: string | null
 }): Promise<LeadRow | null> {
   const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  const userId = user?.id
-
   const tenantId = await getCurrentTenantId()
+  const userId = await getCurrentUserId()
 
-  if (!tenantId) {
-    console.error('[createLeadAction] No tenantId')
-    return null
-  }
+  const leadCode = `LEAD-${new Date().toISOString().split('T')[0].replace(/-/g, '')}-${Math.random().toString().slice(2, 6).padStart(4, '0')}`
 
-  // Generate lead code
-  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-  const leadCode = `LEAD-${today}-${Math.random().toString().slice(2, 6)}`
-
-  const { data, error } = await supabase
-    .from('leads')
-    .insert([
-      {
-        id: crypto.randomUUID(),
-        organizationId: tenantId,
-        leadCode,
-        personName: input.personName,
-        company: input.company || null,
-        position: input.position || null,
-        phone: input.phone || null,
-        email: input.email || null,
-        wechat: input.wechat || null,
-        source: input.source,
-        sourceDetail: input.sourceDetail || null,
-        category: input.category,
-        urgency: input.urgency,
-        status: 'NEW',
-        assignedToId: userId, // 自动分配给创建人
-        notes: input.notes || null,
-        createdById: userId,
-        updatedById: userId,
-      },
-    ])
-    .select('*')
-    .single()
+  const { data: inserted, error } = await supabase.from('leads').insert([{
+    id: crypto.randomUUID(),
+    organizationId: tenantId,
+    leadCode,
+    personName: data.personName.trim(),
+    company: data.company || null,
+    position: data.position || null,
+    phone: data.phone || null,
+    email: data.email || null,
+    wechat: data.wechat || null,
+    source: data.source,
+    sourceDetail: data.sourceDetail || null,
+    category: data.category,
+    urgency: data.urgency,
+    status: 'NEW',
+    assignedToId: userId,
+    nextFollowDate: null,
+    notes: data.notes || null,
+    createdById: userId,
+    updatedById: userId,
+  }]).select().single()
 
   if (error) {
     console.error('[createLeadAction] Error:', error.message)
     return null
   }
 
-  return data as LeadRow
+  return inserted as LeadRow
 }
 
-// ─── updateLeadStatusAction ────────────────────────────────────────────────────
-export async function updateLeadStatusAction(
-  leadId: string,
-  status: 'NEW' | 'PUSHING' | 'CONVERTED' | 'LOST',
-): Promise<LeadRow | null> {
+export async function updateLeadStatusAction(leadId: string, status: string): Promise<LeadRow | null> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const userId = await getCurrentUserId()
 
-  const { data, error } = await supabase
+  const { data: updated, error } = await supabase
     .from('leads')
-    .update({
-      status,
-      updatedById: user?.id,
-      updatedAt: new Date().toISOString(),
-    })
+    .update({ status, updatedById: userId, updatedAt: new Date().toISOString() })
     .eq('id', leadId)
-    .select('*')
+    .select()
     .single()
 
   if (error) {
@@ -191,28 +148,26 @@ export async function updateLeadStatusAction(
     return null
   }
 
-  return data as LeadRow
+  return updated as LeadRow
 }
 
-// ─── discardLeadAction ─────────────────────────────────────────────────────────
-export async function discardLeadAction(leadId: string): Promise<LeadRow | null> {
+export async function discardLeadAction(leadId: string, reason: string): Promise<LeadRow | null> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const userId = await getCurrentUserId()
 
-  // 丢失 = 放回公海（assignedToId=null）+ status=LOST
-  const { data, error } = await supabase
+  const { data: updated, error } = await supabase
     .from('leads')
     .update({
       status: 'LOST',
       assignedToId: null,
-      discardReason: 'manual_discard',
+      discardReason: reason,
       discardedAt: new Date().toISOString(),
-      discardedById: user?.id,
-      updatedById: user?.id,
+      discardedById: userId,
+      updatedById: userId,
       updatedAt: new Date().toISOString(),
     })
     .eq('id', leadId)
-    .select('*')
+    .select()
     .single()
 
   if (error) {
@@ -220,29 +175,23 @@ export async function discardLeadAction(leadId: string): Promise<LeadRow | null>
     return null
   }
 
-  return data as LeadRow
+  return updated as LeadRow
 }
 
-// ─── claimLeadAction ───────────────────────────────────────────────────────────
 export async function claimLeadAction(leadId: string): Promise<LeadRow | null> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const userId = await getCurrentUserId()
 
-  if (!user?.id) {
+  if (!userId) {
     console.error('[claimLeadAction] Not authenticated')
     return null
   }
 
-  const { data, error } = await supabase
+  const { data: updated, error } = await supabase
     .from('leads')
-    .update({
-      assignedToId: user.id,
-      updatedById: user.id,
-      updatedAt: new Date().toISOString(),
-    })
+    .update({ assignedToId: userId, updatedById: userId, updatedAt: new Date().toISOString() })
     .eq('id', leadId)
-    .is('assignedToId', null)
-    .select('*')
+    .select()
     .single()
 
   if (error) {
@@ -250,80 +199,39 @@ export async function claimLeadAction(leadId: string): Promise<LeadRow | null> {
     return null
   }
 
-  return data as LeadRow
+  return updated as LeadRow
 }
 
-// ─── setNextFollowDateAction ──────────────────────────────────────────────────
-export async function setNextFollowDateAction(
-  leadId: string,
-  nextFollowDate: string,
-): Promise<LeadRow | null> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  const { data, error } = await supabase
-    .from('leads')
-    .update({
-      nextFollowDate,
-      updatedById: user?.id,
-      updatedAt: new Date().toISOString(),
-    })
-    .eq('id', leadId)
-    .select('*')
-    .single()
-
-  if (error) {
-    console.error('[setNextFollowDateAction] Error:', error.message)
-    return null
-  }
-
-  return data as LeadRow
-}
-
-// ─── addLeadFollowUpAction ─────────────────────────────────────────────────────
-export async function addLeadFollowUpAction(input: {
+export async function addLeadFollowUpAction(data: {
   leadId: string
   followupType: string
   content: string
-  nextAction?: string
-  nextActionDate?: string
+  nextAction?: string | null
+  nextActionDate?: string | null
 }): Promise<LeadFollowUpRow | null> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
   const tenantId = await getCurrentTenantId()
+  const userId = await getCurrentUserId()
 
-  if (!tenantId) {
-    console.error('[addLeadFollowUpAction] No tenantId')
-    return null
-  }
-
-  const { data, error } = await supabase
-    .from('lead_follow_ups')
-    .insert([
-      {
-        id: crypto.randomUUID(),
-        organizationId: tenantId,
-        leadId: input.leadId,
-        followupType: input.followupType,
-        content: input.content,
-        nextAction: input.nextAction || null,
-        nextActionDate: input.nextActionDate || null,
-        createdById: user?.id,
-      },
-    ])
-    .select('*')
-    .single()
+  const { data: inserted, error } = await supabase.from('lead_follow_ups').insert([{
+    id: crypto.randomUUID(),
+    organizationId: tenantId,
+    leadId: data.leadId,
+    followupType: data.followupType,
+    content: data.content.trim(),
+    nextAction: data.nextAction || null,
+    nextActionDate: data.nextActionDate || null,
+    createdById: userId,
+  }]).select().single()
 
   if (error) {
     console.error('[addLeadFollowUpAction] Error:', error.message)
     return null
   }
 
-  return data as LeadFollowUpRow
+  return inserted as LeadFollowUpRow
 }
 
-// ─── getLeadFollowUpsAction ───────────────────────────────────────────────────
 export async function getLeadFollowUpsAction(leadId: string): Promise<LeadFollowUpRow[]> {
   const supabase = await createClient()
 
