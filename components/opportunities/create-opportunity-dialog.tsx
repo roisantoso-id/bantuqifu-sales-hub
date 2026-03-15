@@ -49,6 +49,7 @@ export function CreateOpportunityDialog({
     currency: 'IDR',
     requirements: '',
     expectedCloseDate: '',
+    wechatGroupName: '',
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -56,6 +57,11 @@ export function CreateOpportunityDialog({
 
     if (!formData.title.trim()) {
       toast.error('请输入商机标题')
+      return
+    }
+
+    if (!formData.wechatGroupName.trim()) {
+      toast.error('请输入企微群业务概括')
       return
     }
 
@@ -75,6 +81,7 @@ export function CreateOpportunityDialog({
         currency: formData.currency,
         requirements: formData.requirements,
         expectedCloseDate: formData.expectedCloseDate || undefined,
+        wechatGroupName: formData.wechatGroupName || undefined,
       })
 
       if (result.success && result.data) {
@@ -87,6 +94,7 @@ export function CreateOpportunityDialog({
           currency: 'IDR',
           requirements: '',
           expectedCloseDate: '',
+          wechatGroupName: '',
         })
         // 刷新页面数据
         router.refresh()
@@ -195,6 +203,21 @@ export function CreateOpportunityDialog({
               value={formData.expectedCloseDate}
               onChange={(e) => handleChange('expectedCloseDate', e.target.value)}
             />
+          </div>
+
+          {/* 企微群 */}
+          <div className="space-y-1.5">
+            <Label htmlFor="wechatGroupName">
+              企微群业务概括 <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="wechatGroupName"
+              value={formData.wechatGroupName}
+              onChange={(e) => handleChange('wechatGroupName', e.target.value)}
+              placeholder="例如：山海图代理商"
+              required
+            />
+            <p className="text-[11px] text-slate-400">系统自动分配编号，如 2026010山海图代理商</p>
           </div>
 
           {/* 需求描述 */}

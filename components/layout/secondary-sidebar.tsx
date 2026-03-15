@@ -86,7 +86,7 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect, onToggle
       opp.customer.name.includes(query) ||
       opp.customer.passportNo.toLowerCase().includes(query.toLowerCase()) ||
       opp.serviceTypeLabel.includes(query) ||
-      (opp.destination?.includes(query) ?? false)
+      (opp.requirements?.includes(query) ?? false)
     const matchesStage = !activeGroup || activeGroup.stages.includes(opp.stageId)
     return matchesQuery && matchesStage
   })
@@ -115,7 +115,7 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect, onToggle
           <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-[#9ca3af]" />
           <input
             type="text"
-            placeholder="搜索客户、护照号..."
+            placeholder="搜索客户、商机编号..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="h-7 w-full rounded-sm border border-[#e5e7eb] bg-[#f9fafb] pl-6 pr-2 text-[12px] text-[#111827] placeholder-[#9ca3af] outline-none focus:border-[#2563eb] focus:bg-white"
@@ -225,14 +225,20 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect, onToggle
                   </div>
                 </div>
 
-                {/* Row 2: passport + destination */}
-                <div className="mt-0.5 flex items-center justify-between">
-                  <span className="font-mono text-[11px] text-[#9ca3af]">
+                {/* Row 2: opportunity code + wechat group or requirements */}
+                <div className="mt-0.5 flex items-center justify-between gap-2">
+                  <span className="font-mono text-[11px] text-[#9ca3af] shrink-0">
                     {opp.customer.passportNo}
                   </span>
-                  <span className="text-[11px] text-[#6b7280]">
-                    {opp.destination ?? '—'}
-                  </span>
+                  {opp.wechatGroupId ? (
+                    <span className="truncate text-[11px] text-[#6b7280]">
+                      {opp.wechatGroupId}{opp.wechatGroupName ? opp.wechatGroupName.slice(0, 10) : ''}
+                    </span>
+                  ) : (
+                    <span className="truncate text-[11px] text-[#6b7280]">
+                      {opp.requirements ? opp.requirements.slice(0, 20) : '—'}
+                    </span>
+                  )}
                 </div>
 
                 {/* Row 3: service badge + stage pill + assignee */}

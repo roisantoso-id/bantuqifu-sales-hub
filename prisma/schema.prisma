@@ -182,7 +182,11 @@ model Lead {
   budgetCurrency        String    @default("CNY")
   urgency               LeadUrgency @default(MEDIUM)
   initialIntent         String    // 初步意向备注
-  
+
+  // 客户关联
+  customerId            String?
+  customer              Customer? @relation(fields: [customerId], references: [id])
+
   // 跟进逻辑
   assigneeId            String?
   assignee              User?     @relation("LeadAssignee", fields: [assigneeId], references: [id])
@@ -478,6 +482,10 @@ model Opportunity {
   
   assigneeId              String
   assignee                User @relation("OpportunityAssignee", fields: [assigneeId], references: [id])
+
+  // 企微群
+  wechatGroupId           Int?     // 企微群编号（从 wechat_group_sequences 分配）
+  wechatGroupName         String?  // 业务概括，如"山海图代理商"
 
   // 置顶功能：存储置顶该商机的用户ID列表
   pinnedByUsers           String[] @default([])
@@ -835,8 +843,16 @@ model CustomerLevelDict {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// ── SYSTEM COUNTER (语义化 ID 生成计数器) ──────────────────────────────────────
+// ── WECHAT GROUP SEQUENCE (企微群编号自增表) ────────────────────────────────────
 // ════════════════════════════════════════════════════════════════════════════════
+
+model WechatGroupSequence {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+
+  @@map("wechat_group_sequences")
+}
+
 
 model SystemCounter {
   id        String   @id // 格式：OPP_20260315，CUS_20260315，LED_20260315

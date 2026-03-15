@@ -192,6 +192,147 @@ async function main() {
   console.log(`   ✓ admin 分配到班兔中国 (ADMIN 角色)\n`)
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // 第六步：创建测试数据（客户、线索、商机）
+  // ═══════════════════════════════════════════════════════════════════════════
+  console.log('📊 6. 创建测试数据...')
+
+  // 创建客户
+  const customers = await Promise.all([
+    prisma.customer.create({
+      data: {
+        organizationId: orgID.id,
+        customerId: 'CUS-260315-0001',
+        customerName: '极兔物流-总办',
+        level: 'L4',
+        phone: '+62-21-12345678',
+        email: 'jtexpress@example.com',
+      },
+    }),
+    prisma.customer.create({
+      data: {
+        organizationId: orgID.id,
+        customerId: 'CUS-260315-0002',
+        customerName: '青山矿业-苏拉威西项目',
+        level: 'L3',
+        phone: '+62-21-23456789',
+      },
+    }),
+    prisma.customer.create({
+      data: {
+        organizationId: orgID.id,
+        customerId: 'CUS-260315-0003',
+        customerName: '华为印尼-人力资源部',
+        level: 'L3',
+        email: 'hr@huawei-id.com',
+      },
+    }),
+  ])
+  console.log(`   ✓ 创建了 ${customers.length} 个客户`)
+
+  // 创建线索
+  const leads = await Promise.all([
+    prisma.lead.create({
+      data: {
+        organizationId: orgID.id,
+        leadCode: 'LEAD-260315-0001',
+        personName: '王总',
+        company: '山海图贸易',
+        phone: '+86-138-0013-8000',
+        source: 'wechat',
+        category: 'VISA',
+        budgetMin: 5000,
+        budgetMax: 10000,
+        budgetCurrency: 'CNY',
+        urgency: 'HIGH',
+        initialIntent: '想办 B1 签证，自雇商人',
+        status: 'new',
+        assigneeId: testUser.id,
+        nextFollowDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+        notes: '客户来自微信群，对B1签证很感兴趣',
+      },
+    }),
+    prisma.lead.create({
+      data: {
+        organizationId: orgID.id,
+        leadCode: 'LEAD-260315-0002',
+        personName: '李经理',
+        company: '深圳科技公司',
+        phone: '+86-138-0013-8001',
+        source: 'referral',
+        category: 'COMPANY_REGISTRATION',
+        budgetMin: 50000,
+        budgetMax: 100000,
+        budgetCurrency: 'CNY',
+        urgency: 'MEDIUM',
+        initialIntent: '想在印尼注册PMA公司',
+        status: 'contacted',
+        assigneeId: testUser.id,
+        nextFollowDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+      },
+    }),
+  ])
+  console.log(`   ✓ 创建了 ${leads.length} 个线索`)
+
+  // 创建商机
+  const opportunities = await Promise.all([
+    prisma.opportunity.create({
+      data: {
+        id: 'OPP-260315-0001',
+        organizationId: orgID.id,
+        opportunityCode: 'OPP-260315-0001',
+        customerId: customers[0].id,
+        stageId: 'P1',
+        status: 'active',
+        serviceType: 'VISA',
+        serviceTypeLabel: '签证服务',
+        estimatedAmount: 15000000,
+        currency: 'IDR',
+        requirements: '需要办理10个B1签证',
+        assigneeId: testUser.id,
+        wechatGroupId: 2026010,
+        wechatGroupName: '极兔物流签证项目',
+      },
+    }),
+    prisma.opportunity.create({
+      data: {
+        id: 'OPP-260315-0002',
+        organizationId: orgID.id,
+        opportunityCode: 'OPP-260315-0002',
+        customerId: customers[1].id,
+        stageId: 'P2',
+        status: 'active',
+        serviceType: 'COMPANY_REGISTRATION',
+        serviceTypeLabel: '公司注册',
+        estimatedAmount: 25000000,
+        currency: 'IDR',
+        requirements: '注册PMA公司，矿业相关',
+        assigneeId: testUser.id,
+        wechatGroupId: 2026011,
+        wechatGroupName: '青山矿业公司注册',
+      },
+    }),
+    prisma.opportunity.create({
+      data: {
+        id: 'OPP-260315-0003',
+        organizationId: orgID.id,
+        opportunityCode: 'OPP-260315-0003',
+        customerId: customers[2].id,
+        stageId: 'P3',
+        status: 'active',
+        serviceType: 'IMMIGRATION',
+        serviceTypeLabel: '移民服务',
+        estimatedAmount: 50000000,
+        currency: 'IDR',
+        requirements: '批量办理工作签证',
+        assigneeId: testUser.id,
+        wechatGroupId: 2026012,
+        wechatGroupName: '华为工签批量办理',
+      },
+    }),
+  ])
+  console.log(`   ✓ 创建了 ${opportunities.length} 个商机\n`)
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // 完成
   // ═══════════════════════════════════════════════════════════════════════════
   console.log('✅ 多租户 RBAC 系统初始化完成！')

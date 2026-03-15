@@ -21,6 +21,8 @@ export interface OpportunityRow {
   expectedCloseDate?: string | null
   actualCloseDate?: string | null
   pinnedByUsers?: string[]
+  wechatGroupId?: number | null
+  wechatGroupName?: string | null
   createdAt: string
   updatedAt: string
   customer?: {
@@ -85,6 +87,24 @@ export async function getOpportunityTimelineAction(oppId: string) {
   }
 }
 
+// ─── allocateWechatGroupIdAction ──────────────────────────────────────────────
+// 原子性分配企微群编号，防止并发重复
+export async function allocateWechatGroupIdAction(): Promise<{ success: boolean; groupId?: number; error?: string }> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('wechat_group_sequences')
+    .insert({})
+    .select('id')
+    .single()
+
+  if (error || !data) {
+    console.error('[allocateWechatGroupIdAction] Error:', error)
+    return { success: false, error: '分配企微群编号失败，请稍后重试' }
+  }
+
+  return { success: true, groupId: data.id }
+}
+
 // ─── createOpportunityAction ───────────────────────────────────────────────────
 // 手动新建商机（非线索转化）
 export async function createOpportunityAction(data: {
@@ -95,6 +115,7 @@ export async function createOpportunityAction(data: {
   currency?: string
   requirements?: string
   expectedCloseDate?: string
+  wechatGroupName?: string
 }): Promise<{ success: boolean; data?: OpportunityRow; error?: string }> {
   const supabase = await createClient()
   const tenantId = await getCurrentTenantId()
@@ -115,14 +136,24 @@ export async function createOpportunityAction(data: {
   const randomSuffix = Math.random().toString().slice(2, 6)
   const opportunityCode = `OPP-${today}-${randomSuffix}`
 
+  // 如果填写了企微群名称，原子性分配编号
+  let wechatGroupId: number | null = null
+  if (data.wechatGroupName?.trim()) {
+    const allocated = await allocateWechatGroupIdAction()
+    if (!allocated.success || !allocated.groupId) {
+      return { success: false, error: '分配企微群编号失败，请稍后重试' }
+    }
+    wechatGroupId = allocated.groupId
+  }
+
   // 创建商机
   const opportunityData = {
-    id: crypto.randomUUID(),
+    id: opportunityCode,
     organizationId: tenantId,
     opportunityCode,
     customerId: data.customerId,
-    convertedFromLeadId: null, // 手动新建，无线索来源
-    stageId: 'P1', // 默认进入 P1 初步接触阶段
+    convertedFromLeadId: null,
+    stageId: 'P1',
     status: 'active',
     serviceType: data.serviceType,
     serviceTypeLabel: data.serviceType,
@@ -132,6 +163,8 @@ export async function createOpportunityAction(data: {
     notes: '',
     assigneeId: userId,
     expectedCloseDate: data.expectedCloseDate || null,
+    wechatGroupId,
+    wechatGroupName: data.wechatGroupName?.trim() || null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }
@@ -144,7 +177,7 @@ export async function createOpportunityAction(data: {
 
   if (oppError || !opportunity) {
     console.error('[createOpportunityAction] Create error:', oppError)
-    return { success: false, error: `创建商机失败: ${oppError?.message || '未知错误'}` }
+    return { success: false, error: '创建商机失败，请稍后重试' }
   }
 
   // 记录系统日志
@@ -173,6 +206,8 @@ export async function getOpportunitiesAction(filters?: {
 }): Promise<OpportunityRow[]> {
   const supabase = await createClient()
   const tenantId = await getCurrentTenantId()
+
+  console.log('[getOpportunitiesAction] tenantId:', tenantId)
 
   if (!tenantId) {
     console.error('[getOpportunitiesAction] No tenantId found')
@@ -206,6 +241,8 @@ export async function getOpportunitiesAction(filters?: {
   }
 
   const { data, error } = await query.order('createdAt', { ascending: false })
+
+  console.log('[getOpportunitiesAction] Query result:', { count: data?.length || 0, error: error?.message })
 
   if (error) {
     console.error('[getOpportunitiesAction] Error:', error.message)
@@ -259,7 +296,7 @@ export async function updateOpportunityStageAction(
 
   if (error) {
     console.error('[updateOpportunityStageAction] Error:', error.message)
-    return { success: false, error: error.message }
+    return { success: false, error: '更新商机阶段失败，请稍后重试' }
   }
 
   // 记录阶段变更日志
@@ -306,7 +343,7 @@ export async function updateOpportunityAction(
 
   if (error) {
     console.error('[updateOpportunityAction] Error:', error.message)
-    return { success: false, error: error.message }
+    return { success: false, error: '更新商机失败，请稍后重试' }
   }
 
   return { success: true }
@@ -368,7 +405,7 @@ export async function toggleOpportunityPinAction(
 
   if (updateError) {
     console.error('[toggleOpportunityPinAction] Update error:', updateError.message)
-    return { success: false, error: updateError.message }
+    return { success: false, error: '操作失败，请稍后重试' }
   }
 
   return { success: true }

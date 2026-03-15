@@ -56,12 +56,21 @@ function isStagnant(lead: LeadRow): boolean {
   return daysSince > 7
 }
 
-function getRecycleCountdown(lead: LeadRow): number | null {
-  if (lead.status !== 'NEW') return null
-  const created = new Date(lead.createdAt)
-  const hoursSince = Math.floor((Date.now() - created.getTime()) / (1000 * 60 * 60))
-  const remaining = 48 - hoursSince
-  return remaining > 0 ? remaining : 0
+function getRecycleCountdown(lead: LeadRow): { hours: number; isUrgent: boolean } | null {
+  // 已转化的线索不显示倒计时
+  if (lead.convertedOpportunityId || lead.status === 'CONVERTED') return null
+
+  // 只有已分配的线索才有回收倒计时
+  if (!lead.assigneeId) return null
+
+  const lastAction = lead.lastActionAt ? new Date(lead.lastActionAt) : new Date(lead.createdAt)
+  const hoursSince = Math.floor((Date.now() - lastAction.getTime()) / (1000 * 60 * 60))
+  const remaining = 7 * 24 - hoursSince // 7天 = 168小时
+
+  if (remaining <= 0) return { hours: 0, isUrgent: true }
+  if (remaining <= 24) return { hours: remaining, isUrgent: true } // 最后24小时标红
+
+  return { hours: remaining, isUrgent: false }
 }
 
 export function LeadTable({
@@ -204,7 +213,7 @@ export function LeadTable({
                     )}
                   </td>
                   <td className="py-2.5 px-3">
-                    <div className="font-medium text-slate-900">{lead.personName}</div>
+                    <div className="font-medium text-slate-900">{lead.wechatName}</div>
                     {lead.company && <div className="text-slate-500 text-[11px]">{lead.company}</div>}
                   </td>
                   <td className="py-2.5 px-3">
@@ -225,10 +234,10 @@ export function LeadTable({
                   <td className="py-2.5 px-3 text-slate-600">{getLeadSourceLabel(lead.source)}</td>
                   {viewMode === 'my_leads' && (
                     <td className="py-2.5 px-3">
-                      {countdown !== null && (
-                        <div className={`flex items-center gap-1 ${countdown < 12 ? 'text-red-600' : 'text-amber-600'}`}>
+                      {countdown && (
+                        <div className={`flex items-center gap-1 ${countdown.isUrgent ? 'text-red-600' : 'text-amber-600'}`}>
                           <Clock className="h-3 w-3" />
-                          <span>{countdown}h</span>
+                          <span>{countdown.hours}h</span>
                         </div>
                       )}
                     </td>

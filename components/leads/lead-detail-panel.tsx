@@ -17,8 +17,10 @@ import {
   Briefcase,
   Clock,
   Send,
+  Edit,
+  Save,
 } from 'lucide-react'
-import { getLeadFollowUpsAction, addLeadFollowUpAction, type LeadRow, type LeadFollowUpRow } from '@/app/actions/lead'
+import { getLeadFollowUpsAction, addLeadFollowUpAction, updateLeadAction, type LeadRow, type LeadFollowUpRow } from '@/app/actions/lead'
 import { toast } from 'sonner'
 import {
   getLeadStatusLabel,
@@ -39,13 +41,27 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
   const [isLoading, setIsLoading] = useState(true)
   const [followUpNote, setFollowUpNote] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editForm, setEditForm] = useState({
+    wechatName: '',
+    phone: '',
+    initialIntent: '',
+    notes: '',
+  })
 
   // 判断是否已转化为商机（只读模式）
-  const isReadOnly = lead?.status === 'CONVERTED'
+  const isReadOnly = lead?.status === 'CONVERTED' || lead?.convertedOpportunityId
 
   useEffect(() => {
     if (isOpen && lead?.id) {
       setIsLoading(true)
+      setIsEditing(false)
+      setEditForm({
+        wechatName: lead.wechatName || '',
+        phone: lead.phone || '',
+        initialIntent: lead.initialIntent || '',
+        notes: lead.notes || '',
+      })
       getLeadFollowUpsAction(lead.id)
         .then(data => {
           setFollowUps(data)
@@ -90,6 +106,28 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
     }
   }
 
+  const handleSaveEdit = async () => {
+    if (!lead?.id) return
+
+    setIsSaving(true)
+    try {
+      const result = await updateLeadAction(lead.id, editForm)
+      if (result.success) {
+        toast.success('线索信息已更新')
+        setIsEditing(false)
+        // 刷新页面以显示最新数据
+        window.location.reload()
+      } else {
+        toast.error(result.error || '更新失败')
+      }
+    } catch (error) {
+      console.error('Update lead error:', error)
+      toast.error('更新失败，请重试')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   if (!lead) return null
 
   return (
@@ -109,7 +147,7 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5">
                 <h2 className="text-[13px] font-semibold text-[#111827] truncate">
-                  {lead.personName}
+                  {lead.wechatName}
                 </h2>
                 {isReadOnly && (
                   <Badge className="h-4 text-[10px] bg-[#dbeafe] text-[#1e40af] border-0">
@@ -123,6 +161,23 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
               <Badge className="h-5 text-[10px] bg-[#f3f4f6] text-[#374151] border-0">
                 {getLeadUrgencyLabel(lead.urgency)}
               </Badge>
+              {!isReadOnly && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-[#6b7280] hover:text-[#111827] hover:bg-[#f3f4f6]"
+                  onClick={() => isEditing ? handleSaveEdit() : setIsEditing(true)}
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : isEditing ? (
+                    <Save className="h-3 w-3" />
+                  ) : (
+                    <Edit className="h-3 w-3" />
+                  )}
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -150,42 +205,51 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
           <div className="px-4 py-3 space-y-2">
             <div className="text-[11px] font-medium text-[#6b7280] mb-2">基本信息</div>
 
-            {/* 两列紧凑布局 */}
-            <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-[12px]">
-              <div className="flex items-center gap-2">
-                <Building2 className="h-3 w-3 text-[#9ca3af] shrink-0" />
-                <span className="text-[#6b7280] truncate">
-                  {lead.company || '—'}
-                </span>
-              </div>
+            {/* 微信名 */}
+            <div className="space-y-1">
+              <div className="text-[10px] text-[#9ca3af]">微信名/称呼</div>
+              {isEditing ? (
+                <Input
+                  value={editForm.wechatName}
+                  onChange={(e) => setEditForm({...editForm, wechatName: e.target.value})}
+                  className="h-7 text-[12px]"
+                />
+              ) : (
+                <div className="text-[12px] text-[#6b7280]">{lead.wechatName || '—'}</div>
+              )}
+            </div>
 
-              <div className="flex items-center gap-2">
-                <Briefcase className="h-3 w-3 text-[#9ca3af] shrink-0" />
-                <span className="text-[#6b7280] truncate">
-                  {lead.position || '—'}
-                </span>
-              </div>
+            {/* 电话 */}
+            <div className="space-y-1">
+              <div className="text-[10px] text-[#9ca3af]">电话</div>
+              {isEditing ? (
+                <Input
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
+                  className="h-7 text-[12px]"
+                />
+              ) : (
+                <div className="flex items-center gap-2 text-[12px]">
+                  <Phone className="h-3 w-3 text-[#9ca3af]" />
+                  <span className="text-[#6b7280]">{lead.phone || '—'}</span>
+                </div>
+              )}
+            </div>
 
-              <div className="flex items-center gap-2">
-                <Phone className="h-3 w-3 text-[#9ca3af] shrink-0" />
-                <span className="text-[#6b7280] truncate">
-                  {lead.phone || '—'}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Mail className="h-3 w-3 text-[#9ca3af] shrink-0" />
-                <span className="text-[#6b7280] truncate">
-                  {lead.email || '—'}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 col-span-2">
-                <MessageCircle className="h-3 w-3 text-[#9ca3af] shrink-0" />
-                <span className="text-[#6b7280] truncate">
-                  {lead.wechat || '—'}
-                </span>
-              </div>
+            {/* 初步意向 */}
+            <div className="space-y-1">
+              <div className="text-[10px] text-[#9ca3af]">初步意向</div>
+              {isEditing ? (
+                <Textarea
+                  value={editForm.initialIntent}
+                  onChange={(e) => setEditForm({...editForm, initialIntent: e.target.value})}
+                  className="min-h-[60px] text-[12px]"
+                />
+              ) : (
+                <div className="text-[12px] text-[#6b7280] leading-relaxed">
+                  {lead.initialIntent || '—'}
+                </div>
+              )}
             </div>
           </div>
 
@@ -215,12 +279,21 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
               </div>
             </div>
 
-            {lead.notes && (
+            {(lead.notes || isEditing) && (
               <div className="mt-3">
                 <div className="text-[10px] text-[#9ca3af] mb-1">备注</div>
-                <p className="text-[11px] text-[#374151] leading-relaxed">
-                  {lead.notes}
-                </p>
+                {isEditing ? (
+                  <Textarea
+                    value={editForm.notes}
+                    onChange={(e) => setEditForm({...editForm, notes: e.target.value})}
+                    className="min-h-[60px] text-[11px]"
+                    placeholder="添加备注..."
+                  />
+                ) : (
+                  <p className="text-[11px] text-[#374151] leading-relaxed">
+                    {lead.notes}
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -274,6 +347,11 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
                               minute: '2-digit'
                             })}
                           </span>
+                          {followUp.operator && (
+                            <span className="text-[10px] text-[#6b7280]">
+                              · {followUp.operator.name || followUp.operator.email}
+                            </span>
+                          )}
                         </div>
                         <p className="text-[11px] text-[#374151] leading-relaxed">
                           {followUp.content}

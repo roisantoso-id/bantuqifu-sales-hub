@@ -67,13 +67,13 @@ export async function createInteractionAction(data: {
 
     if (error) {
       console.error('[createInteractionAction] insert error:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: '创建记录失败，请稍后重试' }
     }
 
     return { success: true, data: inserted }
   } catch (err) {
     console.error('[createInteractionAction] exception:', err)
-    return { success: false, error: String(err) }
+    return { success: false, error: '系统错误，请稍后重试' }
   }
 }
 
@@ -109,13 +109,13 @@ export async function getTimelineAction(data: {
 
     if (error) {
       console.error('[getTimelineAction] query error:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: '获取时间线失败，请稍后重试' }
     }
 
     return { success: true, data: interactions || [] }
   } catch (err) {
     console.error('[getTimelineAction] exception:', err)
-    return { success: false, error: String(err) }
+    return { success: false, error: '系统错误，请稍后重试' }
   }
 }
 
@@ -150,13 +150,13 @@ export async function updateInteractionAction(data: {
 
     if (error) {
       console.error('[updateInteractionAction] update error:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: '更新记录失败，请稍后重试' }
     }
 
     return { success: true, data: updated }
   } catch (err) {
     console.error('[updateInteractionAction] exception:', err)
-    return { success: false, error: String(err) }
+    return { success: false, error: '系统错误，请稍后重试' }
   }
 }
 
@@ -177,13 +177,13 @@ export async function deleteInteractionAction(data: {
 
     if (error) {
       console.error('[deleteInteractionAction] delete error:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: '删除记录失败，请稍后重试' }
     }
 
     return { success: true }
   } catch (err) {
     console.error('[deleteInteractionAction] exception:', err)
-    return { success: false, error: String(err) }
+    return { success: false, error: '系统错误，请稍后重试' }
   }
 }
 
@@ -214,13 +214,13 @@ export async function addInteractionAttachmentAction(data: {
 
     if (error) {
       console.error('[addInteractionAttachmentAction] insert error:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: '添加附件失败，请稍后重试' }
     }
 
     return { success: true, data: inserted }
   } catch (err) {
     console.error('[addInteractionAttachmentAction] exception:', err)
-    return { success: false, error: String(err) }
+    return { success: false, error: '系统错误，请稍后重试' }
   }
 }
 
@@ -240,13 +240,13 @@ export async function getInteractionAttachmentsAction(data: {
 
     if (error) {
       console.error('[getInteractionAttachmentsAction] query error:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: '获取附件失败，请稍后重试' }
     }
 
     return { success: true, data: attachments || [] }
   } catch (err) {
     console.error('[getInteractionAttachmentsAction] exception:', err)
-    return { success: false, error: String(err) }
+    return { success: false, error: '系统错误，请稍后重试' }
   }
 }
 
@@ -265,13 +265,13 @@ export async function deleteInteractionAttachmentAction(data: {
 
     if (error) {
       console.error('[deleteInteractionAttachmentAction] delete error:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: '删除附件失败，请稍后重试' }
     }
 
     return { success: true }
   } catch (err) {
     console.error('[deleteInteractionAttachmentAction] exception:', err)
-    return { success: false, error: String(err) }
+    return { success: false, error: '系统错误，请稍后重试' }
   }
 }
 
@@ -301,12 +301,12 @@ export async function getOpportunityTimelineWithLeadHistoryAction(data: {
 
     if (error) {
       console.error('[getOpportunityTimelineWithLeadHistoryAction] query error:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: '获取时间线失败，请稍后重试' }
     }
 
     return { success: true, data: interactions || [] }
   } catch (err) {
     console.error('[getOpportunityTimelineWithLeadHistoryAction] exception:', err)
-    return { success: false, error: String(err) }
+    return { success: false, error: '系统错误，请稍后重试' }
   }
 }

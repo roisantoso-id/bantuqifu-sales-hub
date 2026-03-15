@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, AlertCircle } from 'lucide-react'
@@ -39,6 +40,7 @@ export function ConvertToOppDialog({
 }: ConvertToOppDialogProps) {
   const [customers, setCustomers] = useState<CustomerRow[]>([])
   const [selectedCustomerId, setSelectedCustomerId] = useState('')
+  const [wechatGroupName, setWechatGroupName] = useState('')
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -46,6 +48,10 @@ export function ConvertToOppDialog({
   useEffect(() => {
     if (isOpen) {
       setIsLoadingCustomers(true)
+      // 如果线索已关联客户，自动填充
+      if (lead?.customerId) {
+        setSelectedCustomerId(lead.customerId)
+      }
       getCustomersAction()
         .then((data) => {
           setCustomers(data)
@@ -57,7 +63,7 @@ export function ConvertToOppDialog({
           setIsLoadingCustomers(false)
         })
     }
-  }, [isOpen])
+  }, [isOpen, lead?.customerId])
 
   const handleConvert = async () => {
     if (!lead) return
@@ -67,26 +73,24 @@ export function ConvertToOppDialog({
       return
     }
 
+    if (!wechatGroupName.trim()) {
+      toast.error('请输入企微群业务概括')
+      return
+    }
+
     setIsSubmitting(true)
 
     try {
-      console.log('🚀 Converting lead:', { leadId: lead.id, customerId: selectedCustomerId })
-      const result = await convertLeadToOpportunityAction(lead.id, selectedCustomerId)
-      console.log('✅ Convert result:', result)
+      const result = await convertLeadToOpportunityAction(lead.id, selectedCustomerId, wechatGroupName.trim())
 
       if (result.success) {
         toast.success(`转化成功！已生成商机 ${result.opportunityId}`)
-        // 重置选择状态
         setSelectedCustomerId('')
-        // 先调用成功回调刷新数据
+        setWechatGroupName('')
         onSuccess()
-        // 延迟关闭对话框，确保状态更新完成
-        setTimeout(() => {
-          onClose()
-        }, 100)
+        setTimeout(() => { onClose() }, 100)
       } else {
         toast.error(result.error || '转化失败')
-        console.error('❌ Convert failed:', result.error)
       }
     } catch (error) {
       console.error('❌ Convert error:', error)
@@ -117,7 +121,7 @@ export function ConvertToOppDialog({
                   <span className="font-medium">线索编号:</span> {lead.leadCode}
                 </div>
                 <div>
-                  <span className="font-medium">联系人:</span> {lead.personName}
+                  <span className="font-medium">联系人:</span> {lead.wechatName}
                 </div>
                 <div>
                   <span className="font-medium">意向分类:</span> {lead.category}
@@ -130,6 +134,20 @@ export function ConvertToOppDialog({
               </div>
             </AlertDescription>
           </Alert>
+
+          {/* 企微群业务概括 */}
+          <div className="space-y-2">
+            <Label htmlFor="wechat-group-name">
+              企微群业务概括 <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="wechat-group-name"
+              value={wechatGroupName}
+              onChange={(e) => setWechatGroupName(e.target.value)}
+              placeholder="例如：山海图代理商"
+            />
+            <p className="text-xs text-slate-500">系统将自动分配编号，如 2026010山海图代理商</p>
+          </div>
 
           {/* 客户选择 */}
           <div className="space-y-2">
@@ -190,7 +208,7 @@ export function ConvertToOppDialog({
           </Button>
           <Button
             onClick={handleConvert}
-            disabled={isSubmitting || !selectedCustomerId || isLoadingCustomers}
+            disabled={isSubmitting || !selectedCustomerId || !wechatGroupName.trim() || isLoadingCustomers}
           >
             {isSubmitting ? (
               <>

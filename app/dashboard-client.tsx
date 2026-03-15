@@ -233,7 +233,7 @@ export function DashboardClient({
               customer: {
                 id: opp.customer?.id || opp.customerId,
                 name: opp.customer?.customerName || '未知客户',
-                passportNo: opp.customer?.customerId || '',
+                passportNo: opp.opportunityCode,
                 phone: '',
                 email: '',
                 wechat: '',
@@ -252,6 +252,8 @@ export function DashboardClient({
               destination: undefined,
               travelDate: undefined,
               assignee: '',
+              wechatGroupId: opp.wechatGroupId ?? null,
+              wechatGroupName: opp.wechatGroupName ?? null,
               createdAt: opp.createdAt,
               updatedAt: opp.updatedAt,
               expectedCloseDate: opp.expectedCloseDate || undefined,

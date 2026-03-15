@@ -82,7 +82,7 @@ export async function getCustomersAction(): Promise<CustomerRow[]> {
 
   if (error) {
     console.error('[customer action] getCustomers error:', error.message)
-    throw new Error(error.message)
+    throw new Error('获取客户列表失败，请稍后重试')
   }
 
   return (data ?? []).map((c: any) => {
@@ -249,7 +249,7 @@ export async function createCustomerAction(data: {
 
     if (error) {
       console.error('[customer action] createCustomer error:', error.message)
-      throw new Error(error.message)
+      throw new Error('创建客户失败，请稍后重试')
     }
 
     return {

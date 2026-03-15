@@ -274,6 +274,8 @@ export interface Opportunity {
   destination?: string
   travelDate?: string
   assignee: string
+  wechatGroupId?: number | null
+  wechatGroupName?: string | null
   p2Data?: OpportunityP2Data[] // P2阶段选中的产品
   p3Data?: OpportunityP3Data[] // P3阶段的报价数据
   p4Data?: OpportunityP4Data // P4: 合同签署

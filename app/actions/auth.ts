@@ -11,7 +11,7 @@ export async function signOut() {
 
   if (error) {
     console.error('Sign out error:', error)
-    return { error: error.message }
+    return { error: '退出登录失败，请稍后重试' }
   }
 
   revalidatePath('/', 'layout')

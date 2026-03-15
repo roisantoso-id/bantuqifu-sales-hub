@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Loader2 } from 'lucide-react'
 import { createLeadAction } from '@/app/actions/lead'
+import { getCustomersAction } from '@/app/actions/customer'
 import { toast } from 'sonner'
 
 interface CreateLeadDialogProps {
@@ -36,47 +37,71 @@ export function CreateLeadDialog({
   onSuccess,
 }: CreateLeadDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [customers, setCustomers] = useState<any[]>([])
   const [formData, setFormData] = useState({
-    personName: '',
-    company: '',
-    position: '',
+    wechatName: '',
     phone: '',
-    email: '',
-    wechat: '',
-    source: 'REFERRAL',
-    sourceDetail: '',
+    source: 'referral',
     category: 'VISA',
-    urgency: 'WARM',
+    budgetMin: '',
+    budgetMax: '',
+    budgetCurrency: 'CNY',
+    urgency: 'MEDIUM',
+    initialIntent: '',
+    customerId: '',
     notes: '',
   })
+
+  useEffect(() => {
+    if (isOpen) {
+      getCustomersAction().then(setCustomers)
+    }
+  }, [isOpen])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.personName.trim()) {
-      toast.error('请输入联系人姓名')
+    if (!formData.wechatName.trim()) {
+      toast.error('请输入微信名/称呼')
+      return
+    }
+
+    if (!formData.initialIntent.trim()) {
+      toast.error('请输入初步意向')
       return
     }
 
     setIsSubmitting(true)
 
     try {
-      const result = await createLeadAction(formData)
+      const result = await createLeadAction({
+        wechatName: formData.wechatName,
+        phone: formData.phone || undefined,
+        source: formData.source,
+        category: formData.category || undefined,
+        budgetMin: formData.budgetMin ? parseFloat(formData.budgetMin) : undefined,
+        budgetMax: formData.budgetMax ? parseFloat(formData.budgetMax) : undefined,
+        budgetCurrency: formData.budgetCurrency,
+        urgency: formData.urgency,
+        initialIntent: formData.initialIntent,
+        customerId: formData.customerId || undefined,
+        notes: formData.notes || undefined,
+      })
 
       if (result) {
         toast.success(`线索创建成功！编号: ${result.leadCode}`)
         // Reset form
         setFormData({
-          personName: '',
-          company: '',
-          position: '',
+          wechatName: '',
           phone: '',
-          email: '',
-          wechat: '',
-          source: 'REFERRAL',
-          sourceDetail: '',
+          source: 'referral',
           category: 'VISA',
-          urgency: 'WARM',
+          budgetMin: '',
+          budgetMax: '',
+          budgetCurrency: 'CNY',
+          urgency: 'MEDIUM',
+          initialIntent: '',
+          customerId: '',
           notes: '',
         })
         onSuccess()
@@ -107,43 +132,21 @@ export function CreateLeadDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
-          {/* 联系人信息 */}
+          {/* 基本信息 */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-slate-900">联系人信息</h3>
+            <h3 className="text-sm font-medium text-slate-900">基本信息</h3>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="personName">
-                  姓名 <span className="text-red-500">*</span>
+                <Label htmlFor="wechatName">
+                  微信名/称呼 <span className="text-red-500">*</span>
                 </Label>
                 <Input
-                  id="personName"
-                  value={formData.personName}
-                  onChange={(e) => handleChange('personName', e.target.value)}
-                  placeholder="请输入联系人姓名"
+                  id="wechatName"
+                  value={formData.wechatName}
+                  onChange={(e) => handleChange('wechatName', e.target.value)}
+                  placeholder="请输入微信名或称呼"
                   required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="company">公司</Label>
-                <Input
-                  id="company"
-                  value={formData.company}
-                  onChange={(e) => handleChange('company', e.target.value)}
-                  placeholder="公司名称"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="position">职位</Label>
-                <Input
-                  id="position"
-                  value={formData.position}
-                  onChange={(e) => handleChange('position', e.target.value)}
-                  placeholder="职位"
                 />
               </div>
 
@@ -158,27 +161,35 @@ export function CreateLeadDialog({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="email">邮箱</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => handleChange('email', e.target.value)}
-                  placeholder="电子邮箱"
-                />
-              </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="customerId">关联客户（可选）</Label>
+              <Select value={formData.customerId} onValueChange={(v) => handleChange('customerId', v)}>
+                <SelectTrigger id="customerId">
+                  <SelectValue placeholder="选择客户（可选）" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">不关联客户</SelectItem>
+                  {customers.map((customer) => (
+                    <SelectItem key={customer.id} value={customer.id}>
+                      {customer.customerName} ({customer.customerId})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="wechat">微信</Label>
-                <Input
-                  id="wechat"
-                  value={formData.wechat}
-                  onChange={(e) => handleChange('wechat', e.target.value)}
-                  placeholder="微信号"
-                />
-              </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="initialIntent">
+                初步意向 <span className="text-red-500">*</span>
+              </Label>
+              <Textarea
+                id="initialIntent"
+                value={formData.initialIntent}
+                onChange={(e) => handleChange('initialIntent', e.target.value)}
+                placeholder="请描述客户的初步意向"
+                className="min-h-[80px]"
+                required
+              />
             </div>
           </div>
 
@@ -199,7 +210,7 @@ export function CreateLeadDialog({
                     <SelectItem value="TAX_SERVICES">💰 税务服务</SelectItem>
                     <SelectItem value="FINANCIAL_SERVICES">📊 财务服务</SelectItem>
                     <SelectItem value="PERMIT_SERVICES">📋 许可证服务</SelectItem>
-                    <SelectItem value="OTHER">📌 其他</SelectItem>
+                    <SelectItem value="referral">📌 其他</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -211,9 +222,9 @@ export function CreateLeadDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="HOT">🔥 HOT - 急迫</SelectItem>
-                    <SelectItem value="WARM">🌡️ WARM - 一般</SelectItem>
-                    <SelectItem value="COLD">❄️ COLD - 不急</SelectItem>
+                    <SelectItem value="HIGH">🔥 HOT - 急迫</SelectItem>
+                    <SelectItem value="MEDIUM">🌡️ WARM - 一般</SelectItem>
+                    <SelectItem value="LOW">❄️ COLD - 不急</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -227,23 +238,51 @@ export function CreateLeadDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="REFERRAL">转介绍</SelectItem>
-                    <SelectItem value="WEBSITE">官网</SelectItem>
-                    <SelectItem value="SOCIAL_MEDIA">社交媒体</SelectItem>
-                    <SelectItem value="EXHIBITION">展会</SelectItem>
-                    <SelectItem value="COLD_CALL">陌生拜访</SelectItem>
-                    <SelectItem value="OTHER">其他</SelectItem>
+                    <SelectItem value="referral">转介绍</SelectItem>
+                    <SelectItem value="website">官网</SelectItem>
+                    <SelectItem value="facebook">社交媒体</SelectItem>
+                    <SelectItem value="facebook">展会</SelectItem>
+                    <SelectItem value="cold_outreach">陌生拜访</SelectItem>
+                    <SelectItem value="referral">其他</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="sourceDetail">来源详情</Label>
+                <Label htmlFor="budgetCurrency">预算币种</Label>
+                <Select value={formData.budgetCurrency} onValueChange={(v) => handleChange('budgetCurrency', v)}>
+                  <SelectTrigger id="budgetCurrency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CNY">CNY - 人民币</SelectItem>
+                    <SelectItem value="IDR">IDR - 印尼盾</SelectItem>
+                    <SelectItem value="USD">USD - 美元</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="budgetMin">预算最小值</Label>
                 <Input
-                  id="sourceDetail"
-                  value={formData.sourceDetail}
-                  onChange={(e) => handleChange('sourceDetail', e.target.value)}
-                  placeholder="具体来源说明"
+                  id="budgetMin"
+                  type="number"
+                  value={formData.budgetMin}
+                  onChange={(e) => handleChange('budgetMin', e.target.value)}
+                  placeholder="最小预算"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="budgetMax">预算最大值</Label>
+                <Input
+                  id="budgetMax"
+                  type="number"
+                  value={formData.budgetMax}
+                  onChange={(e) => handleChange('budgetMax', e.target.value)}
+                  placeholder="最大预算"
                 />
               </div>
             </div>
