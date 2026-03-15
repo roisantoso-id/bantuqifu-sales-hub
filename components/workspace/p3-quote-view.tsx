@@ -162,7 +162,7 @@ export function P3QuoteView({
             <div>
               <h4 className="text-[13px] font-semibold text-[#111827]">服务报价单</h4>
               <p className="font-mono text-[11px] text-[#9ca3af]">
-                QUO-{opportunity.id.replace('opp-', '').toUpperCase()}-{formatDate(opportunity.createdAt).split('/')[0]}
+                QUO-{(opportunity.opportunityCode ?? opportunity.id).replace('opp-', '').toUpperCase()}-{formatDate(opportunity.createdAt).split('/')[0]}
               </p>
             </div>
             <div className="text-right">

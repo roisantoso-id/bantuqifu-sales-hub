@@ -261,6 +261,7 @@ export interface OpportunityP8Data {
 
 export interface Opportunity {
   id: string
+  opportunityCode?: string
   customerId: string
   customer: Customer
   stageId: StageId

@@ -878,7 +878,7 @@ function OpportunitiesTab({ opportunities }: { opportunities: Opportunity[] }) {
           {opportunities.map((opp) => (
             <tr key={opp.id} className="border-b border-[#f3f4f6] hover:bg-[#f9fafb]">
               <td className="px-3 py-2">
-                <span className="font-mono text-[12px] text-[#2563eb]">{opp.id}</span>
+                <span className="font-mono text-[12px] text-[#2563eb]">{opp.opportunityCode ?? opp.id}</span>
               </td>
               <td className="px-3 py-2 text-[13px] text-[#111827]">{opp.serviceTypeLabel}</td>
               <td className="px-3 py-2">
