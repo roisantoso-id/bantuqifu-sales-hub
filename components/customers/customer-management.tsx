@@ -1,11 +1,22 @@
 'use client'
 // Customer Management - v2.1 with contacts tab support
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Search, Plus, Edit2, Archive, ChevronRight, Lock, Users, RefreshCw, X, Building2, Calendar, Globe, User, Phone, Mail, MessageCircle } from 'lucide-react'
 import { CUSTOMER_LEVELS } from '@/lib/types'
 import { CreateOpportunityDialog } from '@/components/opportunities/create-opportunity-dialog'
-import {
+
+// Server Actions - 动态导入避免 HMR 问题
+import * as customerActions from '@/app/actions/customer'
+
+type CustomerRow = customerActions.CustomerRow
+type CustomerOpportunityRow = customerActions.CustomerOpportunityRow
+type CustomerActionLogRow = customerActions.CustomerActionLogRow
+type CustomerFollowupRow = customerActions.CustomerFollowupRow
+type AssociatedCompanyRow = customerActions.AssociatedCompanyRow
+type CustomerContactRow = customerActions.CustomerContactRow
+
+const {
   getCustomersAction,
   getCustomerDetailAction,
   createCustomerAction,
@@ -15,13 +26,7 @@ import {
   addAssociatedCompanyAction,
   getCustomerContactsAction,
   addCustomerContactAction,
-  type CustomerRow,
-  type CustomerOpportunityRow,
-  type CustomerActionLogRow,
-  type CustomerFollowupRow,
-  type AssociatedCompanyRow,
-  type CustomerContactRow,
-} from '@/app/actions/customer'
+} = customerActions
 
 interface CustomerManagementProps {
   onSelectCustomer?: (customerId: string) => void
