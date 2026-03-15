@@ -1,31 +1,24 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import {
   Loader2,
-  AlertCircle,
-  User,
-  Building2,
+  X,
   Phone,
   Mail,
   MessageCircle,
+  Building2,
   Briefcase,
-  Target,
-  Flame,
-  Globe,
-  CheckCircle2,
   Clock,
-  Calendar
+  Send,
 } from 'lucide-react'
-import { getLeadFollowUpsAction, type LeadRow, type LeadFollowUpRow } from '@/app/actions/lead'
+import { getLeadFollowUpsAction, addLeadFollowUpAction, type LeadRow, type LeadFollowUpRow } from '@/app/actions/lead'
 import { toast } from 'sonner'
 import {
   getLeadStatusLabel,
@@ -45,6 +38,7 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
   const [followUps, setFollowUps] = useState<LeadFollowUpRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [followUpNote, setFollowUpNote] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
 
   // 判断是否已转化为商机（只读模式）
   const isReadOnly = lead?.status === 'CONVERTED'
@@ -52,7 +46,6 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
   useEffect(() => {
     if (isOpen && lead?.id) {
       setIsLoading(true)
-      // 一进入页面立刻拉取该线索的所有跟进记录
       getLeadFollowUpsAction(lead.id)
         .then(data => {
           setFollowUps(data)
@@ -65,311 +58,274 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
     }
   }, [isOpen, lead?.id])
 
-  // 获取紧迫度样式
-  const getUrgencyStyle = (urgency: string) => {
-    const styles: Record<string, { bg: string; text: string; icon: React.ReactNode }> = {
-      HOT: { bg: 'bg-red-50', text: 'text-red-700', icon: <Flame className="h-3.5 w-3.5" /> },
-      WARM: { bg: 'bg-amber-50', text: 'text-amber-700', icon: <Flame className="h-3.5 w-3.5" /> },
-      COLD: { bg: 'bg-blue-50', text: 'text-blue-700', icon: <Flame className="h-3.5 w-3.5" /> },
-      HIGH: { bg: 'bg-red-50', text: 'text-red-700', icon: <Flame className="h-3.5 w-3.5" /> },
-      MEDIUM: { bg: 'bg-amber-50', text: 'text-amber-700', icon: <Flame className="h-3.5 w-3.5" /> },
-      LOW: { bg: 'bg-blue-50', text: 'text-blue-700', icon: <Flame className="h-3.5 w-3.5" /> },
+  const handleSaveFollowUp = async () => {
+    if (!lead?.id || !followUpNote.trim()) {
+      toast.error('请输入跟进内容')
+      return
     }
-    return styles[urgency] || styles.MEDIUM
-  }
 
-  const urgencyStyle = lead ? getUrgencyStyle(lead.urgency) : null
+    setIsSaving(true)
+
+    try {
+      const result = await addLeadFollowUpAction({
+        leadId: lead.id,
+        followupType: 'general',
+        content: followUpNote.trim(),
+      })
+
+      if (result) {
+        toast.success('跟进记录已保存')
+        setFollowUpNote('')
+        // 重新加载跟进记录
+        const updatedFollowUps = await getLeadFollowUpsAction(lead.id)
+        setFollowUps(updatedFollowUps)
+      } else {
+        toast.error('保存失败，请重试')
+      }
+    } catch (error) {
+      console.error('Save follow-up error:', error)
+      toast.error('保存失败，请重试')
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   if (!lead) return null
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent className="w-[650px] overflow-y-auto p-0">
-        {/* Header with gradient */}
-        <div className="sticky top-0 z-10 bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-5 text-white">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <h2 className="text-lg font-semibold">线索详情</h2>
+      <SheetContent className="w-[500px] sm:max-w-[500px] p-0 overflow-hidden flex flex-col">
+        {/* 可访问性标题 - 视觉隐藏 */}
+        <SheetHeader className="sr-only">
+          <SheetTitle>线索详情 - {lead.leadCode}</SheetTitle>
+          <SheetDescription>
+            查看和编辑线索 {lead.personName} 的详细信息
+          </SheetDescription>
+        </SheetHeader>
+
+        {/* 极简头部 */}
+        <div className="border-b border-[#e5e7eb] bg-white px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <h2 className="text-[13px] font-semibold text-[#111827] truncate">
+                  {lead.personName}
+                </h2>
                 {isReadOnly && (
-                  <Badge className="bg-white/20 text-white border-white/30">
+                  <Badge className="h-4 text-[10px] bg-[#dbeafe] text-[#1e40af] border-0">
                     已转化
                   </Badge>
                 )}
               </div>
-              <p className="text-sm text-blue-100 font-mono">{lead.leadCode}</p>
+              <p className="text-[11px] text-[#6b7280] font-mono">{lead.leadCode}</p>
             </div>
-            <Badge className={`${urgencyStyle?.bg} ${urgencyStyle?.text} border-0`}>
-              <span className="flex items-center gap-1">
-                {urgencyStyle?.icon}
+            <div className="flex items-center gap-2">
+              <Badge className="h-5 text-[10px] bg-[#f3f4f6] text-[#374151] border-0">
                 {getLeadUrgencyLabel(lead.urgency)}
-              </span>
-            </Badge>
+              </Badge>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-[#6b7280] hover:text-[#111827] hover:bg-[#f3f4f6]"
+                onClick={onClose}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
 
-        <div className="px-6 py-6 space-y-6">
+        {/* 高密度信息区 */}
+        <div className="flex-1 overflow-y-auto">
           {/* 转化提示 */}
           {isReadOnly && (
-            <Alert className="bg-blue-50 border-blue-200">
-              <AlertCircle className="h-4 w-4 text-blue-600" />
-              <AlertDescription className="text-blue-800 text-sm">
-                该线索已转化为商机，基础信息不可修改。请前往商机页面继续跟进。
-              </AlertDescription>
-            </Alert>
+            <div className="mx-4 mt-3 mb-2 px-3 py-2 bg-[#eff6ff] border border-[#bfdbfe] rounded-sm">
+              <p className="text-[11px] text-[#1e40af]">
+                该线索已转化为商机，基础信息不可修改
+              </p>
+            </div>
           )}
 
-          {/* 联系人信息卡片 */}
-          <div className="rounded-lg border bg-white shadow-sm">
-            <div className="px-4 py-3 border-b bg-slate-50">
-              <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                <User className="h-4 w-4 text-slate-600" />
-                联系人信息
-              </h3>
-            </div>
-            <div className="p-4 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-slate-500 flex items-center gap-1.5">
-                    <User className="h-3 w-3" />
-                    姓名
-                  </Label>
-                  <Input
-                    value={lead.personName}
-                    disabled={isReadOnly}
-                    className={`h-9 text-sm ${isReadOnly ? 'bg-slate-50 text-slate-600 border-slate-200' : ''}`}
-                  />
-                </div>
+          {/* 基本信息 - 紧凑布局 */}
+          <div className="px-4 py-3 space-y-2">
+            <div className="text-[11px] font-medium text-[#6b7280] mb-2">基本信息</div>
 
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-slate-500 flex items-center gap-1.5">
-                    <Building2 className="h-3 w-3" />
-                    公司
-                  </Label>
-                  <Input
-                    value={lead.company || ''}
-                    placeholder="未填写"
-                    disabled={isReadOnly}
-                    className={`h-9 text-sm ${isReadOnly ? 'bg-slate-50 text-slate-600 border-slate-200' : ''}`}
-                  />
-                </div>
+            {/* 两列紧凑布局 */}
+            <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-[12px]">
+              <div className="flex items-center gap-2">
+                <Building2 className="h-3 w-3 text-[#9ca3af] shrink-0" />
+                <span className="text-[#6b7280] truncate">
+                  {lead.company || '—'}
+                </span>
+              </div>
 
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-slate-500 flex items-center gap-1.5">
-                    <Phone className="h-3 w-3" />
-                    电话
-                  </Label>
-                  <Input
-                    value={lead.phone || ''}
-                    placeholder="未填写"
-                    disabled={isReadOnly}
-                    className={`h-9 text-sm ${isReadOnly ? 'bg-slate-50 text-slate-600 border-slate-200' : ''}`}
-                  />
-                </div>
+              <div className="flex items-center gap-2">
+                <Briefcase className="h-3 w-3 text-[#9ca3af] shrink-0" />
+                <span className="text-[#6b7280] truncate">
+                  {lead.position || '—'}
+                </span>
+              </div>
 
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-slate-500 flex items-center gap-1.5">
-                    <Mail className="h-3 w-3" />
-                    邮箱
-                  </Label>
-                  <Input
-                    value={lead.email || ''}
-                    placeholder="未填写"
-                    disabled={isReadOnly}
-                    className={`h-9 text-sm ${isReadOnly ? 'bg-slate-50 text-slate-600 border-slate-200' : ''}`}
-                  />
-                </div>
+              <div className="flex items-center gap-2">
+                <Phone className="h-3 w-3 text-[#9ca3af] shrink-0" />
+                <span className="text-[#6b7280] truncate">
+                  {lead.phone || '—'}
+                </span>
+              </div>
 
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-slate-500 flex items-center gap-1.5">
-                    <MessageCircle className="h-3 w-3" />
-                    微信
-                  </Label>
-                  <Input
-                    value={lead.wechat || ''}
-                    placeholder="未填写"
-                    disabled={isReadOnly}
-                    className={`h-9 text-sm ${isReadOnly ? 'bg-slate-50 text-slate-600 border-slate-200' : ''}`}
-                  />
-                </div>
+              <div className="flex items-center gap-2">
+                <Mail className="h-3 w-3 text-[#9ca3af] shrink-0" />
+                <span className="text-[#6b7280] truncate">
+                  {lead.email || '—'}
+                </span>
+              </div>
 
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-slate-500 flex items-center gap-1.5">
-                    <Briefcase className="h-3 w-3" />
-                    职位
-                  </Label>
-                  <Input
-                    value={lead.position || ''}
-                    placeholder="未填写"
-                    disabled={isReadOnly}
-                    className={`h-9 text-sm ${isReadOnly ? 'bg-slate-50 text-slate-600 border-slate-200' : ''}`}
-                  />
-                </div>
+              <div className="flex items-center gap-2 col-span-2">
+                <MessageCircle className="h-3 w-3 text-[#9ca3af] shrink-0" />
+                <span className="text-[#6b7280] truncate">
+                  {lead.wechat || '—'}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* 线索信息卡片 */}
-          <div className="rounded-lg border bg-white shadow-sm">
-            <div className="px-4 py-3 border-b bg-slate-50">
-              <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                <Target className="h-4 w-4 text-slate-600" />
-                线索信息
-              </h3>
-            </div>
-            <div className="p-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100">
-                    <Target className="h-4 w-4 text-blue-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-slate-500 mb-0.5">意向</p>
-                    <p className="text-sm font-medium text-slate-900 truncate">
-                      {getLeadCategoryLabel(lead.category)}
-                    </p>
-                  </div>
-                </div>
+          <Separator />
 
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-purple-100">
-                    <Globe className="h-4 w-4 text-purple-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-slate-500 mb-0.5">来源</p>
-                    <p className="text-sm font-medium text-slate-900 truncate">
-                      {getLeadSourceLabel(lead.source)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 col-span-2">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-100">
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-slate-500 mb-0.5">状态</p>
-                    <Badge variant="outline" className="font-medium">
-                      {getLeadStatusLabel(lead.status)}
-                    </Badge>
-                  </div>
-                </div>
+          {/* 线索属性 - 紧凑标签 */}
+          <div className="px-4 py-3">
+            <div className="text-[11px] font-medium text-[#6b7280] mb-2">线索属性</div>
+            <div className="flex flex-wrap gap-1.5">
+              <div className="inline-flex items-center gap-1 px-2 py-1 bg-[#f3f4f6] rounded-sm">
+                <span className="text-[10px] text-[#9ca3af]">意向</span>
+                <span className="text-[11px] text-[#111827] font-medium">
+                  {getLeadCategoryLabel(lead.category)}
+                </span>
               </div>
+              <div className="inline-flex items-center gap-1 px-2 py-1 bg-[#f3f4f6] rounded-sm">
+                <span className="text-[10px] text-[#9ca3af]">来源</span>
+                <span className="text-[11px] text-[#111827] font-medium">
+                  {getLeadSourceLabel(lead.source)}
+                </span>
+              </div>
+              <div className="inline-flex items-center gap-1 px-2 py-1 bg-[#f3f4f6] rounded-sm">
+                <span className="text-[10px] text-[#9ca3af]">状态</span>
+                <span className="text-[11px] text-[#111827] font-medium">
+                  {getLeadStatusLabel(lead.status)}
+                </span>
+              </div>
+            </div>
 
-              {lead.notes && (
-                <div className="mt-4 space-y-1.5">
-                  <Label className="text-xs text-slate-500">备注</Label>
-                  <Textarea
-                    value={lead.notes}
-                    disabled={isReadOnly}
-                    className={`min-h-[80px] text-sm ${isReadOnly ? 'bg-slate-50 text-slate-600 border-slate-200' : ''}`}
-                  />
-                </div>
+            {lead.notes && (
+              <div className="mt-3">
+                <div className="text-[10px] text-[#9ca3af] mb-1">备注</div>
+                <p className="text-[11px] text-[#374151] leading-relaxed">
+                  {lead.notes}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* 跟进记录 - 高密度时间轴 */}
+          <div className="px-4 py-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-[11px] font-medium text-[#6b7280]">跟进记录</div>
+              {followUps.length > 0 && (
+                <span className="text-[10px] text-[#9ca3af]">
+                  {followUps.length} 条
+                </span>
               )}
             </div>
-          </div>
 
-          {/* 跟进记录时间轴 */}
-          <div className="rounded-lg border bg-white shadow-sm">
-            <div className="px-4 py-3 border-b bg-slate-50">
-              <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                <Clock className="h-4 w-4 text-slate-600" />
-                跟进记录
-                {followUps.length > 0 && (
-                  <Badge variant="secondary" className="text-xs">
-                    {followUps.length}
-                  </Badge>
-                )}
-              </h3>
-            </div>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-4 w-4 animate-spin text-[#9ca3af]" />
+              </div>
+            ) : followUps.length === 0 ? (
+              <div className="text-center py-8">
+                <Clock className="h-8 w-8 text-[#e5e7eb] mx-auto mb-2" />
+                <p className="text-[11px] text-[#9ca3af]">暂无跟进记录</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {followUps.map((followUp, index) => (
+                  <div key={followUp.id} className="relative">
+                    {/* 时间轴线 */}
+                    {index !== followUps.length - 1 && (
+                      <div className="absolute left-1 top-5 bottom-0 w-px bg-[#e5e7eb]" />
+                    )}
 
-            <div className="p-4">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
-                </div>
-              ) : followUps.length === 0 ? (
-                <div className="text-center py-12">
-                  <Clock className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                  <p className="text-sm text-slate-500">暂无跟进记录</p>
-                  <p className="text-xs text-slate-400 mt-1">添加第一条跟进记录开始追踪</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {followUps.map((followUp, index) => (
-                    <div key={followUp.id} className="relative">
-                      {/* Timeline line */}
-                      {index !== followUps.length - 1 && (
-                        <div className="absolute left-4 top-10 bottom-0 w-px bg-slate-200" />
-                      )}
+                    <div className="flex gap-2">
+                      {/* 时间轴点 */}
+                      <div className="relative flex h-2.5 w-2.5 shrink-0 items-center justify-center rounded-full bg-[#2563eb] mt-1.5 ring-2 ring-white" />
 
-                      <div className="flex gap-3">
-                        {/* Timeline dot */}
-                        <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 ring-4 ring-white">
-                          <Calendar className="h-4 w-4 text-blue-600" />
+                      {/* 内容 */}
+                      <div className="flex-1 pb-2">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="outline" className="h-4 text-[10px] font-normal border-[#e5e7eb]">
+                            {getFollowupTypeLabel(followUp.followupType)}
+                          </Badge>
+                          <span className="text-[10px] text-[#9ca3af]">
+                            {new Date(followUp.createdAt).toLocaleString('zh-CN', {
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
                         </div>
-
-                        {/* Content */}
-                        <div className="flex-1 pb-4">
-                          <div className="rounded-lg border bg-slate-50 p-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <Badge variant="outline" className="text-xs font-medium">
-                                {getFollowupTypeLabel(followUp.followupType)}
-                              </Badge>
-                              <span className="text-xs text-slate-500">
-                                {new Date(followUp.createdAt).toLocaleString('zh-CN', {
-                                  month: '2-digit',
-                                  day: '2-digit',
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })}
-                              </span>
-                            </div>
-                            <p className="text-sm text-slate-700 leading-relaxed">{followUp.content}</p>
-                            {followUp.nextAction && (
-                              <div className="mt-2 pt-2 border-t border-slate-200">
-                                <div className="flex items-start gap-2">
-                                  <CheckCircle2 className="h-3.5 w-3.5 text-blue-600 mt-0.5 shrink-0" />
-                                  <div className="flex-1">
-                                    <p className="text-xs font-medium text-slate-600 mb-0.5">下一步行动</p>
-                                    <p className="text-xs text-slate-700">{followUp.nextAction}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
+                        <p className="text-[11px] text-[#374151] leading-relaxed">
+                          {followUp.content}
+                        </p>
+                        {followUp.nextAction && (
+                          <div className="mt-1 pl-2 border-l-2 border-[#dbeafe]">
+                            <p className="text-[10px] text-[#6b7280]">
+                              下一步: {followUp.nextAction}
+                            </p>
                           </div>
-                        </div>
+                        )}
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* 快速跟进 */}
           {!isReadOnly && (
-            <div className="rounded-lg border bg-white shadow-sm">
-              <div className="px-4 py-3 border-b bg-slate-50">
-                <h3 className="text-sm font-semibold text-slate-900">快速跟进</h3>
-              </div>
-              <div className="p-4 space-y-3">
+            <>
+              <Separator />
+              <div className="px-4 py-3">
+                <div className="text-[11px] font-medium text-[#6b7280] mb-2">快速跟进</div>
                 <Textarea
-                  placeholder="记录本次跟进的详细内容..."
+                  placeholder="记录本次跟进..."
                   value={followUpNote}
                   onChange={(e) => setFollowUpNote(e.target.value)}
-                  className="min-h-[100px] text-sm resize-none"
+                  className="min-h-[60px] text-[11px] resize-none mb-2"
+                  disabled={isSaving}
                 />
                 <Button
                   size="sm"
-                  className="w-full bg-blue-600 hover:bg-blue-700"
-                  onClick={() => toast.info('跟进功能开发中')}
+                  className="w-full h-7 text-[11px] bg-[#2563eb] hover:bg-[#1d4ed8]"
+                  onClick={handleSaveFollowUp}
+                  disabled={isSaving || !followUpNote.trim()}
                 >
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  保存跟进记录
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                      保存中...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-3 w-3 mr-1.5" />
+                      保存跟进
+                    </>
+                  )}
                 </Button>
               </div>
-            </div>
+            </>
           )}
         </div>
       </SheetContent>

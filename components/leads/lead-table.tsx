@@ -3,9 +3,7 @@
 import { useState } from 'react'
 import { Flame, Thermometer, Snowflake, AlertCircle, Clock, UserPlus, MoreHorizontal } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +24,7 @@ import {
 import { toast } from 'sonner'
 import { claimLeadAction, discardLeadAction, type LeadRow } from '@/app/actions/lead'
 import { ConvertToOppDialog } from './convert-to-opp-dialog'
+import { LeadDetailPanel } from './lead-detail-panel'
 import {
   getLeadStatusLabel,
   getLeadSourceLabel,
@@ -78,7 +77,6 @@ export function LeadTable({
   onRefresh?: () => void
   selectedLeadId?: string | null
 }) {
-  const [followUpNote, setFollowUpNote] = useState('')
   const [claiming, setClaiming] = useState<string | null>(null)
   const [convertDialogOpen, setConvertDialogOpen] = useState(false)
   const [leadToConvert, setLeadToConvert] = useState<LeadRow | null>(null)
@@ -291,68 +289,12 @@ export function LeadTable({
         </table>
       </div>
 
-      {/* 右侧抽屉 - 受 URL 控制 */}
-      <Sheet
-        open={!!selectedLead}
-        onOpenChange={(open) => {
-          if (!open) {
-            // 关闭抽屉时，通过 onSelect(null) 清除 URL 中的 leadId
-            // 实际的 URL 更新由父组件处理
-            window.history.back()
-          }
-        }}
-      >
-        <SheetContent className="w-[500px]">
-          <SheetHeader>
-            <SheetTitle>线索详情 - {selectedLead?.leadCode}</SheetTitle>
-          </SheetHeader>
-
-          {selectedLead && (
-            <div className="mt-6 space-y-4">
-              <div className="space-y-2">
-                <div className="text-sm font-medium">联系人信息</div>
-                <div className="text-sm text-slate-600">
-                  <div>姓名: {selectedLead.personName}</div>
-                  {selectedLead.phone && <div>电话: {selectedLead.phone}</div>}
-                  {selectedLead.email && <div>邮箱: {selectedLead.email}</div>}
-                  {selectedLead.wechat && <div>微信: {selectedLead.wechat}</div>}
-                  {selectedLead.company && <div>公司: {selectedLead.company}</div>}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="text-sm font-medium">线索信息</div>
-                <div className="text-sm text-slate-600">
-                  <div>意向: {selectedLead.category}</div>
-                  <div>紧迫度: {selectedLead.urgency}</div>
-                  <div>来源: {selectedLead.source}</div>
-                  <div>状态: {selectedLead.status}</div>
-                </div>
-              </div>
-
-              {selectedLead.notes && (
-                <div className="space-y-2">
-                  <div className="text-sm font-medium">备注</div>
-                  <div className="text-sm text-slate-600">{selectedLead.notes}</div>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <div className="text-sm font-medium">快速跟进</div>
-                <Textarea
-                  placeholder="添加跟进备注..."
-                  value={followUpNote}
-                  onChange={(e) => setFollowUpNote(e.target.value)}
-                  className="min-h-[100px]"
-                />
-                <Button size="sm" className="w-full">
-                  保存跟进记录
-                </Button>
-              </div>
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
+      {/* 右侧抽屉 - 使用新的 LeadDetailPanel 组件 */}
+      <LeadDetailPanel
+        lead={selectedLead}
+        isOpen={!!selectedLead}
+        onClose={() => window.history.back()}
+      />
 
       {/* 转商机对话框 */}
       <ConvertToOppDialog
