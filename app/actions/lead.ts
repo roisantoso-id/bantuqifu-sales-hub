@@ -145,12 +145,38 @@ export async function createLeadAction(input: {
     return null
   }
 
-  // Generate lead code using Supabase RPC
-  const { data: leadCode, error: codeError } = await supabase.rpc('generate_business_code', { doc_prefix: 'LEAD' })
+  // Generate lead code with retry logic for duplicate handling
+  let leadCode: string | null = null
+  let retryCount = 0
+  const maxRetries = 3
 
-  if (codeError || !leadCode) {
-    console.error('[createLeadAction] Generate lead code error:', codeError)
-    return null
+  while (!leadCode && retryCount < maxRetries) {
+    const { data: generatedCode, error: codeError } = await supabase.rpc('generate_business_code', { doc_prefix: 'LEAD' })
+    
+    if (codeError) {
+      console.error('[createLeadAction] Generate lead code error:', codeError)
+      retryCount++
+      continue
+    }
+    
+    // Check if code already exists
+    const { data: existing } = await supabase
+      .from('leads')
+      .select('id')
+      .eq('leadCode', generatedCode)
+      .maybeSingle()
+    
+    if (!existing) {
+      leadCode = generatedCode
+    } else {
+      retryCount++
+    }
+  }
+
+  if (!leadCode) {
+    // Fallback: generate unique code with timestamp suffix
+    const timestamp = Date.now().toString(36).toUpperCase()
+    leadCode = `LEAD-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${timestamp}`
   }
 
   // 生成企业微信群ID和名称
