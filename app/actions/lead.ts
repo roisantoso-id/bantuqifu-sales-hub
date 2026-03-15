@@ -434,6 +434,8 @@ export async function convertLeadToOpportunityAction(
   leadId: string,
   customerId: string
 ): Promise<{ success: boolean; opportunityId?: string; error?: string }> {
+  console.log('[convertLeadToOpportunityAction] Starting conversion:', { leadId, customerId })
+
   const supabase = await createClient()
   const tenantId = await getCurrentTenantId()
 
@@ -441,12 +443,16 @@ export async function convertLeadToOpportunityAction(
   const userId = user?.id
 
   if (!userId) {
+    console.error('[convertLeadToOpportunityAction] No user ID')
     return { success: false, error: '用户未登录' }
   }
 
   if (!tenantId) {
+    console.error('[convertLeadToOpportunityAction] No tenant ID')
     return { success: false, error: '租户信息缺失' }
   }
+
+  console.log('[convertLeadToOpportunityAction] User and tenant:', { userId, tenantId })
 
   // 1. 查询线索信息
   const { data: lead, error: leadError } = await supabase
@@ -456,8 +462,11 @@ export async function convertLeadToOpportunityAction(
     .single()
 
   if (leadError || !lead) {
+    console.error('[convertLeadToOpportunityAction] Lead query error:', leadError)
     return { success: false, error: '线索不存在' }
   }
+
+  console.log('[convertLeadToOpportunityAction] Lead found:', lead.leadCode, 'status:', lead.status)
 
   if (lead.status === 'CONVERTED') {
     return { success: false, error: '该线索已被转化过' }
@@ -468,34 +477,44 @@ export async function convertLeadToOpportunityAction(
   const randomSuffix = Math.random().toString().slice(2, 6)
   const opportunityCode = `OPP-${today}-${randomSuffix}`
 
+  console.log('[convertLeadToOpportunityAction] Generated opportunity code:', opportunityCode)
+
   // 3. 创建商机
+  const opportunityData = {
+    id: crypto.randomUUID(),
+    organizationId: tenantId,
+    opportunityCode,
+    customerId,
+    convertedFromLeadId: leadId,
+    stageId: 'P1',
+    status: 'active',
+    serviceType: lead.category || 'VISA',
+    serviceTypeLabel: lead.category || '签证服务',
+    estimatedAmount: lead.budgetMin || 0,
+    currency: lead.budgetCurrency || 'IDR',
+    requirements: lead.initialIntent || '',
+    notes: lead.notes || '',
+    assigneeId: userId,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+
+  console.log('[convertLeadToOpportunityAction] Creating opportunity with data:', opportunityData)
+
   const { data: opportunity, error: oppError } = await supabase
     .from('opportunities')
-    .insert({
-      id: crypto.randomUUID(),
-      organizationId: tenantId,
-      opportunityCode,
-      customerId,
-      convertedFromLeadId: leadId,
-      stageId: 'P1', // 默认进入 P1 初步接触阶段
-      status: 'active',
-      serviceType: lead.category || 'VISA',
-      serviceTypeLabel: lead.category || '签证服务',
-      estimatedAmount: lead.budgetMin || 0,
-      currency: lead.budgetCurrency || 'IDR',
-      requirements: lead.initialIntent || '',
-      notes: lead.notes || '',
-      assigneeId: userId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    })
+    .insert(opportunityData)
     .select('id, opportunityCode')
     .single()
 
   if (oppError || !opportunity) {
     console.error('[convertLeadToOpportunityAction] Create opportunity error:', oppError)
-    return { success: false, error: '创建商机失败' }
+    return { success: false, error: `创建商机失败: ${oppError?.message || '未知错误'}` }
   }
+
+  console.log('[convertLeadToOpportunityAction] Opportunity created:', opportunity)
+
+  console.log('[convertLeadToOpportunityAction] Opportunity created:', opportunity)
 
   // 4. 更新线索状态为已转化
   const { error: updateError } = await supabase
@@ -510,8 +529,10 @@ export async function convertLeadToOpportunityAction(
 
   if (updateError) {
     console.error('[convertLeadToOpportunityAction] Update lead error:', updateError)
-    return { success: false, error: '更新线索状态失败' }
+    return { success: false, error: `更新线索状态失败: ${updateError.message}` }
   }
+
+  console.log('[convertLeadToOpportunityAction] ✅ Conversion successful!')
 
   // 5. 创建系统跟进记录（可选）
   // 如果您有 interactions 表，可以在这里记录转化事件

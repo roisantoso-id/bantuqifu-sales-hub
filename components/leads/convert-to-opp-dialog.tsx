@@ -70,17 +70,26 @@ export function ConvertToOppDialog({
     setIsSubmitting(true)
 
     try {
+      console.log('🚀 Converting lead:', { leadId: lead.id, customerId: selectedCustomerId })
       const result = await convertLeadToOpportunityAction(lead.id, selectedCustomerId)
+      console.log('✅ Convert result:', result)
 
       if (result.success) {
         toast.success(`转化成功！已生成商机 ${result.opportunityId}`)
+        // 重置选择状态
+        setSelectedCustomerId('')
+        // 先调用成功回调刷新数据
         onSuccess()
-        onClose()
+        // 延迟关闭对话框，确保状态更新完成
+        setTimeout(() => {
+          onClose()
+        }, 100)
       } else {
         toast.error(result.error || '转化失败')
+        console.error('❌ Convert failed:', result.error)
       }
     } catch (error) {
-      console.error('Convert error:', error)
+      console.error('❌ Convert error:', error)
       toast.error('转化失败，请重试')
     } finally {
       setIsSubmitting(false)
