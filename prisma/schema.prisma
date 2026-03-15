@@ -195,7 +195,11 @@ model Lead {
   nextFollowDate        DateTime? // 下次跟进计划（关键字段）
   lastActionAt          DateTime?
   status                LeadStatus @default(new)
-  
+
+  // 企业微信群
+  wechatGroupId         Int?
+  wechatGroupName       String?
+
   // 丢弃逻辑
   discardedAt           DateTime?
   discardReason         DiscardReason?

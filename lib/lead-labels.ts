@@ -7,6 +7,7 @@ export const LEAD_STATUS_LABELS: Record<string, string> = {
   contacted: '已联系',
   no_interest: '无意向',
   ready_for_opportunity: '待转化',
+  converted: '已转化',
   discarded: '已丢弃',
   public_pool: '公海',
 

@@ -57,7 +57,7 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
   })
 
   // 判断是否已转化为商机（只读模式）
-  const isReadOnly = lead?.status === 'CONVERTED' || lead?.convertedOpportunityId
+  const isReadOnly = lead?.status === 'converted' || lead?.convertedOpportunityId
 
   useEffect(() => {
     if (isOpen && lead?.id) {
@@ -305,6 +305,16 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
                 </span>
               </div>
             </div>
+
+            {/* 企业微信群信息 */}
+            {lead.wechatGroupId && (
+              <div className="mt-3 p-2 bg-green-50 rounded-sm">
+                <div className="text-[10px] text-[#9ca3af] mb-1">关联企微群</div>
+                <div className="text-[11px] text-[#374151]">
+                  {lead.wechatGroupId}{lead.wechatGroupName}
+                </div>
+              </div>
+            )}
 
             {/* 状态管理 */}
             {!isReadOnly && (

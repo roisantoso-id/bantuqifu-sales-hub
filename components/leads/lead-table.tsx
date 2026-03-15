@@ -175,6 +175,7 @@ export function LeadTable({
               <th className="text-left py-2 px-3 font-medium text-slate-600">紧迫度</th>
               <th className="text-left py-2 px-3 font-medium text-slate-600">状态</th>
               <th className="text-left py-2 px-3 font-medium text-slate-600">来源</th>
+              <th className="text-left py-2 px-3 font-medium text-slate-600">关联企微群</th>
               {viewMode === 'my_leads' && (
                 <th className="text-left py-2 px-3 font-medium text-slate-600">回收倒计时</th>
               )}
@@ -187,7 +188,7 @@ export function LeadTable({
               const stagnant = isStagnant(lead)
               const countdown = getRecycleCountdown(lead)
               const urgency = getUrgencyIcon(lead.urgency)
-              const isConverted = lead.status === 'CONVERTED'
+              const isConverted = lead.status === 'converted' || lead.convertedOpportunityId
 
               return (
                 <tr
@@ -232,6 +233,9 @@ export function LeadTable({
                     </Badge>
                   </td>
                   <td className="py-2.5 px-3 text-slate-600">{getLeadSourceLabel(lead.source)}</td>
+                  <td className="py-2.5 px-3 text-slate-600 text-[11px]">
+                    {lead.wechatGroupId ? `${lead.wechatGroupId}${lead.wechatGroupName}` : '—'}
+                  </td>
                   {viewMode === 'my_leads' && (
                     <td className="py-2.5 px-3">
                       {countdown && (

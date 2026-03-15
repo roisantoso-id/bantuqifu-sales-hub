@@ -74,7 +74,7 @@ export async function getLeadsAction(
 
   let query = supabase
     .from('leads')
-    .select('*')
+    .select('*, customer:customers(id, customerName)')
     .eq('organizationId', tenantId)
 
   // Filter by view mode
@@ -145,6 +145,20 @@ export async function createLeadAction(input: {
   const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
   const leadCode = `LEAD-${today}-${Math.random().toString().slice(2, 6)}`
 
+  // 生成企业微信群ID和名称
+  const { data: groupRow, error: groupError } = await supabase
+    .from('wechat_group_sequences')
+    .insert({})
+    .select('id')
+    .single()
+
+  if (groupError || !groupRow) {
+    console.error('[createLeadAction] Wechat group alloc error:', groupError)
+    return null
+  }
+
+  const wechatGroupName = `${input.wechatName || '线索'}-${leadCode}`
+
   const { data, error } = await supabase
     .from('leads')
     .insert([
@@ -165,6 +179,8 @@ export async function createLeadAction(input: {
         status: 'new',
         assigneeId: userId, // 自动分配给创建人
         lastActionAt: new Date().toISOString(),
+        wechatGroupId: groupRow.id,
+        wechatGroupName: wechatGroupName,
         notes: input.notes || null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -628,16 +644,25 @@ export async function convertLeadToOpportunityAction(
 
   console.log('[convertLeadToOpportunityAction] Generated opportunity code:', opportunityCode)
 
-  // 3. 原子性分配企微群编号
-  const { data: groupRow, error: groupError } = await supabase
-    .from('wechat_group_sequences')
-    .insert({})
-    .select('id')
-    .single()
+  // 3. 使用线索的企微群信息（如果线索没有，则生成新的）
+  let wechatGroupId = lead.wechatGroupId
+  let finalWechatGroupName = lead.wechatGroupName || wechatGroupName
 
-  if (groupError || !groupRow) {
-    console.error('[convertLeadToOpportunityAction] Wechat group alloc error:', groupError)
-    return { success: false, error: '分配企微群编号失败，请稍后重试' }
+  if (!wechatGroupId) {
+    // 如果线索没有企微群ID，则生成新的
+    const { data: groupRow, error: groupError } = await supabase
+      .from('wechat_group_sequences')
+      .insert({})
+      .select('id')
+      .single()
+
+    if (groupError || !groupRow) {
+      console.error('[convertLeadToOpportunityAction] Wechat group alloc error:', groupError)
+      return { success: false, error: '分配企微群编号失败，请稍后重试' }
+    }
+
+    wechatGroupId = groupRow.id
+    finalWechatGroupName = wechatGroupName.trim()
   }
 
   // 4. 创建商机
@@ -656,8 +681,8 @@ export async function convertLeadToOpportunityAction(
     requirements: lead.initialIntent || '',
     notes: lead.notes || '',
     assigneeId: userId,
-    wechatGroupId: groupRow.id,
-    wechatGroupName: wechatGroupName.trim(),
+    wechatGroupId: wechatGroupId,
+    wechatGroupName: finalWechatGroupName,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }
@@ -685,6 +710,8 @@ export async function convertLeadToOpportunityAction(
     .update({
       status: 'converted',
       convertedOpportunityId: opportunity.id,
+      wechatGroupId: wechatGroupId,
+      wechatGroupName: finalWechatGroupName,
       updatedAt: new Date().toISOString(),
       updatedById: userId,
     })
