@@ -54,7 +54,14 @@ export function PrimarySidebar({ activeNav, onNavChange, userName }: PrimarySide
           return (
             <button
               key={item.id}
-              onClick={() => onNavChange(item.id)}
+              onClick={() => {
+                // 线索模块跳转到新的 URL 驱动页面
+                if (item.id === 'leads') {
+                  router.push('/leads')
+                } else {
+                  onNavChange(item.id)
+                }
+              }}
               title={item.label}
               aria-label={item.label}
               className={[
