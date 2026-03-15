@@ -8,6 +8,13 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Loader2,
   X,
   Phone,
@@ -20,7 +27,7 @@ import {
   Edit,
   Save,
 } from 'lucide-react'
-import { getLeadFollowUpsAction, addLeadFollowUpAction, updateLeadAction, type LeadRow, type LeadFollowUpRow } from '@/app/actions/lead'
+import { getLeadFollowUpsAction, addLeadFollowUpAction, updateLeadAction, advanceLeadStatusAction, type LeadRow, type LeadFollowUpRow } from '@/app/actions/lead'
 import { toast } from 'sonner'
 import {
   getLeadStatusLabel,
@@ -122,6 +129,26 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
       }
     } catch (error) {
       console.error('Update lead error:', error)
+      toast.error('更新失败，请重试')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleAdvanceStatus = async (newStatus: 'contacted' | 'ready_for_opportunity' | 'no_interest') => {
+    if (!lead?.id) return
+
+    setIsSaving(true)
+    try {
+      const result = await advanceLeadStatusAction(lead.id, newStatus)
+      if (result.success) {
+        toast.success('状态已更新')
+        window.location.reload()
+      } else {
+        toast.error(result.error || '更新失败')
+      }
+    } catch (error) {
+      console.error('Advance status error:', error)
       toast.error('更新失败，请重试')
     } finally {
       setIsSaving(false)
@@ -278,6 +305,30 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
                 </span>
               </div>
             </div>
+
+            {/* 状态管理 */}
+            {!isReadOnly && (
+              <div className="mt-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-[#9ca3af]">更改状态：</span>
+                  <Select
+                    value={lead.status}
+                    onValueChange={(value) => handleAdvanceStatus(value as any)}
+                    disabled={isSaving}
+                  >
+                    <SelectTrigger className="h-7 w-[140px] text-[11px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="new">新线索</SelectItem>
+                      <SelectItem value="contacted">已联系</SelectItem>
+                      <SelectItem value="ready_for_opportunity">准备转商机</SelectItem>
+                      <SelectItem value="no_interest">无意向</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
 
             {(lead.notes || isEditing) && (
               <div className="mt-3">

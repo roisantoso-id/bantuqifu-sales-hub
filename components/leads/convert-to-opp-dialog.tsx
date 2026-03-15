@@ -161,10 +161,22 @@ export function ConvertToOppDialog({
                 <span className="ml-2 text-sm text-slate-500">加载客户列表...</span>
               </div>
             ) : (
-              <Select onValueChange={setSelectedCustomerId} value={selectedCustomerId}>
-                <SelectTrigger id="customer-select">
-                  <SelectValue placeholder="请选择印尼实体或联系人..." />
-                </SelectTrigger>
+              <>
+                {lead?.customerId && (
+                  <Alert className="mb-2">
+                    <AlertDescription className="text-sm">
+                      该线索已关联客户，将自动使用该客户创建商机
+                    </AlertDescription>
+                  </Alert>
+                )}
+                <Select
+                  onValueChange={setSelectedCustomerId}
+                  value={selectedCustomerId}
+                  disabled={!!lead?.customerId}
+                >
+                  <SelectTrigger id="customer-select">
+                    <SelectValue placeholder="请选择印尼实体或联系人..." />
+                  </SelectTrigger>
                 <SelectContent>
                   {customers.length === 0 ? (
                     <div className="p-4 text-center text-sm text-slate-500">
@@ -184,6 +196,7 @@ export function ConvertToOppDialog({
                   )}
                 </SelectContent>
               </Select>
+              </>
             )}
 
             <p className="text-xs text-slate-500">

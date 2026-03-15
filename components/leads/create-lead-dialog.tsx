@@ -163,12 +163,15 @@ export function CreateLeadDialog({
 
             <div className="space-y-1.5">
               <Label htmlFor="customerId">关联客户（可选）</Label>
-              <Select value={formData.customerId} onValueChange={(v) => handleChange('customerId', v)}>
+              <Select
+                value={formData.customerId || undefined}
+                onValueChange={(v) => handleChange('customerId', v === 'none' ? '' : v)}
+              >
                 <SelectTrigger id="customerId">
                   <SelectValue placeholder="选择客户（可选）" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">不关联客户</SelectItem>
+                  <SelectItem value="none">不关联客户</SelectItem>
                   {customers.map((customer) => (
                     <SelectItem key={customer.id} value={customer.id}>
                       {customer.customerName} ({customer.customerId})

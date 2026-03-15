@@ -17,8 +17,8 @@ export interface LeadRow {
   sourceDetail?: string | null
   category: string
   urgency: string
-  status: 'NEW' | 'PUSHING' | 'CONVERTED' | 'LOST'
-  assignedToId?: string | null
+  status: 'NEW' | 'PUSHING' | 'converted' | 'LOST'
+  assigneeId?: string | null
   nextFollowDate?: string | null
   discardReason?: string | null
   discardedAt?: string | null
@@ -80,10 +80,10 @@ export async function getLeadsAction(
   // Filter by view mode
   if (viewMode === 'my_leads') {
     if (!userId) return []
-    query = query.eq('assignedToId', userId)
+    query = query.eq('assigneeId', userId)
   } else {
     // 公海：无负责人的线索
-    query = query.is('assignedToId', null)
+    query = query.is('assigneeId', null)
   }
 
   // Apply filters
@@ -184,7 +184,7 @@ export async function createLeadAction(input: {
 // ─── updateLeadStatusAction ────────────────────────────────────────────────────
 export async function updateLeadStatusAction(
   leadId: string,
-  status: 'NEW' | 'PUSHING' | 'CONVERTED' | 'LOST',
+  status: 'NEW' | 'PUSHING' | 'converted' | 'LOST',
 ): Promise<LeadRow | null> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -262,7 +262,81 @@ export async function updateLeadAction(
   return { success: true }
 }
 
+// ─── advanceLeadStatusAction ───────────────────────────────────────────────────
+// 推进线索状态
+export async function advanceLeadStatusAction(
+  leadId: string,
+  newStatus: 'contacted' | 'ready_for_opportunity' | 'no_interest' | 'new'
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const tenantId = await getCurrentTenantId()
+
+  if (!tenantId) {
+    return { success: false, error: '租户信息缺失' }
+  }
+
+  // 检查线索是否已转化
+  const { data: lead, error: checkError } = await supabase
+    .from('leads')
+    .select('status, convertedOpportunityId, organizationId')
+    .eq('id', leadId)
+    .single()
+
+  if (checkError) {
+    console.error('[advanceLeadStatusAction] Check error:', checkError.message)
+    return { success: false, error: '线索不存在' }
+  }
+
+  if (lead.convertedOpportunityId) {
+    return { success: false, error: '该线索已转化为商机，不能修改状态' }
+  }
+
+  const oldStatus = lead.status
+
+  // 更新状态
+  const { error } = await supabase
+    .from('leads')
+    .update({
+      status: newStatus,
+      lastActionAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    })
+    .eq('id', leadId)
+
+  if (error) {
+    console.error('[advanceLeadStatusAction] Update error:', error.message)
+    return { success: false, error: '更新失败，请稍后重试' }
+  }
+
+  // 状态标签映射
+  const statusLabels: Record<string, string> = {
+    new: '新线索',
+    contacted: '已联系',
+    ready_for_opportunity: '准备转商机',
+    no_interest: '无意向',
+    discarded: '已丢弃',
+    public_pool: '公海池',
+  }
+
+  // 添加跟进记录
+  await supabase.from('interactions').insert({
+    id: crypto.randomUUID(),
+    organizationId: tenantId,
+    customerId: null,
+    leadId: leadId,
+    operatorId: user?.id,
+    type: 'SYSTEM',
+    content: `状态变更：${statusLabels[oldStatus] || oldStatus} → ${statusLabels[newStatus] || newStatus}`,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  })
+
+  return { success: true }
+}
+
 // ─── discardLeadAction ─────────────────────────────────────────────────────────
+// 退回公海：清空责任人，状态重置为 new
 export async function discardLeadAction(
   leadId: string,
   discardReason?: string
@@ -270,15 +344,14 @@ export async function discardLeadAction(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // 废弃 = 放回公海（assignedToId=null），保持原状态，只标记废弃信息
   const { data, error } = await supabase
     .from('leads')
     .update({
-      assignedToId: null, // 放回公海
-      discardReason: discardReason || 'manual_discard',
+      assigneeId: null, // 清空责任人
+      status: 'new', // 状态重置为新线索
+      discardReason: discardReason === 'return_to_pool' ? 'RETURN_TO_POOL' : 'OTHER',
       discardedAt: new Date().toISOString(),
       discardedById: user?.id,
-      updatedById: user?.id,
       updatedAt: new Date().toISOString(),
     })
     .eq('id', leadId)
@@ -303,23 +376,23 @@ export async function claimLeadAction(leadId: string): Promise<LeadRow | null> {
     return null
   }
 
-  // 使用原子操作确保并发安全：只有当 assignedToId 为 null 时才能更新
+  // 使用原子操作确保并发安全：只有当 assigneeId 为 null 时才能更新
   const { data, error } = await supabase
     .from('leads')
     .update({
-      assignedToId: user.id,
+      assigneeId: user.id,
       updatedById: user.id,
       updatedAt: new Date().toISOString(),
       status: 'contacted', // 认领后自动变为已联系
     })
     .eq('id', leadId)
-    .is('assignedToId', null) // 并发核心：确保它真的是公海的无主线索
+    .is('assigneeId', null) // 并发核心：确保它真的是公海的无主线索
     .select('*')
     .single()
 
   if (error) {
     console.error('[claimLeadAction] Error:', error.message)
-    // 如果是因为 assignedToId 不为 null 导致的失败，返回特殊错误
+    // 如果是因为 assigneeId 不为 null 导致的失败，返回特殊错误
     if (error.code === 'PGRST116') {
       console.warn('[claimLeadAction] Lead already claimed by another user')
     }
@@ -449,7 +522,7 @@ export async function autoRecycleLeadsAction(): Promise<{ success: boolean; coun
 
   // 查询需要回收的线索：
   // 1. 状态为 NEW（新线索）
-  // 2. 已分配给销售（assignedToId 不为空）
+  // 2. 已分配给销售（assigneeId 不为空）
   // 3. 创建时间超过7天
   // 4. 不是已转化或已丢弃的
   const { data: leadsToRecycle, error: queryError } = await supabase
@@ -457,7 +530,7 @@ export async function autoRecycleLeadsAction(): Promise<{ success: boolean; coun
     .select('id, leadCode, personName, createdAt')
     .eq('organizationId', tenantId)
     .eq('status', 'NEW')
-    .not('assignedToId', 'is', null)
+    .not('assigneeId', 'is', null)
     .lt('createdAt', sevenDaysAgo.toISOString())
 
   if (queryError) {
@@ -476,7 +549,7 @@ export async function autoRecycleLeadsAction(): Promise<{ success: boolean; coun
   const { error: updateError } = await supabase
     .from('leads')
     .update({
-      assignedToId: null, // 清空负责人
+      assigneeId: null, // 清空负责人
       discardReason: 'SYSTEM_AUTO_RECYCLE',
       discardedAt: new Date().toISOString(),
       discardedById: SYSTEM_USER_ID,
@@ -537,7 +610,7 @@ export async function convertLeadToOpportunityAction(
 
   console.log('[convertLeadToOpportunityAction] Lead found:', lead.leadCode, 'status:', lead.status)
 
-  if (lead.status === 'CONVERTED') {
+  if (lead.status === 'converted') {
     return { success: false, error: '该线索已被转化过' }
   }
 
@@ -610,7 +683,7 @@ export async function convertLeadToOpportunityAction(
   const { error: updateError } = await supabase
     .from('leads')
     .update({
-      status: 'CONVERTED',
+      status: 'converted',
       convertedOpportunityId: opportunity.id,
       updatedAt: new Date().toISOString(),
       updatedById: userId,

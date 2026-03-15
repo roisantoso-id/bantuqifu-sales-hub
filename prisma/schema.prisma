@@ -140,6 +140,7 @@ enum LeadStatus {
   contacted
   no_interest
   ready_for_opportunity
+  converted
   discarded
   public_pool
 }
@@ -162,6 +163,7 @@ enum DiscardReason {
   NO_CONTACT
   MISMATCH_NEEDS
   LIMITED_SALES_CAPABILITY
+  RETURN_TO_POOL
   OTHER
 }
 
@@ -255,6 +257,7 @@ model Customer {
   
   // Relations
   opportunities   Opportunity[]
+  leads           Lead[]
   chinaEntities   DomesticEntityAssociation[]
   foreignEntities ForeignCompanyEntity[]
   contacts        CustomerContact[]
