@@ -59,17 +59,15 @@ export function AuditRail({ logs, opportunity, visible, onToggle, onAddNote }: A
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [mounted, setMounted] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  
+
   // 客户端挂载后才显示时间，避免 hydration 不匹配
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  // 如果不可见，不渲染
-  if (!visible) return null
-
-  const sorted = [...logs].sort(
-    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  const sorted = useMemo(
+    () => [...logs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()),
+    [logs]
   )
 
   // 预格式化所有日志的时间戳，避免 hydration 不匹配
@@ -78,27 +76,29 @@ export function AuditRail({ logs, opportunity, visible, onToggle, onAddNote }: A
     [sorted]
   )
 
-  const toggleExpand = (id: string) => {
-    const newSet = new Set(expandedIds)
-    if (newSet.has(id)) {
-      newSet.delete(id)
-    } else {
-      newSet.add(id)
-    }
-    setExpandedIds(newSet)
-  }
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) {
+        newSet.delete(id)
+      } else {
+        newSet.add(id)
+      }
+      return newSet
+    })
+  }, [])
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     setUploadedFiles((prev) => [...prev, ...files])
     if (fileInputRef.current) fileInputRef.current.value = ''
-  }
+  }, [])
 
-  const removeFile = (index: number) => {
+  const removeFile = useCallback((index: number) => {
     setUploadedFiles((prev) => prev.filter((_, i) => i !== index))
-  }
+  }, [])
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (!inputValue.trim() && uploadedFiles.length === 0) return
 
     setIsSubmitting(true)
@@ -113,7 +113,10 @@ export function AuditRail({ logs, opportunity, visible, onToggle, onAddNote }: A
     } finally {
       setIsSubmitting(false)
     }
-  }
+  }, [inputValue, uploadedFiles, onAddNote])
+
+  // 如果不可见，在所有 hooks 之后返回 null
+  if (!visible) return null
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-l border-[#e5e7eb] bg-white">
