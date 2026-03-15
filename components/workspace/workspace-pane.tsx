@@ -45,6 +45,15 @@ export function WorkspacePane({
   onAdvanceStage,
   onQuoteSent,
 }: WorkspaceProps) {
+  // Guard against undefined opportunity
+  if (!opportunity) {
+    return (
+      <div className="flex h-full flex-1 items-center justify-center bg-white">
+        <p className="text-[14px] text-[#6b7280]">请从左侧选择一个商机</p>
+      </div>
+    )
+  }
+
   const isOnCurrentStage = viewingStage === opportunity.stageId
   const currentIdx = STAGE_ORDER[opportunity.stageId]
   const viewingIdx = STAGE_ORDER[viewingStage]
