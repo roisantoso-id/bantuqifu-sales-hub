@@ -781,7 +781,7 @@ const result = await createCustomerAction({
             setShowCreateOpportunity(false)
             // 刷新商机列表
             if (selectedCustomer) {
-              loadCustomerDetail(selectedCustomer.id)
+              handleSelectCustomer(selectedCustomer)
             }
           }}
         />
