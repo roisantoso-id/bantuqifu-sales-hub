@@ -18,8 +18,6 @@ export interface OpportunityRow {
   requirements?: string | null
   notes?: string | null
   assigneeId?: string | null
-  expectedCloseDate?: string | null
-  actualCloseDate?: string | null
   pinnedByUsers?: string[]
   createdAt: string
   updatedAt: string
@@ -94,7 +92,6 @@ export async function createOpportunityAction(data: {
   estimatedAmount: number
   currency?: string
   requirements?: string
-  expectedCloseDate?: string
 }): Promise<{ success: boolean; data?: OpportunityRow; error?: string }> {
   const supabase = await createClient()
   const tenantId = await getCurrentTenantId()
@@ -131,7 +128,6 @@ export async function createOpportunityAction(data: {
     requirements: data.requirements || '',
     notes: '',
     assigneeId: userId,
-    expectedCloseDate: data.expectedCloseDate || null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }
