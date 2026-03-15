@@ -22,18 +22,15 @@ export default async function DashboardPage({
   const { data: { user } } = await supabase.auth.getUser()
   const currentUserId = user?.id || null
 
-  // 根据导航模块预加载数据
-  let initialLeads = null
-  let initialOpportunities = null
+  // 根据导航模块预加载数据 - 始终调用，但可能返回 null
+  const viewMode = leadTab === 'pool' ? 'pool' : 'my_leads'
+  const initialLeads = activeNav === 'leads'
+    ? await getLeadsAction(viewMode, { search: leadSearch })
+    : null
 
-  if (activeNav === 'leads') {
-    const viewMode = leadTab === 'pool' ? 'pool' : 'my_leads'
-    initialLeads = await getLeadsAction(viewMode, {
-      search: leadSearch,
-    })
-  } else if (activeNav === 'opportunities') {
-    initialOpportunities = await getOpportunitiesAction()
-  }
+  const initialOpportunities = activeNav === 'opportunities'
+    ? await getOpportunitiesAction()
+    : null
 
   return (
     <DashboardClient
