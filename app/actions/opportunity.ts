@@ -22,6 +22,11 @@ export interface OpportunityRow {
   actualCloseDate?: string | null
   createdAt: string
   updatedAt: string
+  customer?: {
+    id: string
+    customerName: string
+    customerId: string
+  }
 }
 
 // ─── getCurrentTenantId helper ─────────────────────────────────────────────────
@@ -158,7 +163,7 @@ export async function createOpportunityAction(data: {
 }
 
 // ─── getOpportunitiesAction ────────────────────────────────────────────────────
-// 获取商机列表
+// 获取商机列表（包含客户信息）
 export async function getOpportunitiesAction(filters?: {
   status?: string
   stageId?: string
@@ -175,7 +180,14 @@ export async function getOpportunitiesAction(filters?: {
 
   let query = supabase
     .from('opportunities')
-    .select('*')
+    .select(`
+      *,
+      customer:customers!opportunities_customerId_fkey (
+        id,
+        customerName,
+        customerId
+      )
+    `)
     .eq('organizationId', tenantId)
 
   // 应用过滤条件

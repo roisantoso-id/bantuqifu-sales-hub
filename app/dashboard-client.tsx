@@ -43,7 +43,14 @@ export function DashboardClient({
       ? initialOpportunities.map(opp => ({
           id: opp.id,
           customerId: opp.customerId,
-          customerName: '', // 需要从客户表获取
+          customerName: opp.customer?.customerName || '未知客户',
+          customer: {
+            id: opp.customer?.id || opp.customerId,
+            name: opp.customer?.customerName || '未知客户',
+            level: 'L5' as const,
+            industry: '',
+            country: 'Indonesia',
+          },
           stageId: opp.stageId as StageId,
           title: opp.serviceTypeLabel || opp.serviceType,
           amount: opp.estimatedAmount,

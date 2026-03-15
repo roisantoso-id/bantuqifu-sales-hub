@@ -60,6 +60,11 @@ export interface OpportunityRow {
   actualCloseDate?: string | null
   createdAt: string
   updatedAt: string
+  customer?: {
+    id: string
+    customerName: string
+    customerId: string
+  }
 }
 
 export interface Lead {
