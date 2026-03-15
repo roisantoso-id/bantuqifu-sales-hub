@@ -475,6 +475,10 @@ model Opportunity {
   // 置顶功能：存储置顶该商机的用户ID列表
   pinnedByUsers           String[] @default([])
 
+  // 预计成交日期
+  expectedCloseDate       DateTime?
+  actualCloseDate         DateTime?
+
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
   

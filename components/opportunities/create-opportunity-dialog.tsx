@@ -46,6 +46,7 @@ export function CreateOpportunityDialog({
     estimatedAmount: '',
     currency: 'IDR',
     requirements: '',
+    expectedCloseDate: '',
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -71,6 +72,7 @@ export function CreateOpportunityDialog({
         estimatedAmount: parseFloat(formData.estimatedAmount),
         currency: formData.currency,
         requirements: formData.requirements,
+        expectedCloseDate: formData.expectedCloseDate || undefined,
       })
 
       if (result.success && result.data) {
@@ -82,6 +84,7 @@ export function CreateOpportunityDialog({
           estimatedAmount: '',
           currency: 'IDR',
           requirements: '',
+          expectedCloseDate: '',
         })
         onSuccess()
         onClose()
@@ -175,6 +178,17 @@ export function CreateOpportunityDialog({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* 预计成交日期 */}
+          <div className="space-y-1.5">
+            <Label htmlFor="expectedCloseDate">预计成交日期</Label>
+            <Input
+              id="expectedCloseDate"
+              type="date"
+              value={formData.expectedCloseDate}
+              onChange={(e) => handleChange('expectedCloseDate', e.target.value)}
+            />
           </div>
 
           {/* 需求描述 */}
