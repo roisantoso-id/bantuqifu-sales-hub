@@ -11,6 +11,12 @@ import { Badge } from '@/components/ui/badge'
 import { Loader2, AlertCircle } from 'lucide-react'
 import { getLeadFollowUpsAction, type LeadRow, type LeadFollowUpRow } from '@/app/actions/lead'
 import { toast } from 'sonner'
+import {
+  getLeadStatusLabel,
+  getLeadSourceLabel,
+  getLeadUrgencyLabel,
+  getLeadCategoryLabel,
+} from '@/lib/lead-labels'
 
 interface LeadDetailPanelProps {
   lead: LeadRow | null
@@ -137,20 +143,20 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-slate-600">意向分类:</span>
-                <span className="ml-2 font-medium">{lead.category}</span>
+                <span className="ml-2 font-medium">{getLeadCategoryLabel(lead.category)}</span>
               </div>
               <div>
                 <span className="text-slate-600">紧迫度:</span>
-                <span className="ml-2 font-medium">{lead.urgency}</span>
+                <span className="ml-2 font-medium">{getLeadUrgencyLabel(lead.urgency)}</span>
               </div>
               <div>
                 <span className="text-slate-600">来源:</span>
-                <span className="ml-2 font-medium">{lead.source}</span>
+                <span className="ml-2 font-medium">{getLeadSourceLabel(lead.source)}</span>
               </div>
               <div>
                 <span className="text-slate-600">状态:</span>
                 <Badge variant="outline" className="ml-2">
-                  {lead.status}
+                  {getLeadStatusLabel(lead.status)}
                 </Badge>
               </div>
             </div>

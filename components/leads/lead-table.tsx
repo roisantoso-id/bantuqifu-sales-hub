@@ -26,6 +26,12 @@ import {
 import { toast } from 'sonner'
 import { claimLeadAction, discardLeadAction, type LeadRow } from '@/app/actions/lead'
 import { ConvertToOppDialog } from './convert-to-opp-dialog'
+import {
+  getLeadStatusLabel,
+  getLeadSourceLabel,
+  getLeadUrgencyLabel,
+  getLeadCategoryLabel,
+} from '@/lib/lead-labels'
 
 function getUrgencyIcon(urgency: string) {
   const map: Record<string, { icon: React.ReactNode; cls: string }> = {
@@ -205,20 +211,20 @@ export function LeadTable({
                   </td>
                   <td className="py-2.5 px-3">
                     <span className="mr-1">{getCategoryIcon(lead.category)}</span>
-                    <span className="text-slate-700">{lead.category}</span>
+                    <span className="text-slate-700">{getLeadCategoryLabel(lead.category)}</span>
                   </td>
                   <td className="py-2.5 px-3">
                     <div className={`flex items-center gap-1 ${urgency.cls}`}>
                       {urgency.icon}
-                      <span>{lead.urgency}</span>
+                      <span>{getLeadUrgencyLabel(lead.urgency)}</span>
                     </div>
                   </td>
                   <td className="py-2.5 px-3">
                     <Badge variant="outline" className="text-[11px]">
-                      {lead.status}
+                      {getLeadStatusLabel(lead.status)}
                     </Badge>
                   </td>
-                  <td className="py-2.5 px-3 text-slate-600">{lead.source}</td>
+                  <td className="py-2.5 px-3 text-slate-600">{getLeadSourceLabel(lead.source)}</td>
                   {viewMode === 'my_leads' && (
                     <td className="py-2.5 px-3">
                       {countdown !== null && (
