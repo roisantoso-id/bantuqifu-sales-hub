@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { LeadRow } from '@/app/actions/lead'
-import { createLeadAction, updateLeadDetailsAction } from '@/app/actions/lead'
+import { createLeadAction, updateLeadAction } from '@/app/actions/lead'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -47,10 +47,16 @@ export function LeadEntryForm({ initialData, onSuccess }: LeadEntryFormProps) {
     try {
       if (isEditing && initialData) {
         // 执行修改逻辑 (传入底层 ID)
-        const res = await updateLeadDetailsAction(initialData.id, {
-          ...formData,
-          budgetMin: formData.budgetMin ? Number(formData.budgetMin) : undefined,
-          budgetMax: formData.budgetMax ? Number(formData.budgetMax) : undefined,
+        const res = await updateLeadAction(initialData.id, {
+          wechatName: formData.wechatName,
+          phone: formData.phone,
+          source: formData.source,
+          category: formData.category,
+          urgency: formData.urgency,
+          budgetMin: formData.budgetMin ? Number(formData.budgetMin) : null,
+          budgetMax: formData.budgetMax ? Number(formData.budgetMax) : null,
+          initialIntent: formData.initialIntent,
+          notes: formData.notes,
         })
         if (!res.success) throw new Error(res.error)
         toast.success('线索修改成功')
