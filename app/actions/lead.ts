@@ -195,17 +195,19 @@ export async function updateLeadStatusAction(
 }
 
 // ─── discardLeadAction ─────────────────────────────────────────────────────────
-export async function discardLeadAction(leadId: string): Promise<LeadRow | null> {
+export async function discardLeadAction(
+  leadId: string,
+  discardReason?: string
+): Promise<LeadRow | null> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // 丢失 = 放回公海（assignedToId=null）+ status=LOST
+  // 废弃 = 放回公海（assignedToId=null），保持原状态，只标记废弃信息
   const { data, error } = await supabase
     .from('leads')
     .update({
-      status: 'LOST',
-      assignedToId: null,
-      discardReason: 'manual_discard',
+      assignedToId: null, // 放回公海
+      discardReason: discardReason || 'manual_discard',
       discardedAt: new Date().toISOString(),
       discardedById: user?.id,
       updatedById: user?.id,

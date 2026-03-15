@@ -289,17 +289,7 @@ export default function SalesHub() {
       {/* Pane 2+ — 根据 activeNav 显示不同内容 */}
       {activeNav === 'leads' ? (
         <div className="flex-1 overflow-hidden">
-          <LeadManagement
-            leads={leads}
-            opportunities={opportunities}
-            onCreateCustomer={handleCreateCustomer}
-            onConvertLeadToOpportunity={handleConvertLeadToOpportunity}
-            onLeadStatusChange={handleLeadStatusChange}
-            onAddLead={handleAddLead}
-            onDeleteLead={handleDeleteLead}
-            onDiscardLead={handleDiscardLead}
-            onClaimLead={handleClaimLead}
-          />
+          <LeadManagement />
         </div>
       ) : activeNav === 'opportunities' ? (
         <>

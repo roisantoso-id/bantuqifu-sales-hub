@@ -4,13 +4,10 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, ArrowRight, ChevronDown, MessageCircle } from 'lucide-react'
 import Image from 'next/image'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/client'
 
 // 初始化 Supabase 客户端
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-)
+const supabase = createClient()
 
 const TENANTS = [
   { id: 'org_bantu_id', name: '班兔印尼', code: 'BANTU_ID', site: 'ID' },
@@ -53,10 +50,16 @@ export default function LoginPage() {
       }
 
       if (data?.session) {
+        // 设置 tenant 信息到 cookie（用于服务端）
+        document.cookie = `selectedTenant=${selectedTenant.id}; path=/; max-age=86400`
+
+        // 同时保存到 localStorage（用于客户端）
         localStorage.setItem('selectedTenant', selectedTenant.id)
         localStorage.setItem('selectedTenantName', selectedTenant.name)
         localStorage.setItem('currentSite', selectedTenant.site)
+
         router.push('/')
+        router.refresh() // 刷新服务端组件
       }
     } catch (err) {
       console.error('Login error:', err)
