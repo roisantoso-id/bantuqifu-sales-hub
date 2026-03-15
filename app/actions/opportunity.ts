@@ -224,7 +224,8 @@ export async function getOpportunitiesAction(filters?: {
       customer:customers!opportunities_customerId_fkey (
         id,
         customerName,
-        customerId
+        customerId,
+        customerCode
       )
     `)
     .eq('organizationId', tenantId)
