@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
 
 export interface LeadRow {
   id: string
@@ -41,6 +42,12 @@ export interface LeadFollowUpRow {
   createdAt: string
 }
 
+// ─── getCurrentTenantId helper ─────────────────────────────────────────────────
+async function getCurrentTenantId(): Promise<string> {
+  const cookieStore = await cookies()
+  return cookieStore.get('selectedTenant')?.value ?? 'org_bantu_id'
+}
+
 // ─── getLeadsAction ────────────────────────────────────────────────────────────
 export async function getLeadsAction(
   viewMode: 'my_leads' | 'pool',
@@ -53,8 +60,7 @@ export async function getLeadsAction(
   const userId = user?.id
 
   // Get tenant from cookies
-  const cookieStore = await import('next/headers').then(m => m.cookies())
-  const tenantId = (await cookieStore).get('tenantId')?.value
+  const tenantId = await getCurrentTenantId()
 
   if (!tenantId) {
     console.error('[getLeadsAction] No tenantId found')
@@ -115,8 +121,7 @@ export async function createLeadAction(input: {
   const { data: { user } } = await supabase.auth.getUser()
   const userId = user?.id
 
-  const cookieStore = await import('next/headers').then(m => m.cookies())
-  const tenantId = (await cookieStore).get('tenantId')?.value
+  const tenantId = await getCurrentTenantId()
 
   if (!tenantId) {
     console.error('[createLeadAction] No tenantId')
@@ -286,8 +291,7 @@ export async function addLeadFollowUpAction(input: {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const cookieStore = await import('next/headers').then(m => m.cookies())
-  const tenantId = (await cookieStore).get('tenantId')?.value
+  const tenantId = await getCurrentTenantId()
 
   if (!tenantId) {
     console.error('[addLeadFollowUpAction] No tenantId')
