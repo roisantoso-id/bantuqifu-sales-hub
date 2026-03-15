@@ -172,7 +172,7 @@ model Lead {
   organizationId        String   // 强制租户隔离
   organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   
-  leadCode              String   @unique @default(cuid()) // LEAD-系列ID
+  leadCode              String   @unique // 手动生成，格式 LEAD-YYMMDD-XXXX
   wechatName            String   // 微信名/称呼
   phone                 String?
   source                LeadSource
@@ -239,7 +239,8 @@ model Customer {
   organizationId  String   // 强制租户隔离
   organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   
-  customerId      String   @unique // 客户编号（语义化 ID，如 CUS-260315-0001）
+  customerId      String   @unique // @deprecated 旧业务编号，保留防止报错，请使用 customerCode
+  customerCode    String?  @unique // 新业务编号（语义化 ID，如 CUS-260315-0001）
   customerName    String
   passportNo      String?
   phone           String?
@@ -272,6 +273,7 @@ model Customer {
   @@index([levelDictId])
   @@index([industryId])
   @@unique([organizationId, customerId])
+  @@index([customerCode])
   @@map("customers")
 }
 
@@ -470,7 +472,7 @@ model Opportunity {
   organizationId          String   // 强制租户隔离
   organization            Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   
-  opportunityCode         String   @unique @default(cuid())
+  opportunityCode         String   @unique // 手动生成，格式 OPP-YYMMDD-XXXX
   
   customerId              String
   customer                Customer @relation(fields: [customerId], references: [id])

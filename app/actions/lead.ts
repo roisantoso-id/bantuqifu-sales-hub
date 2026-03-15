@@ -145,9 +145,13 @@ export async function createLeadAction(input: {
     return null
   }
 
-  // Generate lead code
-  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-  const leadCode = `LEAD-${today}-${Math.random().toString().slice(2, 6)}`
+  // Generate lead code using Supabase RPC
+  const { data: leadCode, error: codeError } = await supabase.rpc('generate_business_code', { doc_prefix: 'LEAD' })
+
+  if (codeError || !leadCode) {
+    console.error('[createLeadAction] Generate lead code error:', codeError)
+    return null
+  }
 
   // 生成企业微信群ID和名称
   const { data: groupRow, error: groupError } = await supabase
@@ -213,7 +217,6 @@ export async function updateLeadStatusAction(
     .from('leads')
     .update({
       status,
-      updatedById: user?.id,
       updatedAt: new Date().toISOString(),
     })
     .eq('id', leadId)
@@ -269,7 +272,6 @@ export async function updateLeadAction(
     .from('leads')
     .update({
       ...updates,
-      updatedById: user?.id,
       updatedAt: new Date().toISOString(),
     })
     .eq('id', leadId)
@@ -367,7 +369,7 @@ export async function returnToPoolAction(
   const { data, error } = await supabase
     .from('leads')
     .update({
-      assigneeId: null,
+      assigneeId: null, // 清空负责人
       status: 'public_pool',
       discardReason: reason,
       updatedAt: new Date().toISOString(),
@@ -429,7 +431,6 @@ export async function claimLeadAction(leadId: string): Promise<LeadRow | null> {
     .from('leads')
     .update({
       assigneeId: user.id,
-      updatedById: user.id,
       updatedAt: new Date().toISOString(),
       status: 'contacted', // 认领后自动变为已联系
     })
@@ -462,7 +463,6 @@ export async function setNextFollowDateAction(
     .from('leads')
     .update({
       nextFollowDate,
-      updatedById: user?.id,
       updatedAt: new Date().toISOString(),
     })
     .eq('id', leadId)
@@ -602,7 +602,6 @@ export async function autoRecycleLeadsAction(): Promise<{ success: boolean; coun
       discardedAt: new Date().toISOString(),
       discardedById: SYSTEM_USER_ID,
       updatedAt: new Date().toISOString(),
-      updatedById: SYSTEM_USER_ID,
     })
     .in('id', leadIds)
 
@@ -647,9 +646,12 @@ export async function convertLeadToOpportunityAction(
   if (!finalCustomerId) return { success: false, error: '必须关联客户才能转化为商机' }
 
   // 2. 生成商机编号 (OPP-YYMMDD-XXXX)
-  const today = new Date().toISOString().slice(2, 10).replace(/-/g, '')
-  const randomSuffix = Math.random().toString().slice(2, 6)
-  const opportunityCode = `OPP-${today}-${randomSuffix}`
+  const { data: opportunityCode, error: codeError } = await supabase.rpc('generate_business_code', { doc_prefix: 'OPP' })
+
+  if (codeError || !opportunityCode) {
+    console.error('[convertLeadToOpportunityAction] Generate opportunity code error:', codeError)
+    return { success: false, error: '生成商机编号失败' }
+  }
 
   // 3. 处理企微群分配
   let wechatGroupId = lead.wechatGroupId

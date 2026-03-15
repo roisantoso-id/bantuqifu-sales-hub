@@ -132,9 +132,12 @@ export async function createOpportunityAction(data: {
   }
 
   // 生成商机编号（格式：OPP-YYMMDD-XXXX）
-  const today = new Date().toISOString().slice(2, 10).replace(/-/g, '')
-  const randomSuffix = Math.random().toString().slice(2, 6)
-  const opportunityCode = `OPP-${today}-${randomSuffix}`
+  const { data: opportunityCode, error: codeError } = await supabase.rpc('generate_business_code', { doc_prefix: 'OPP' })
+
+  if (codeError || !opportunityCode) {
+    console.error('[createOpportunityAction] Generate code error:', codeError)
+    return { success: false, error: '生成商机编号失败' }
+  }
 
   // 如果填写了企微群名称，原子性分配编号
   let wechatGroupId: number | null = null
@@ -148,7 +151,7 @@ export async function createOpportunityAction(data: {
 
   // 创建商机
   const opportunityData = {
-    id: opportunityCode,
+    id: crypto.randomUUID(),
     organizationId: tenantId,
     opportunityCode,
     customerId: data.customerId,

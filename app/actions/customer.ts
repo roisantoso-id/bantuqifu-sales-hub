@@ -3,7 +3,6 @@
 
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
-import { generateBizId } from '@/lib/utils/id-generator'
 
 // ─── 租户隔离辅助 ─────────────────────────────────────────────────────────────
 
@@ -228,8 +227,13 @@ export async function createCustomerAction(data: {
   const tenantId = await getCurrentTenantId()
 
   try {
-    // 1. 生成语义化客户 ID
-    const customerId = await generateBizId('CUS') // 例如：CUS-260315-0001
+    // 1. 生成语义化客户编号（通过 Supabase RPC）
+    const { data: customerCode, error: codeError } = await supabase.rpc('generate_business_code', { doc_prefix: 'CUS' })
+
+    if (codeError || !customerCode) {
+      console.error('[customer action] generate customerCode error:', codeError)
+      throw new Error('生成客户编号失败')
+    }
 
     // 2. 插入数据库（显式生成 id 避免 DEFAULT 缓存问题）
     const newId = crypto.randomUUID()
@@ -239,7 +243,8 @@ export async function createCustomerAction(data: {
         {
           id: newId,
           organizationId: tenantId,
-          customerId,
+          customerId: customerCode, // 保留旧字段兼容
+          customerCode,             // 新字段
           customerName: data.customerName,
           phone: data.phone ?? null,
           email: data.email ?? null,
