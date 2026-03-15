@@ -1,7 +1,7 @@
 'use client'
 
 import { X, ClipboardList, Upload, FileText, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
-import { useState, useRef, useMemo, useEffect } from 'react'
+import { useState, useRef, useMemo, useEffect, useCallback } from 'react'
 import type { ActionLog, ActionType, StageId } from '@/lib/types'
 
 interface AuditRailProps {
