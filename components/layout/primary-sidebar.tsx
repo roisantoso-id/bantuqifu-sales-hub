@@ -1,6 +1,6 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
   TrendingUp,
@@ -26,6 +26,7 @@ const navItems: { id: NavSection; icon: React.ReactNode; label: string }[] = [
 
 export function PrimarySidebar({ activeNav, onNavChange, userName }: PrimarySidebarProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const initials = userName.slice(-2)
 
   const handleLogout = () => {
@@ -35,6 +36,13 @@ export function PrimarySidebar({ activeNav, onNavChange, userName }: PrimarySide
     localStorage.removeItem('currentSite')
     // 重定向到登录页
     router.push('/login')
+  }
+
+  const handleNavClick = (navId: NavSection) => {
+    // 使用 URL 驱动导航
+    const params = new URLSearchParams()
+    params.set('nav', navId)
+    router.push(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
   return (
@@ -54,14 +62,7 @@ export function PrimarySidebar({ activeNav, onNavChange, userName }: PrimarySide
           return (
             <button
               key={item.id}
-              onClick={() => {
-                // 线索模块跳转到新的 URL 驱动页面
-                if (item.id === 'leads') {
-                  router.push('/leads')
-                } else {
-                  onNavChange(item.id)
-                }
-              }}
+              onClick={() => handleNavClick(item.id)}
               title={item.label}
               aria-label={item.label}
               className={[
