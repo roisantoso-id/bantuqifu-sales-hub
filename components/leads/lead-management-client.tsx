@@ -157,14 +157,16 @@ export function LeadManagementClient({
             刷新
           </Button>
 
-          <Button
-            size="sm"
-            className="h-8 gap-1.5 bg-[#2563eb] text-[12px] hover:bg-[#1d4ed8]"
-            onClick={() => setCreateDialogOpen(true)}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            新增线索
-          </Button>
+          {activeTab !== 'pool' && (
+            <Button
+              size="sm"
+              className="h-8 gap-1.5 bg-[#2563eb] text-[12px] hover:bg-[#1d4ed8]"
+              onClick={() => setCreateDialogOpen(true)}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              新增线索
+            </Button>
+          )}
         </div>
       </div>
 
@@ -176,11 +178,13 @@ export function LeadManagementClient({
           </div>
         ) : initialLeads.length === 0 ? (
           <div className="flex h-64 flex-col items-center justify-center text-center">
-            <p className="text-[13px] text-[#6b7280]">暂无线索数据</p>
+            <p className="text-[13px] text-[#6b7280]">
+              {activeTab === 'pool' ? '公海暂无可认领线索' : '暂无线索数据'}
+            </p>
             {searchQuery && (
               <p className="mt-1 text-[12px] text-[#9ca3af]">尝试修改搜索条件</p>
             )}
-            {!searchQuery && (
+            {!searchQuery && activeTab !== 'pool' && (
               <Button
                 size="sm"
                 className="mt-4 h-8 bg-[#2563eb] text-[12px] hover:bg-[#1d4ed8]"
