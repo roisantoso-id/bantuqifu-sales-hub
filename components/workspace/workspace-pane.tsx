@@ -61,7 +61,7 @@ export function WorkspacePane({
             <ChevronRight size={12} />
             <span className="text-[#374151]">{opportunity.customer.name}</span>
             <ChevronRight size={12} />
-            <span className="font-mono text-[#374151]">{opportunity.id}</span>
+            <span className="font-mono text-[#374151]">{opportunity.opportunityCode ?? opportunity.id}</span>
           </div>
         </div>
 

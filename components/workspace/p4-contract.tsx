@@ -158,7 +158,7 @@ export function P4Contract({ opportunity, p4Data, onDataChange }: P4ContractProp
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[12px] font-medium text-[#111827]">
-                    Bantu_Contract_{opportunity.id}.pdf
+                    Bantu_Contract_{opportunity.opportunityCode ?? opportunity.id}.pdf
                   </p>
                   <p className="text-[11px] text-[#9ca3af]">
                     上传于 {currentData.uploadedAt ? new Date(currentData.uploadedAt).toLocaleString('zh-CN') : '未知'}
@@ -228,7 +228,7 @@ export function P4Contract({ opportunity, p4Data, onDataChange }: P4ContractProp
               关联商机
             </p>
             <p className="mt-1 font-mono text-[13px] font-medium text-[#111827]">
-              {opportunity.id}
+              {opportunity.opportunityCode ?? opportunity.id}
             </p>
             <p className="text-[12px] text-[#374151]">
               {opportunity.customer.name} - {opportunity.serviceTypeLabel}
@@ -292,7 +292,7 @@ export function P4Contract({ opportunity, p4Data, onDataChange }: P4ContractProp
       <div className="border-t border-[#e5e7eb] bg-[#f9fafb] px-5 py-2">
         <div className="flex items-center justify-between text-[12px]">
           <div className="text-[#9ca3af]">
-            已关联商机: <span className="font-mono font-medium text-[#111827]">{opportunity.id}</span>
+            已关联商机: <span className="font-mono font-medium text-[#111827]">{opportunity.opportunityCode ?? opportunity.id}</span>
             {opportunity.customer.name}
           </div>
           <button

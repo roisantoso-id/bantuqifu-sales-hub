@@ -274,7 +274,7 @@ export function P7Delivery({
           {/* Opportunity Info */}
           <div className="mb-3 rounded-sm border border-[#e5e7eb] bg-white p-2.5">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-[#9ca3af]">关联商机</p>
-            <p className="mt-1 font-mono text-[13px] font-medium text-[#111827]">{opportunity.id}</p>
+            <p className="mt-1 font-mono text-[13px] font-medium text-[#111827]">{opportunity.opportunityCode ?? opportunity.id}</p>
             <p className="text-[12px] text-[#374151]">
               {opportunity.customer.name} · {opportunity.serviceTypeLabel}
             </p>
