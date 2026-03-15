@@ -39,6 +39,21 @@ psql $DATABASE_URL -f prisma/migrations/your_migration_file.sql
 - **索引**: 为两个日期字段添加索引以提升查询性能
 - **状态**: 需要手动执行
 
+### ✅ update_service_type_enum.sql
+- **日期**: 2026-03-15
+- **描述**: 更新 ServiceType 枚举以匹配实际业务类目
+- **新枚举值**:
+  - `VISA`: 签证服务
+  - `COMPANY_REGISTRATION`: 公司注册
+  - `FACTORY_SETUP`: 工厂落地
+  - `TAX_SERVICES`: 税务服务
+  - `PERMIT_SERVICES`: 许可证服务
+  - `FINANCIAL_SERVICES`: 财务服务
+  - `IMMIGRATION`: 移民服务
+  - `OTHER`: 其他
+- **数据迁移**: 自动将旧值映射到新值
+- **状态**: 需要手动执行
+
 ## 注意事项
 
 1. **执行顺序**: 按照文件名或日期顺序执行迁移

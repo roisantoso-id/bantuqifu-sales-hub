@@ -265,7 +265,7 @@ export interface Opportunity {
   customer: Customer
   stageId: StageId
   status: OpportunityStatus
-  serviceType: 'VISA' | 'IMMIGRATION' | 'STUDY' | 'WORK'
+  serviceType: 'VISA' | 'COMPANY_REGISTRATION' | 'FACTORY_SETUP' | 'TAX_SERVICES' | 'PERMIT_SERVICES' | 'FINANCIAL_SERVICES' | 'IMMIGRATION' | 'OTHER'
   serviceTypeLabel: string
   estimatedAmount: number
   currency: Currency

@@ -141,9 +141,13 @@ export function CreateOpportunityDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="VISA">🛂 签证服务</SelectItem>
-                <SelectItem value="IMMIGRATION">🏢 移民服务</SelectItem>
-                <SelectItem value="STUDY">📚 留学服务</SelectItem>
-                <SelectItem value="WORK">💼 工作签证</SelectItem>
+                <SelectItem value="COMPANY_REGISTRATION">🏢 公司注册</SelectItem>
+                <SelectItem value="FACTORY_SETUP">🏭 工厂落地</SelectItem>
+                <SelectItem value="TAX_SERVICES">💰 税务服务</SelectItem>
+                <SelectItem value="PERMIT_SERVICES">📋 许可证服务</SelectItem>
+                <SelectItem value="FINANCIAL_SERVICES">📊 财务服务</SelectItem>
+                <SelectItem value="IMMIGRATION">✈️ 移民服务</SelectItem>
+                <SelectItem value="OTHER">📌 其他</SelectItem>
               </SelectContent>
             </Select>
           </div>

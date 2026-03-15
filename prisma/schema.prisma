@@ -435,10 +435,14 @@ model Product {
 // ═════════════════════════════════════════���══════════════════════════════════════
 
 enum ServiceType {
-  VISA
-  IMMIGRATION
-  STUDY
-  WORK
+  VISA                    // 签证服务
+  COMPANY_REGISTRATION    // 公司注册
+  FACTORY_SETUP           // 工厂落地
+  TAX_SERVICES            // 税务服务
+  PERMIT_SERVICES         // 许可证服务
+  FINANCIAL_SERVICES      // 财务服务
+  IMMIGRATION             // 移民服务
+  OTHER                   // 其他
 }
 
 enum OpportunityStatus {
