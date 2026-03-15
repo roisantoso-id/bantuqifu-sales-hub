@@ -69,7 +69,7 @@ export function LeadManagement() {
   })
 
   const [showDiscard, setShowDiscard] = useState<LeadRow | null>(null)
-  const [discardReason, setDiscardReason] = useState('NOT_INTERESTED')
+  const [discardReason, setDiscardReason] = useState('NO_CONTACT')
   const [discarding, setDiscarding] = useState(false)
 
   const [showFollowUp, setShowFollowUp] = useState(false)

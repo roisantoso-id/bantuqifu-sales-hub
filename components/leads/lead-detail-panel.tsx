@@ -47,6 +47,7 @@ export function LeadDetailPanel({ lead, isOpen, onClose, onConvertToOpportunity,
   const [followUps, setFollowUps] = useState<LeadFollowUpRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [followUpNote, setFollowUpNote] = useState('')
+  const [followUpType, setFollowUpType] = useState<'NOTE' | 'CALL' | 'VISIT'>('NOTE')
   const [isSaving, setIsSaving] = useState(false)
   const [customers, setCustomers] = useState<CustomerRow[]>([])
   const [activeTab, setActiveTab] = useState('details')
@@ -113,7 +114,7 @@ export function LeadDetailPanel({ lead, isOpen, onClose, onConvertToOpportunity,
     try {
       const result = await addLeadFollowUpAction({
         leadId: lead.id,
-        followupType: 'general',
+        followupType: followUpType,
         content: followUpNote.trim(),
       })
 
@@ -485,7 +486,19 @@ export function LeadDetailPanel({ lead, isOpen, onClose, onConvertToOpportunity,
             {/* 快速跟进输入 */}
             {!isReadOnly && (
               <div className="mt-4 pt-3 border-t border-slate-100">
-                <label className="text-[11px] text-slate-500 mb-1.5 block">新增跟进</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-[11px] text-slate-500">新增跟进</label>
+                  <Select value={followUpType} onValueChange={(v) => setFollowUpType(v as 'NOTE' | 'CALL' | 'VISIT')}>
+                    <SelectTrigger className="h-6 w-[80px] text-[10px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="NOTE">备注</SelectItem>
+                      <SelectItem value="CALL">电话</SelectItem>
+                      <SelectItem value="VISIT">拜访</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Textarea
                   placeholder="记录本次跟进内容..."
                   value={followUpNote}

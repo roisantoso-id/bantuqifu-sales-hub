@@ -182,6 +182,7 @@ export function LeadManagementClient({
             刷新
           </Button>
 
+          {activeTab !== 'pool' && (
           <Button
             size="sm"
             className="h-8 gap-1.5 bg-[#2563eb] text-[12px] hover:bg-[#1d4ed8]"
@@ -190,6 +191,7 @@ export function LeadManagementClient({
             <Plus className="h-3.5 w-3.5" />
             新增线索
           </Button>
+          )}
         </div>
       </div>
 

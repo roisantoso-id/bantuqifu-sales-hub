@@ -114,6 +114,7 @@ export function ConvertToOppDialog({
       if (result.success) {
         toast.success(`转化成功！商机已创建`)
         onSuccess()
+        onClose()
       } else {
         toast.error(result.error ?? '转化失败')
       }

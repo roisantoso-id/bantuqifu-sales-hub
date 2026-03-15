@@ -22,7 +22,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
-import { claimLeadAction, discardLeadAction, type LeadRow } from '@/app/actions/lead'
+import { claimLeadAction, returnToPoolAction, type LeadRow } from '@/app/actions/lead'
 import { ConvertToOppDialog } from './convert-to-opp-dialog'
 import {
   getLeadStatusLabel,
@@ -97,7 +97,7 @@ export function LeadTable({
   const confirmReturnToPool = async () => {
     if (!leadToReturn) return
     try {
-      const result = await discardLeadAction(leadToReturn.id, 'return_to_pool')
+      const result = await returnToPoolAction(leadToReturn.id, 'RETURN_TO_POOL')
       if (result) {
         toast.success('线索已退回公海')
         onRefresh?.()
@@ -240,9 +240,23 @@ export function LeadTable({
                       <span className="text-slate-400 text-[11px]">{stagnantDays}天</span>
                     )}
                   </td>
-
-                  {/* 操作 - 三点图标 */}
-                  <td className="py-2 px-3 text-right w-[40px]">
+                  <td className="py-2.5 px-3 text-slate-600 text-[11px]">
+                    {lead.wechatGroupId ? `${lead.wechatGroupId}${lead.wechatGroupName ? ' ' + lead.wechatGroupName : ''}` : '—'}
+                  </td>
+                  {viewMode === 'my_leads' && (
+                    <td className="py-2.5 px-3">
+                      {countdown && (
+                        <div className={`flex items-center gap-1 ${countdown.isUrgent ? 'text-red-600' : 'text-amber-600'}`}>
+                          <Clock className="h-3 w-3" />
+                          <span>{countdown.hours}h</span>
+                        </div>
+                      )}
+                    </td>
+                  )}
+                  <td className="py-2.5 px-3 text-slate-500">
+                    {new Date(lead.createdAt).toLocaleDateString('zh-CN')}
+                  </td>
+                  <td className="py-2.5 px-3 text-center">
                     {viewMode === 'public_pool' ? (
                       <Button
                         size="sm"

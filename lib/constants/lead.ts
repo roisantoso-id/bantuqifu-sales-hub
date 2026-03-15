@@ -32,10 +32,9 @@ export const LEAD_STATUSES = [
 ]
 
 export const DISCARD_REASONS = [
-  { value: 'INVALID_INFO',   label: '信息无效' },
-  { value: 'NOT_INTERESTED', label: '无意向' },
-  { value: 'POOR_MATCH',     label: '需求不匹配' },
-  { value: 'COMPETITOR',     label: '选择竞争对手' },
-  { value: 'DUPLICATE',      label: '重复线索' },
-  { value: 'OTHER',          label: '其他' },
+  { value: 'NO_CONTACT',               label: '无法联系' },
+  { value: 'MISMATCH_NEEDS',           label: '需求不匹配' },
+  { value: 'LIMITED_SALES_CAPABILITY', label: '销售能力不足' },
+  { value: 'RETURN_TO_POOL',           label: '退回公海' },
+  { value: 'OTHER',                    label: '其他' },
 ]

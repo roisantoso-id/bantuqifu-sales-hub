@@ -179,6 +179,18 @@ export async function createLeadAction(input: {
     leadCode = `LEAD-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${randomSuffix}`
   }
 
+  // 生成企业微信群ID和名称
+  const { data: groupRow, error: groupError } = await supabase
+    .from('wechat_group_sequences')
+    .insert({})
+    .select('id')
+    .single()
+
+  if (groupError || !groupRow) {
+    console.error('[createLeadAction] Wechat group alloc error:', groupError)
+    return null
+  }
+
   const { data, error } = await supabase
     .from('leads')
     .insert([
@@ -199,6 +211,8 @@ export async function createLeadAction(input: {
         status: 'new',
         assigneeId: userId, // 自动分配给创建人
         lastActionAt: new Date().toISOString(),
+        wechatGroupId: groupRow.id,
+        wechatGroupName: null,
         notes: input.notes || null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -516,7 +530,7 @@ export async function addLeadFollowUpAction(input: {
         customerId: null, // 线索阶段可能还没关联客户
         leadId: input.leadId,
         operatorId: user?.id,
-        type: input.followupType === 'general' ? 'NOTE' : 'CALL',
+        type: input.followupType,
         content: input.content,
         nextAction: input.nextAction || null,
         nextActionDate: input.nextActionDate || null,
@@ -708,7 +722,7 @@ export async function convertLeadToOpportunityAction(
 
   // 3. 处理企微群分配
   let wechatGroupId = lead.wechatGroupId
-  let finalWechatGroupName = lead.wechatGroupName || wechatGroupName
+  let finalWechatGroupName = wechatGroupName.trim()
 
   if (!wechatGroupId) {
     const { data: groupRow, error: groupError } = await supabase
@@ -719,7 +733,6 @@ export async function convertLeadToOpportunityAction(
 
     if (groupError || !groupRow) return { success: false, error: '分配企微群编号失败' }
     wechatGroupId = groupRow.id
-    finalWechatGroupName = wechatGroupName.trim()
   }
 
   // 服务类型的中文映射字典

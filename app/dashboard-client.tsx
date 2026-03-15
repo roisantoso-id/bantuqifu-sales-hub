@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { useCallback, useState, useMemo } from 'react'
+import { useCallback, useState, useMemo, useEffect } from 'react'
 import { PrimarySidebar } from '@/components/layout/primary-sidebar'
 import { SecondarySidebar } from '@/components/layout/secondary-sidebar'
 import { WorkspacePane } from '@/components/workspace/workspace-pane'
@@ -126,6 +126,50 @@ export function DashboardClient({
     },
     [pathname, router]
   )
+
+  // 切换到商机页时重新拉取数据
+  useEffect(() => {
+    if (activeNav !== 'opportunities') return
+    getOpportunitiesAction().then((data) => {
+      if (!data) return
+      setOpportunities(data.map(opp => ({
+        id: opp.id,
+        opportunityCode: opp.opportunityCode,
+        customerId: opp.customerId,
+        customerName: opp.customer?.customerName || '未知客户',
+        customer: {
+          id: opp.customer?.id || opp.customerId,
+          name: opp.customer?.customerName || '未知客户',
+          passportNo: opp.customer?.customerId || '',
+          phone: '',
+          email: '',
+          wechat: '',
+          level: 'L5' as const,
+          industry: '',
+          country: 'Indonesia',
+        },
+        stageId: opp.stageId as StageId,
+        status: (opp.status as OpportunityStatus) || 'active',
+        serviceType: (opp.serviceType as 'VISA' | 'COMPANY_REGISTRATION' | 'FACTORY_SETUP' | 'TAX_SERVICES' | 'PERMIT_SERVICES' | 'FINANCIAL_SERVICES' | 'IMMIGRATION' | 'OTHER') || 'VISA',
+        serviceTypeLabel: opp.serviceTypeLabel || opp.serviceType,
+        estimatedAmount: opp.estimatedAmount || 0,
+        currency: (opp.currency as Currency) || 'IDR',
+        requirements: opp.requirements || undefined,
+        notes: opp.notes || undefined,
+        wechatGroupId: opp.wechatGroupId || undefined,
+        wechatGroupName: opp.wechatGroupName || undefined,
+        destination: undefined,
+        travelDate: undefined,
+        assignee: '',
+        createdAt: opp.createdAt,
+        updatedAt: opp.updatedAt,
+        expectedCloseDate: opp.expectedCloseDate || undefined,
+        products: [],
+        quote: undefined,
+        pinnedByUsers: opp.pinnedByUsers || [],
+      } as any)))
+    })
+  }, [activeNav])
 
   // ── Derived ──────────────────────────────────────────────────────────────────
   const selectedOpportunity = useMemo(
