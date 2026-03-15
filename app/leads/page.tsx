@@ -4,11 +4,14 @@ import { LeadManagementClient } from '@/components/leads/lead-management-client'
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: { tab?: string; q?: string; leadId?: string }
+  searchParams: Promise<{ tab?: string; q?: string; leadId?: string }>
 }) {
-  const currentTab = searchParams.tab === 'public_pool' ? 'pool' : 'my_leads'
-  const searchQuery = searchParams.q || ''
-  const selectedLeadId = searchParams.leadId || null
+  // Next.js 15+ searchParams 是 Promise，需要 await
+  const params = await searchParams
+
+  const currentTab = params.tab === 'pool' ? 'pool' : 'my_leads'
+  const searchQuery = params.q || ''
+  const selectedLeadId = params.leadId || null
 
   // 服务端直接查询数据，带上搜索参数
   const leads = await getLeadsAction(currentTab, {
