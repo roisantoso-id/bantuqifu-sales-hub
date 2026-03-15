@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, EyeOff, ArrowRight, ChevronDown, MessageCircle } from 'lucide-react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
@@ -22,6 +22,7 @@ const LANGUAGES = [
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [selectedTenant, setSelectedTenant] = useState(TENANTS[0])
   const [tenantOpen, setTenantOpen] = useState(false)
   const [email, setEmail] = useState('admin@bantuqifu.com')
@@ -31,9 +32,12 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
+  // 获取重定向路径
+  const redirectPath = searchParams.get('redirect') || '/'
+
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) return
-    
+
     setIsLoading(true)
     setError('')
 
@@ -58,7 +62,8 @@ export default function LoginPage() {
         localStorage.setItem('selectedTenantName', selectedTenant.name)
         localStorage.setItem('currentSite', selectedTenant.site)
 
-        router.push('/')
+        // 重定向到原页面或首页
+        router.push(redirectPath)
         router.refresh() // 刷新服务端组件
       }
     } catch (err) {
