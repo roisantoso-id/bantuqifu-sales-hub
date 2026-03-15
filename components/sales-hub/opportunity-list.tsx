@@ -42,7 +42,8 @@ export function OpportunityList({
     const matchesSearch =
       !searchQuery ||
       opp.customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      opp.customer.passportNo.toLowerCase().includes(searchQuery.toLowerCase())
+      opp.customer.passportNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      opp.opportunityCode.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesStage = !stageFilter || opp.stageId === stageFilter
     return matchesSearch && matchesStage
   })
@@ -53,13 +54,13 @@ export function OpportunityList({
       <div className="border-b border-[#e5e7eb] p-2">
         <div className="relative">
           <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#6b7280]" />
-          <input
+            <input
             type="text"
-            placeholder="搜索客户/护照号..."
+            placeholder="搜索客户/护照/商机编号..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             className="h-7 w-full rounded-sm border border-[#e5e7eb] bg-white pl-7 pr-2 text-[12px] text-[#111827] placeholder:text-[#9ca3af] focus:border-[#2563eb] focus:outline-none"
-          />
+            />
         </div>
         {/* Stage Filters */}
         <div className="mt-2 flex gap-1">
@@ -110,15 +111,15 @@ export function OpportunityList({
             <div className="ml-2 min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
                 <span className="truncate text-[13px] font-medium text-[#111827]">
-                  {opp.customer.name}
+                  {opp.opportunityCode}
                 </span>
                 <span className="flex-shrink-0 rounded-sm bg-[#f3f4f6] px-1 py-0.5 text-[10px] font-medium text-[#6b7280]">
                   {serviceAbbr[opp.serviceType]}
                 </span>
               </div>
               <div className="mt-0.5 flex items-center justify-between">
-                <span className="font-mono text-[11px] text-[#6b7280]">
-                  {opp.customer.passportNo}
+                <span className="text-[11px] text-[#6b7280]">
+                  {opp.customer.name}
                 </span>
                 <span className="font-mono text-[11px] font-medium text-[#111827]">
                   ¥{opp.estimatedAmount.toLocaleString()}

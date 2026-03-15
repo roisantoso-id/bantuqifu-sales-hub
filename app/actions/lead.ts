@@ -264,7 +264,7 @@ export async function updateLeadAction(
   }
 
   if (lead.convertedOpportunityId) {
-    return { success: false, error: '该线索已转化为商机，不能修改' }
+    return { success: false, error: '该线索已转化���商机，不能修改' }
   }
 
   // 更新线索
@@ -598,9 +598,8 @@ export async function autoRecycleLeadsAction(): Promise<{ success: boolean; coun
     .from('leads')
     .update({
       assigneeId: null, // 清空负责人
+      status: 'public_pool', // ✅ 明确标记为公海状态
       discardReason: 'SYSTEM_AUTO_RECYCLE',
-      discardedAt: new Date().toISOString(),
-      discardedById: SYSTEM_USER_ID,
       updatedAt: new Date().toISOString(),
     })
     .in('id', leadIds)
