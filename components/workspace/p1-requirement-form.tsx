@@ -10,29 +10,24 @@ interface P1FormProps {
   onAdvance: () => void
 }
 
-const DEMAND_SOURCES = ['山海图微信群', '群聊转入', '老客户转介绍', '渠道', '其他']
+const DEMAND_SOURCES = ['群聊转入', '老客户转介绍', '渠道', '其他']
 const BUSINESS_CATEGORIES = ['签证服务', '财务服务', '准证服务', '公司开办服务', '税务服务']
 const CITIES = ['Jakarta', 'Surabaya', 'Bali', 'Bandung', 'Medan']
-const URGENCY_LEVELS = ['高', '中', '低']
+const URGENCY_LEVELS = ['普通', '紧急', '特急']
 
 export function P1RequirementForm({ opportunity, onUpdate, onAdvance }: P1FormProps) {
   const [formData, setFormData] = useState({
     customerName: opportunity.customer.name,
-    contactPhone: '',
-    demandSource: '山海图微信群',
+    contactName: '',
+    demandSource: '',
     businessCategory: opportunity.serviceType,
     searchTerm: '',
     showSuggestions: false,
     processingTime: '',
     city: '',
     passportNo: opportunity.customer.passportNo,
-    urgency: '中',
+    urgency: '普通',
     requirements: opportunity.requirements ?? '',
-    budgetMin: 0,
-    budgetMax: 0,
-    currency: 'RMB',
-    nextFollowUp: '',
-    assignee: '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -54,7 +49,6 @@ export function P1RequirementForm({ opportunity, onUpdate, onAdvance }: P1FormPr
     const newErrors: Record<string, string> = {}
     if (!opportunity.id) newErrors.opportunityId = '商机ID必填'
     if (!formData.businessCategory) newErrors.businessCategory = '业务分类必填'
-    if (!formData.nextFollowUp) newErrors.nextFollowUp = '下次跟进计划必填'
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -75,49 +69,57 @@ export function P1RequirementForm({ opportunity, onUpdate, onAdvance }: P1FormPr
   return (
     <div className="flex h-full flex-col bg-white">
       {/* Header */}
-      <div className="border-b border-[#e5e7eb] px-6 py-4">
-        <h3 className="text-[15px] font-semibold text-[#111827]">录入新线索</h3>
+      <div className="border-b border-[#e5e7eb] px-5 py-2.5">
+        <h3 className="text-[13px] font-semibold text-[#111827]">P1: 需求收集</h3>
+        <p className="mt-0.5 text-[11px] text-[#9ca3af]">记录客户基础信息与服务意向</p>
       </div>
 
-      {/* Main Content - 单列布局，标签在上 */}
-      <div className="flex-1 overflow-y-auto px-6 py-5">
-        <div className="space-y-6">
-          {/* 区块 A: 基础身份 */}
-          <div>
-            <h4 className="mb-4 text-[13px] font-semibold text-[#111827]">A. 基础身份</h4>
-            <div className="space-y-4">
-              {/* 微信 ID / 群称呼 */}
-              <div>
-                <label className="mb-1.5 block text-[12px] text-[#6b7280]">微信 ID / 群称呼*</label>
+      {/* Main Content - 两列网格 */}
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="max-w-4xl space-y-4">
+          {/* 区块 A: 客户与商机基础 */}
+          <div className="rounded-sm border border-[#e5e7eb] bg-white p-3">
+            <h4 className="mb-2 text-[12px] font-semibold text-[#111827]">A. 客户与商机基础</h4>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+              {/* 商机 ID - 只读 */}
+              <div className="flex items-center gap-1.5">
+                <label className="w-[120px] text-[12px] text-[#6b7280]">商机 ID</label>
+                <input
+                  type="text"
+                  value={opportunity.id}
+                  disabled
+                  className="h-8 flex-1 rounded-sm border border-[#e5e7eb] bg-[#f9fafb] px-2 font-mono text-[12px] text-[#9ca3af]"
+                />
+              </div>
+
+              {/* 客户名称 */}
+              <div className="flex items-center gap-1.5">
+                <label className="w-[120px] text-[12px] text-[#6b7280]">客户名称*</label>
                 <input
                   type="text"
                   value={formData.customerName}
                   onChange={(e) => setFormData((prev) => ({ ...prev, customerName: e.target.value }))}
-                  placeholder="如：21231231山海图-王总"
-                  className="h-10 w-full border-b border-[#e5e7eb] bg-transparent px-0 text-[13px] text-[#111827] outline-none placeholder-[#9ca3af] focus:border-[#2563eb]"
+                  className="h-8 flex-1 rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#111827] outline-none focus:border-[#2563eb]"
                 />
               </div>
 
-              {/* 联系电话 */}
-              <div>
-                <label className="mb-1.5 block text-[12px] text-[#6b7280]">联系电话</label>
+              {/* 联系人/微信名 */}
+              <div className="flex items-center gap-1.5">
+                <label className="w-[120px] text-[12px] text-[#6b7280]">联系人</label>
                 <input
                   type="text"
-                  value={formData.contactPhone}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, contactPhone: e.target.value }))}
-                  placeholder="手机号 / 微信号"
-                  className="h-10 w-full border-b border-[#e5e7eb] bg-transparent px-0 text-[13px] text-[#111827] outline-none placeholder-[#9ca3af] focus:border-[#2563eb]"
+                  value={formData.contactName}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, contactName: e.target.value }))}
+                  className="h-8 flex-1 rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#111827] outline-none focus:border-[#2563eb]"
+                  placeholder="客户称呼/微信名"
                 />
               </div>
 
-              {/* 线索来源 */}
-              <div>
-                <label className="mb-1.5 block text-[12px] text-[#6b7280]">线索来源*</label>
-                <select
-                  value={formData.demandSource}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, demandSource: e.target.value }))}
-                  className="h-10 w-full border-b border-[#e5e7eb] bg-transparent px-0 text-[13px] text-[#111827] outline-none focus:border-[#2563eb]"
-                >
+              {/* 需求来源 */}
+              <div className="flex items-center gap-1.5">
+                <label className="w-[120px] text-[12px] text-[#6b7280]">需求来源</label>
+                <select className="h-8 flex-1 rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#111827] outline-none focus:border-[#2563eb]">
+                  <option value="">请选择</option>
                   {DEMAND_SOURCES.map((s) => (
                     <option key={s} value={s}>
                       {s}
@@ -126,22 +128,23 @@ export function P1RequirementForm({ opportunity, onUpdate, onAdvance }: P1FormPr
                 </select>
               </div>
             </div>
+            {errors.opportunityId && <p className="mt-1 text-[10px] text-[#dc2626]">{errors.opportunityId}</p>}
           </div>
 
-          {/* 区块 B: 业务画像 */}
-          <div>
-            <h4 className="mb-4 text-[13px] font-semibold text-[#111827]">B. 业务画像</h4>
-            <div className="space-y-4">
-              {/* 意向分类 */}
-              <div>
-                <label className="mb-1.5 block text-[12px] text-[#6b7280]">意向分类</label>
+          {/* 区块 B: 服务意向 */}
+          <div className="rounded-sm border border-[#e5e7eb] bg-white p-3">
+            <h4 className="mb-2 text-[12px] font-semibold text-[#111827]">B. 服务意向</h4>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+              {/* 业务分类 */}
+              <div className="flex items-center gap-1.5">
+                <label className="w-[120px] text-[12px] text-[#6b7280]">业务分类*</label>
                 <select
                   value={formData.businessCategory}
                   onChange={(e) => setFormData((prev) => ({ ...prev, businessCategory: e.target.value }))}
-                  className={`h-10 w-full border-b bg-transparent px-0 text-[13px] outline-none focus:border-[#2563eb] ${
+                  className={`h-8 flex-1 rounded-sm border px-2 text-[12px] outline-none focus:border-[#2563eb] ${
                     errors.businessCategory
-                      ? 'border-[#dc2626] text-[#dc2626]'
-                      : 'border-[#e5e7eb] text-[#111827]'
+                      ? 'border-[#fca5a5] bg-[#fef2f2] text-[#dc2626]'
+                      : 'border-[#e5e7eb] bg-white text-[#111827]'
                   }`}
                 >
                   <option value="">请选择</option>
@@ -151,120 +154,137 @@ export function P1RequirementForm({ opportunity, onUpdate, onAdvance }: P1FormPr
                     </option>
                   ))}
                 </select>
-                {errors.businessCategory && <p className="mt-1 text-[11px] text-[#dc2626]">{errors.businessCategory}</p>}
               </div>
 
-              {/* 预算范围 */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="mb-1.5 block text-[12px] text-[#6b7280]">预算范围 (最低)</label>
-                  <input
-                    type="number"
-                    value={formData.budgetMin}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, budgetMin: Number(e.target.value) }))}
-                    className="h-10 w-full border-b border-[#e5e7eb] bg-transparent px-0 text-[13px] text-[#111827] outline-none placeholder-[#9ca3af] focus:border-[#2563eb]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-[12px] text-[#6b7280]">预算范围 (最高)</label>
-                  <input
-                    type="number"
-                    value={formData.budgetMax}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, budgetMax: Number(e.target.value) }))}
-                    className="h-10 w-full border-b border-[#e5e7eb] bg-transparent px-0 text-[13px] text-[#111827] outline-none placeholder-[#9ca3af] focus:border-[#2563eb]"
-                  />
-                </div>
+              {/* 办理时长需求 */}
+              <div className="flex items-center gap-1.5">
+                <label className="w-[120px] text-[12px] text-[#6b7280]">办理时长</label>
+                <input
+                  type="text"
+                  value={formData.processingTime}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, processingTime: e.target.value }))}
+                  className="h-8 flex-1 rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#111827] outline-none focus:border-[#2563eb]"
+                  placeholder="如：7天、2周"
+                />
               </div>
 
-              {/* 币种 */}
-              <div>
-                <label className="mb-1.5 block text-[12px] text-[#6b7280]">币种</label>
+              {/* 预选产品 - 模糊搜索 */}
+              <div className="relative flex items-center gap-1.5 col-span-2">
+                <label className="w-[120px] text-[12px] text-[#6b7280]">预选产品</label>
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    value={formData.searchTerm}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        searchTerm: e.target.value,
+                        showSuggestions: true,
+                      }))
+                    }
+                    onBlur={() => setTimeout(() => setFormData((prev) => ({ ...prev, showSuggestions: false })), 200)}
+                    onFocus={() => setFormData((prev) => ({ ...prev, showSuggestions: true }))}
+                    className="h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#111827] outline-none focus:border-[#2563eb]"
+                    placeholder="搜索产品"
+                  />
+                  {/* Suggestions */}
+                  {formData.showSuggestions && filteredProducts.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 z-10 mt-0.5 max-h-40 overflow-y-auto rounded-sm border border-[#e5e7eb] bg-white shadow-sm">
+                      {filteredProducts.slice(0, 5).map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => handleProductSelect(p)}
+                          className="flex w-full items-center gap-2 border-b border-[#f3f4f6] px-2 py-1 text-left text-[11px] hover:bg-[#f9fafb]"
+                        >
+                          <span className="flex-1 truncate text-[#111827] font-medium">{p.name}</span>
+                          <span className="text-[#9ca3af]">{p.category}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            {errors.businessCategory && <p className="mt-1 text-[10px] text-[#dc2626]">{errors.businessCategory}</p>}
+          </div>
+
+          {/* 区块 C: 交付关键参数 */}
+          <div className="rounded-sm border border-[#e5e7eb] bg-white p-3">
+            <h4 className="mb-2 text-[12px] font-semibold text-[#111827]">C. 交付关键参数</h4>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+              {/* 入境城市 */}
+              <div className="flex items-center gap-1.5">
+                <label className="w-[120px] text-[12px] text-[#6b7280]">入境城市</label>
                 <select
-                  value={formData.currency}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, currency: e.target.value }))}
-                  className="h-10 w-full border-b border-[#e5e7eb] bg-transparent px-0 text-[13px] text-[#111827] outline-none focus:border-[#2563eb]"
+                  value={formData.city}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, city: e.target.value }))}
+                  className="h-8 flex-1 rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#111827] outline-none focus:border-[#2563eb]"
                 >
-                  <option value="RMB">RMB</option>
-                  <option value="USD">USD</option>
-                  <option value="IDR">IDR</option>
+                  <option value="">请选择</option>
+                  {CITIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
                 </select>
               </div>
 
+              {/* 护照号 */}
+              <div className="flex items-center gap-1.5">
+                <label className="w-[120px] text-[12px] text-[#6b7280]">护照号</label>
+                <input
+                  type="text"
+                  value={formData.passportNo}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, passportNo: e.target.value }))}
+                  className="h-8 flex-1 rounded-sm border border-[#e5e7eb] bg-white px-2 font-mono text-[12px] text-[#111827] outline-none focus:border-[#2563eb]"
+                  placeholder="E00000000"
+                />
+              </div>
+
               {/* 紧急程度 - Toggle Group */}
-              <div className="flex overflow-hidden rounded border border-[#e5e7eb]">
-                {URGENCY_LEVELS.map((level) => (
-                  <button
-                    key={level}
-                    type="button"
-                    onClick={() => setFormData((prev) => ({ ...prev, urgency: level }))}
-                    className={`flex-1 py-2.5 text-[13px] font-medium transition-colors ${
-                      formData.urgency === level
-                        ? 'bg-[#2563eb] text-white'
-                        : 'bg-white text-[#6b7280] hover:bg-[#f9fafb]'
-                    }`}
-                  >
-                    {level}
-                  </button>
-                ))}
+              <div className="col-span-2 flex items-center gap-1.5">
+                <label className="w-[120px] text-[12px] text-[#6b7280]">紧急程度</label>
+                <div className="flex gap-1">
+                  {URGENCY_LEVELS.map((level) => (
+                    <button
+                      key={level}
+                      onClick={() => setFormData((prev) => ({ ...prev, urgency: level }))}
+                      className={`h-8 px-2 rounded-sm text-[12px] font-medium transition-colors ${
+                        formData.urgency === level
+                          ? 'bg-[#2563eb] text-white'
+                          : 'border border-[#e5e7eb] text-[#6b7280] hover:border-[#2563eb]'
+                      }`}
+                    >
+                      {level}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* 区块 C: 跟进上下文 */}
-          <div>
-            <h4 className="mb-4 text-[13px] font-semibold text-[#111827]">C. 跟进上下文</h4>
-            <div className="space-y-4">
-              {/* 首条需求备注 */}
-              <div>
-                <label className="mb-1.5 block text-[12px] text-[#6b7280]">首条需求备注</label>
-                <textarea
-                  value={formData.requirements}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, requirements: e.target.value }))}
-                  placeholder="记录客户的初步需求、特殊情况等"
-                  rows={3}
-                  className="w-full border-b border-[#e5e7eb] bg-transparent px-0 py-2 text-[13px] text-[#111827] placeholder-[#9ca3af] outline-none focus:border-[#2563eb] resize-none leading-relaxed"
-                />
-              </div>
-
-              {/* 下次跟进计划 */}
-              <div>
-                <label className="mb-1.5 block text-[12px] text-[#6b7280]">下次跟进计划* (关键)</label>
-                <input
-                  type="date"
-                  value={formData.nextFollowUp}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, nextFollowUp: e.target.value }))}
-                  className={`h-10 w-full border-b bg-transparent px-0 text-[13px] outline-none focus:border-[#2563eb] ${
-                    errors.nextFollowUp ? 'border-[#dc2626]' : 'border-[#e5e7eb]'
-                  } text-[#111827]`}
-                />
-                <p className="mt-1 text-[11px] text-[#9ca3af]">7天未更新将自动回收至公海池</p>
-                {errors.nextFollowUp && <p className="mt-1 text-[11px] text-[#dc2626]">{errors.nextFollowUp}</p>}
-              </div>
-
-              {/* 负责人 */}
-              <div>
-                <label className="mb-1.5 block text-[12px] text-[#6b7280]">负责人 (选填)</label>
-                <input
-                  type="text"
-                  value={formData.assignee}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, assignee: e.target.value }))}
-                  placeholder="销售人员名字"
-                  className="h-10 w-full border-b border-[#e5e7eb] bg-transparent px-0 text-[13px] text-[#111827] outline-none placeholder-[#9ca3af] focus:border-[#2563eb]"
-                />
-              </div>
-            </div>
+          {/* 区块 D: 备注说明 */}
+          <div className="rounded-sm border border-[#e5e7eb] bg-white p-3">
+            <h4 className="mb-2 text-[12px] font-semibold text-[#111827]">D. 需求详情描述</h4>
+            <textarea
+              value={formData.requirements}
+              onChange={(e) => setFormData((prev) => ({ ...prev, requirements: e.target.value }))}
+              placeholder="记录客户具体需求、特殊情况、备注等"
+              rows={4}
+              className="w-full rounded-sm border border-[#e5e7eb] bg-white p-2 text-[12px] text-[#111827] placeholder-[#9ca3af] outline-none focus:border-[#2563eb] resize-none leading-relaxed"
+            />
           </div>
         </div>
       </div>
 
       {/* Footer - 固定工具栏 */}
-      <div className="border-t border-[#e5e7eb] bg-[#f9fafb] px-6 py-3 flex items-center justify-between">
-        <button className="flex h-9 items-center gap-1.5 rounded border border-[#e5e7eb] bg-white px-4 text-[13px] text-[#374151] hover:border-[#d1d5db]">
+      <div className="border-t border-[#e5e7eb] bg-[#f9fafb] px-5 py-2 flex items-center justify-between">
+        <button className="flex h-8 items-center gap-1.5 rounded-sm border border-[#e5e7eb] bg-white px-3 text-[13px] text-[#374151] hover:border-[#d1d5db]">
           保存草稿
         </button>
         <button
           onClick={handleAdvance}
-          className="flex h-9 items-center gap-1.5 rounded bg-[#2563eb] px-4 text-[13px] font-medium text-white hover:bg-[#1d4ed8]"
+          className="flex h-8 items-center gap-1.5 rounded-sm bg-[#2563eb] px-3 text-[13px] font-medium text-white hover:bg-[#1d4ed8]"
         >
           确认意向并推进至 P2
         </button>
