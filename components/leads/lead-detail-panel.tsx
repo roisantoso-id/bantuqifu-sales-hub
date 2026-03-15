@@ -16,6 +16,7 @@ import {
   getLeadSourceLabel,
   getLeadUrgencyLabel,
   getLeadCategoryLabel,
+  getFollowupTypeLabel,
 } from '@/lib/lead-labels'
 
 interface LeadDetailPanelProps {
@@ -194,7 +195,7 @@ export function LeadDetailPanel({ lead, isOpen, onClose }: LeadDetailPanelProps)
                   >
                     <div className="flex items-center justify-between mb-1">
                       <Badge variant="outline" className="text-xs">
-                        {followUp.followupType}
+                        {getFollowupTypeLabel(followUp.followupType)}
                       </Badge>
                       <span className="text-xs text-slate-500">
                         {new Date(followUp.createdAt).toLocaleString('zh-CN')}

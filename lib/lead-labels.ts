@@ -23,6 +23,7 @@ export const LEAD_STATUS_LABELS: Record<string, string> = {
 
 // 线索来源标签
 export const LEAD_SOURCE_LABELS: Record<string, string> = {
+  // 数据库枚举值（小写）
   wechat: '微信',
   referral: '转介绍',
   facebook: 'Facebook',
@@ -35,6 +36,10 @@ export const LEAD_SOURCE_LABELS: Record<string, string> = {
   FACEBOOK: 'Facebook',
   WEBSITE: '官网',
   COLD_OUTREACH: '陌生开发',
+  CUSTOMER_REF: '客户推荐',
+  PARTNER: '合作伙伴',
+  EXHIBITION: '展会',
+  ONLINE_AD: '线上广告',
 }
 
 // 紧迫度标签
@@ -42,11 +47,17 @@ export const LEAD_URGENCY_LABELS: Record<string, string> = {
   HIGH: '高',
   MEDIUM: '中',
   LOW: '低',
+  HOT: '高',
+  WARM: '中',
+  COLD: '低',
 
   // 小写兼容
   high: '高',
   medium: '中',
   low: '低',
+  hot: '高',
+  warm: '中',
+  cold: '低',
 }
 
 // 线索类目标签
@@ -58,6 +69,7 @@ export const LEAD_CATEGORY_LABELS: Record<string, string> = {
   TAX_SERVICES: '税务服务',
   FACTORY_SETUP: '工厂落地',
   IMMIGRATION: '移民服务',
+  SERVICE_INQUIRY: '服务咨询',
   OTHER: '其他',
 }
 
@@ -67,6 +79,16 @@ export const DISCARD_REASON_LABELS: Record<string, string> = {
   MISMATCH_NEEDS: '需求不匹配',
   LIMITED_SALES_CAPABILITY: '销售能力有限',
   OTHER: '其他',
+}
+
+// 跟进类型标签
+export const FOLLOWUP_TYPE_LABELS: Record<string, string> = {
+  general: '一般跟进',
+  call: '电话沟通',
+  visit: '上门拜访',
+  meeting: '会议',
+  email: '邮件',
+  wechat: '微信',
 }
 
 // 辅助函数：获取标签，如果没有映射则返回原值
@@ -88,4 +110,8 @@ export function getLeadCategoryLabel(category: string): string {
 
 export function getDiscardReasonLabel(reason: string): string {
   return DISCARD_REASON_LABELS[reason] || reason
+}
+
+export function getFollowupTypeLabel(type: string): string {
+  return FOLLOWUP_TYPE_LABELS[type] || type
 }
