@@ -180,16 +180,6 @@ export function LeadManagementClient({
             {searchQuery && (
               <p className="mt-1 text-[12px] text-[#9ca3af]">尝试修改搜索条件</p>
             )}
-            {!searchQuery && (
-              <Button
-                size="sm"
-                className="mt-4 h-8 bg-[#2563eb] text-[12px] hover:bg-[#1d4ed8]"
-                onClick={() => setCreateDialogOpen(true)}
-              >
-                <Plus className="mr-1.5 h-3.5 w-3.5" />
-                添加第一条线索
-              </Button>
-            )}
           </div>
         ) : (
           <LeadTable
