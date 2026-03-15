@@ -179,20 +179,6 @@ export async function createLeadAction(input: {
     leadCode = `LEAD-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${randomSuffix}`
   }
 
-  // 生成企业微信群ID和名称
-  const { data: groupRow, error: groupError } = await supabase
-    .from('wechat_group_sequences')
-    .insert({})
-    .select('id')
-    .single()
-
-  if (groupError || !groupRow) {
-    console.error('[createLeadAction] Wechat group alloc error:', groupError)
-    return null
-  }
-
-  const wechatGroupName = `${input.wechatName || '线索'}-${leadCode}`
-
   const { data, error } = await supabase
     .from('leads')
     .insert([
@@ -213,8 +199,6 @@ export async function createLeadAction(input: {
         status: 'new',
         assigneeId: userId, // 自动分配给创建人
         lastActionAt: new Date().toISOString(),
-        wechatGroupId: groupRow.id,
-        wechatGroupName: wechatGroupName,
         notes: input.notes || null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
