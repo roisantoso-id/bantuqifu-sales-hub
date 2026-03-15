@@ -1,5 +1,6 @@
 'use server'
-// Lead Actions - v1.0 using Supabase direct (matches leads table schema)
+// Lead Actions - v1.1 using Supabase direct (matches leads table schema)
+// Fixed: Moved constants to lib/constants/lead.ts to comply with use server export rules
 
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { generateBizId } from '@/lib/utils/id-generator'
