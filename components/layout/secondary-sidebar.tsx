@@ -146,10 +146,10 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect, onToggle
       {/* Count */}
       <div className="flex items-center justify-between px-3 py-1.5">
         <span className="text-[11px] text-[#9ca3af]">{filtered.length} 条商机</span>
-        {pinnedIds.size > 0 && (
+        {pinned.length > 0 && (
           <span className="inline-flex items-center gap-0.5 text-[10px] text-[#6b7280]">
             <Pin size={10} className="text-[#f59e0b]" />
-            {pinnedIds.size} 个置顶
+            {pinned.length} 个置顶
           </span>
         )}
       </div>
