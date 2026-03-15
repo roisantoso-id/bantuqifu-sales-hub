@@ -174,9 +174,9 @@ export async function createLeadAction(input: {
   }
 
   if (!leadCode) {
-    // Fallback: generate unique code with timestamp suffix
-    const timestamp = Date.now().toString(36).toUpperCase()
-    leadCode = `LEAD-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${timestamp}`
+    // Fallback: generate unique code with random UUID suffix to ensure uniqueness
+    const randomSuffix = crypto.randomUUID().slice(0, 8).toUpperCase()
+    leadCode = `LEAD-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${randomSuffix}`
   }
 
   // 生成企业微信群ID和名称
@@ -715,9 +715,9 @@ export async function convertLeadToOpportunityAction(
   }
 
   if (!opportunityCode) {
-    // Fallback: generate unique code with timestamp suffix
-    const timestamp = Date.now().toString(36).toUpperCase()
-    opportunityCode = `OPP-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${timestamp}`
+    // Fallback: generate unique code with random suffix to ensure uniqueness
+    const randomSuffix = crypto.randomUUID().slice(0, 8).toUpperCase()
+    opportunityCode = `OPP-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${randomSuffix}`
   }
 
   // 3. 处理企微群分配

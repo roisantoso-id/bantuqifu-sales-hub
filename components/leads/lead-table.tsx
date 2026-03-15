@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   Flame, Thermometer, Snowflake, Clock,
   UserPlus, MoreHorizontal, ArrowUpRight,
@@ -41,7 +40,7 @@ import {
   getLeadCategoryLabel,
 } from '@/lib/lead-labels'
 
-// ─── Urgency indicator ─────────────────────────────────────────────────────────
+// Urgency indicator
 const URGENCY_MAP: Record<string, { icon: React.ReactNode; cls: string; dot: string }> = {
   HIGH:   { icon: <Flame className="h-3 w-3" />,       cls: 'text-red-600',   dot: 'bg-red-500'    },
   HOT:    { icon: <Flame className="h-3 w-3" />,       cls: 'text-red-600',   dot: 'bg-red-500'    },
@@ -79,17 +78,20 @@ function getRecycleCountdown(lead: LeadRow): { hours: number; isUrgent: boolean 
   return { hours: remaining, isUrgent: false }
 }
 
-// ─── Component ─────────────────────────────────────────────────────────────────
+// Component
 export function LeadTable({
   leads,
   viewMode,
   onRefresh,
+  onSelect,
+  selectedLeadId,
 }: {
   leads: LeadRow[]
   viewMode: 'my_leads' | 'public_pool'
   onRefresh?: () => void
+  onSelect?: (lead: LeadRow) => void
+  selectedLeadId?: string
 }) {
-  const router = useRouter()
   const [claiming, setClaiming] = useState<string | null>(null)
   const [convertDialogOpen, setConvertDialogOpen] = useState(false)
   const [leadToConvert, setLeadToConvert] = useState<LeadRow | null>(null)
@@ -98,7 +100,7 @@ export function LeadTable({
 
   const handleRowClick = (lead: LeadRow, e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('button, [role="menuitem"]')) return
-    router.push(`/leads/${lead.id}`)
+    onSelect?.(lead)
   }
 
   const handleClaimLead = async (lead: LeadRow, e: React.MouseEvent) => {
@@ -162,6 +164,7 @@ export function LeadTable({
               const countdown = getRecycleCountdown(lead)
               const urgency = URGENCY_MAP[lead.urgency] ?? URGENCY_MAP['MEDIUM']
               const isConverted = lead.status === 'converted' || !!lead.convertedOpportunityId
+              const isSelected = selectedLeadId === lead.id
 
               return (
                 <tr
@@ -171,6 +174,7 @@ export function LeadTable({
                     'cursor-pointer transition-colors hover:bg-[#f9fafb]',
                     stagnant ? 'bg-amber-50/60' : '',
                     isConverted ? 'bg-[#f9fafb] opacity-70' : '',
+                    isSelected ? 'bg-[#eff6ff]' : '',
                   ].join(' ')}
                 >
                   {/* Lead code */}
@@ -278,7 +282,7 @@ export function LeadTable({
                             className="h-7 gap-1 text-[11px] text-[#2563eb]"
                             onClick={(e) => {
                               e.stopPropagation()
-                              router.push(`/leads/${lead.id}`)
+                              onSelect?.(lead)
                             }}
                           >
                             <ArrowUpRight className="h-3 w-3" />
@@ -306,7 +310,7 @@ export function LeadTable({
                             className="text-[12px]"
                             onClick={(e) => {
                               e.stopPropagation()
-                              router.push(`/leads/${lead.id}`)
+                              onSelect?.(lead)
                             }}
                           >
                             查看详情

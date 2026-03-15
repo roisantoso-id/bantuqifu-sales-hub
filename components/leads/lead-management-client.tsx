@@ -7,6 +7,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { LeadTable } from './lead-table'
+import { CreateLeadDialog } from './create-lead-dialog'
+import { LeadDetailPanel } from './lead-detail-panel'
 import { toast } from 'sonner'
 import type { LeadRow } from '@/app/actions/lead'
 
@@ -21,11 +23,19 @@ export function LeadManagementClient({
   initialLeads,
   initialTab,
   initialSearch,
+  initialLeadId,
 }: LeadManagementClientProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
+
+  // Dialog / Panel state
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [selectedLead, setSelectedLead] = useState<LeadRow | null>(
+    initialLeadId ? initialLeads.find(l => l.id === initialLeadId) || null : null
+  )
+  const [detailPanelOpen, setDetailPanelOpen] = useState(!!initialLeadId)
 
   // Read state from URL
   const activeTab = (searchParams.get('tab') || initialTab) as 'my_leads' | 'pool'
@@ -45,7 +55,7 @@ export function LeadManagementClient({
 
   const handleTabChange = (tab: string) => {
     startTransition(() => {
-      router.push(`${pathname}?${createQueryString({ tab, q: null })}`)
+      router.push(`${pathname}?${createQueryString({ tab, q: null, lead: null })}`)
     })
   }
 
@@ -59,6 +69,29 @@ export function LeadManagementClient({
     router.refresh()
   }
 
+  const handleSelectLead = (lead: LeadRow) => {
+    setSelectedLead(lead)
+    setDetailPanelOpen(true)
+    // Update URL with lead id
+    startTransition(() => {
+      router.replace(`${pathname}?${createQueryString({ lead: lead.id })}`)
+    })
+  }
+
+  const handleCloseDetail = () => {
+    setDetailPanelOpen(false)
+    setSelectedLead(null)
+    // Remove lead id from URL
+    startTransition(() => {
+      router.replace(`${pathname}?${createQueryString({ lead: null })}`)
+    })
+  }
+
+  const handleCreateSuccess = () => {
+    setCreateDialogOpen(false)
+    handleRefresh()
+  }
+
   // Stats
   const stats = {
     total: initialLeads.length,
@@ -70,7 +103,7 @@ export function LeadManagementClient({
 
   return (
     <div className="flex h-full flex-col bg-white">
-      {/* ── Toolbar ── */}
+      {/* Toolbar */}
       <div className="flex items-center justify-between border-b border-[#e5e7eb] bg-[#fafafa] px-6 py-3">
         <div className="flex items-center gap-5">
           <h1 className="text-[13px] font-bold text-[#111827]">线索管理</h1>
@@ -127,7 +160,7 @@ export function LeadManagementClient({
           <Button
             size="sm"
             className="h-8 gap-1.5 bg-[#2563eb] text-[12px] hover:bg-[#1d4ed8]"
-            onClick={() => router.push('/leads/new')}
+            onClick={() => setCreateDialogOpen(true)}
           >
             <Plus className="h-3.5 w-3.5" />
             新增线索
@@ -135,7 +168,7 @@ export function LeadManagementClient({
         </div>
       </div>
 
-      {/* ── Table area ── */}
+      {/* Table area */}
       <div className="flex-1 overflow-auto px-6 py-4">
         {isPending ? (
           <div className="flex h-64 items-center justify-center">
@@ -151,7 +184,7 @@ export function LeadManagementClient({
               <Button
                 size="sm"
                 className="mt-4 h-8 bg-[#2563eb] text-[12px] hover:bg-[#1d4ed8]"
-                onClick={() => router.push('/leads/new')}
+                onClick={() => setCreateDialogOpen(true)}
               >
                 <Plus className="mr-1.5 h-3.5 w-3.5" />
                 添加第一条线索
@@ -163,9 +196,25 @@ export function LeadManagementClient({
             leads={initialLeads}
             viewMode={activeTab === 'pool' ? 'public_pool' : 'my_leads'}
             onRefresh={handleRefresh}
+            onSelect={handleSelectLead}
+            selectedLeadId={selectedLead?.id}
           />
         )}
       </div>
+
+      {/* Create Lead Dialog */}
+      <CreateLeadDialog
+        isOpen={createDialogOpen}
+        onClose={() => setCreateDialogOpen(false)}
+        onSuccess={handleCreateSuccess}
+      />
+
+      {/* Lead Detail Panel (Drawer) */}
+      <LeadDetailPanel
+        lead={selectedLead}
+        isOpen={detailPanelOpen}
+        onClose={handleCloseDetail}
+      />
     </div>
   )
 }
