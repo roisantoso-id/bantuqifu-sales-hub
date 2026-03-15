@@ -1,6 +1,7 @@
 'use server'
-// Lead Actions - v1.1 using Supabase direct (matches leads table schema)
-// Fixed: Moved constants to lib/constants/lead.ts to comply with use server export rules
+// Lead Actions - v2.0 using Supabase direct (matches leads table schema)
+// Updated: Fixed public pool logic - discard returns to pool (assignedToId=null), claim takes from pool
+// Previous version had "use server" cache issue - this version forces rebuild
 
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { generateBizId } from '@/lib/utils/id-generator'
@@ -77,14 +78,16 @@ export async function getLeadsAction(
     .order('createdAt', { ascending: false })
 
   if (viewMode === 'my_leads') {
+    // 我的线索：分配给当前用户且不是已废弃的
     if (userId) {
       query = query.eq('assignedToId', userId).neq('status', 'DISCARDED')
     } else {
-      query = query.neq('status', 'DISCARDED').is('assignedToId', null)
+      // 未登录用户看不到任何线索
+      return []
     }
   } else {
-    // 公海：无负责人 或 已废弃
-    query = query.or('assignedToId.is.null,status.eq.DISCARDED')
+    // 公海线索：无负责人（assignedToId 为 null）的所有非废弃线索
+    query = query.is('assignedToId', null).neq('status', 'DISCARDED')
   }
 
   const { data, error } = await query
