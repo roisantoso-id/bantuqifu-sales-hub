@@ -366,7 +366,7 @@ export async function getLeadFollowUpsAction(leadId: string): Promise<LeadFollow
 // 自动回收7天未跟进的线索到公海池
 // 由定时任务（Cron Job）或系统触发器调用
 export async function autoRecycleLeadsAction(): Promise<{ success: boolean; count: number }> {
-  const SYSTEM_USER_ID = 'bantu-system-001'
+  const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000001' // 系统用户固定 UUID
   const supabase = await createClient()
 
   // 计算7天前的时间节点

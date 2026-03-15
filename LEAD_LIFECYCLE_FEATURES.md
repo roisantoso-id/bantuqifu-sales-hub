@@ -10,7 +10,7 @@
 
 ---
 
-## 1. 系统用户 (bantu-system-001)
+## 1. 系统用户 (00000000-0000-0000-0000-000000000001)
 
 ### 目的
 
@@ -23,38 +23,42 @@
 文件：`scripts/seed-system-user.sql`
 
 ```sql
--- 在 auth.users 表中创建系统用户
-INSERT INTO auth.users (
-  id,
-  email,
-  encrypted_password,
-  email_confirmed_at,
-  created_at,
-  updated_at,
-  raw_user_meta_data
-) VALUES (
-  'bantu-system-001',
-  'system@bantuqifu.com',
-  crypt('SYSTEM_USER_NO_LOGIN', gen_salt('bf')),
-  NOW(),
-  NOW(),
-  NOW(),
-  '{"name":"Bantu System (系统自动执行)"}'
-);
-
--- 在业务表中创建对应记录
-INSERT INTO users_auth (id, email, name, "isActive")
-VALUES (
-  'bantu-system-001',
-  'system@bantuqifu.com',
-  'Bantu System (系统自动执行)',
-  true
-);
-
--- 绑定到所有租户
-INSERT INTO user_organizations ("userId", "organizationId", "roleId")
-SELECT 'bantu-system-001', id, (SELECT id FROM roles WHERE code = 'ADMIN')
-FROM organizations;
+-- 使用固定 UUID: 00000000-0000-0000-0000-000000000001
+DO $$
+DECLARE
+  system_user_id UUID := '00000000-0000-0000-0000-000000000001';
+  system_email TEXT := 'system@bantuqifu.com';
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM auth.users WHERE id = system_user_id
+  ) THEN
+    INSERT INTO auth.users (
+      id,
+      instance_id,
+      email,
+      encrypted_password,
+      email_confirmed_at,
+      created_at,
+      updated_at,
+      raw_app_meta_data,
+      raw_user_meta_data,
+      is_super_admin,
+      role
+    ) VALUES (
+      system_user_id,
+      '00000000-0000-0000-0000-000000000000',
+      system_email,
+      crypt('SYSTEM_USER_NO_LOGIN_' || gen_random_uuid()::text, gen_salt('bf')),
+      NOW(),
+      NOW(),
+      NOW(),
+      '{"provider":"system","providers":["system"]}'::jsonb,
+      '{"name":"Bantu System (系统自动执行)"}'::jsonb,
+      false,
+      'authenticated'
+    );
+  END IF;
+END $$;
 ```
 
 #### 执行方式
@@ -63,7 +67,7 @@ FROM organizations;
 2. 验证创建成功：
 
 ```sql
-SELECT * FROM users_auth WHERE id = 'bantu-system-001';
+SELECT * FROM users_auth WHERE id = '00000000-0000-0000-0000-000000000001';
 ```
 
 ---
@@ -76,7 +80,7 @@ SELECT * FROM users_auth WHERE id = 'bantu-system-001';
 - **回收操作**：
   - 清空 `assignedToId`（退回公海）
   - 设置 `discardReason = 'SYSTEM_AUTO_RECYCLE'`
-  - 记录 `discardedById = 'bantu-system-001'`
+  - 记录 `discardedById = '00000000-0000-0000-0000-000000000001'`
   - 更新 `discardedAt` 和 `updatedAt`
 
 ### 实现
@@ -87,7 +91,7 @@ SELECT * FROM users_auth WHERE id = 'bantu-system-001';
 
 ```typescript
 export async function autoRecycleLeadsAction(): Promise<{ success: boolean; count: number }> {
-  const SYSTEM_USER_ID = 'bantu-system-001'
+  const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000001'
   const supabase = await createClient()
 
   // 计算7天前的时间节点
@@ -474,7 +478,7 @@ export function LeadTable({ leads, onRefresh }) {
 │  - discardReason =    │
 │    SYSTEM_AUTO_RECYCLE│
 │  - discardedById =    │
-│    bantu-system-001   │
+│    00000000-0000-... │
 └────────┬─────────────┘
          │
          ▼
@@ -500,7 +504,7 @@ export function LeadTable({ leads, onRefresh }) {
 - [ ] 创建一个7天前的线索（修改 `createdAt`）
 - [ ] 手动调用 API 端点触发回收
 - [ ] 验证线索已退回公海（`assignedToId` 为空）
-- [ ] 验证 `discardedById` 为 `bantu-system-001`
+- [ ] 验证 `discardedById` 为系统用户 UUID
 - [ ] 验证 `discardReason` 为 `SYSTEM_AUTO_RECYCLE`
 
 ### 线索转商机测试

@@ -13,7 +13,7 @@
 验证创建成功：
 
 ```sql
-SELECT * FROM users_auth WHERE id = 'bantu-system-001';
+SELECT * FROM users_auth WHERE id = '00000000-0000-0000-0000-000000000001';
 ```
 
 ## 2. 配置 Cron 密钥

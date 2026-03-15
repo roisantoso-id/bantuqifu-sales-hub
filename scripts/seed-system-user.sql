@@ -5,17 +5,17 @@
 -- 执行方式：在 Supabase SQL Editor 中运行此脚本
 -- ════════════════════════════════════════════════════════════════════════════════
 
--- 1. 在 auth.users 表中创建系统用户（如果不存在）
--- 注意：Supabase auth.users 表通常由 Auth API 管理，这里我们直接插入一个虚拟用户
--- 如果您的 Supabase 项目不允许直接插入 auth.users，请跳过此步骤
-
+-- 定义系统用户的固定 UUID
+-- 使用固定 UUID: 00000000-0000-0000-0000-000000000001
 DO $$
+DECLARE
+  system_user_id UUID := '00000000-0000-0000-0000-000000000001';
+  system_email TEXT := 'system@bantuqifu.com';
 BEGIN
-  -- 检查系统用户是否已存在
+  -- 1. 在 auth.users 表中创建系统用户（如果不存在）
   IF NOT EXISTS (
-    SELECT 1 FROM auth.users WHERE id = 'bantu-system-001'
+    SELECT 1 FROM auth.users WHERE id = system_user_id
   ) THEN
-    -- 插入系统用户到 auth.users
     INSERT INTO auth.users (
       id,
       instance_id,
@@ -29,44 +29,44 @@ BEGIN
       is_super_admin,
       role
     ) VALUES (
-      'bantu-system-001',
+      system_user_id,
       '00000000-0000-0000-0000-000000000000',
-      'system@bantuqifu.com',
-      crypt('SYSTEM_USER_NO_LOGIN', gen_salt('bf')), -- 无法登录的密码
+      system_email,
+      crypt('SYSTEM_USER_NO_LOGIN_' || gen_random_uuid()::text, gen_salt('bf')),
       NOW(),
       NOW(),
       NOW(),
-      '{"provider":"system","providers":["system"]}',
-      '{"name":"Bantu System (系统自动执行)"}',
+      '{"provider":"system","providers":["system"]}'::jsonb,
+      '{"name":"Bantu System (系统自动执行)"}'::jsonb,
       false,
       'authenticated'
     );
 
-    RAISE NOTICE '✓ 系统用户已创建: bantu-system-001';
+    RAISE NOTICE '✓ 系统用户已创建: %', system_user_id;
   ELSE
     RAISE NOTICE '⚠ 系统用户已存在，跳过创建';
   END IF;
+
+  -- 2. 在业务表 users_auth 中创建对应记录
+  INSERT INTO users_auth (id, email, name, "isActive", "createdAt", "updatedAt")
+  VALUES (
+    system_user_id::text,
+    system_email,
+    'Bantu System (系统自动执行)',
+    true,
+    NOW(),
+    NOW()
+  )
+  ON CONFLICT (id) DO NOTHING;
+
+  RAISE NOTICE '✓ 业务用户记录已创建';
+
 END $$;
 
--- 2. 在业务表 users_auth 中创建对应记录（如果使用 Prisma schema）
--- 注意：根据您的实际表结构调整
-INSERT INTO users_auth (id, email, name, "isActive", "createdAt", "updatedAt")
-VALUES (
-  'bantu-system-001',
-  'system@bantuqifu.com',
-  'Bantu System (系统自动执行)',
-  true,
-  NOW(),
-  NOW()
-)
-ON CONFLICT (id) DO NOTHING;
-
 -- 3. 将系统用户绑定到所有租户（印尼和中国）
--- 假设您有 organizations 和 user_organizations 表
-
--- 获取印尼租户 ID
 DO $$
 DECLARE
+  system_user_id TEXT := '00000000-0000-0000-0000-000000000001';
   org_id_id TEXT;
   org_cn_id TEXT;
   admin_role_id TEXT;
@@ -82,7 +82,7 @@ BEGIN
   IF org_id_id IS NOT NULL AND admin_role_id IS NOT NULL THEN
     INSERT INTO user_organizations ("userId", "organizationId", "roleId", "createdAt", "updatedAt")
     VALUES (
-      'bantu-system-001',
+      system_user_id,
       org_id_id,
       admin_role_id,
       NOW(),
@@ -91,13 +91,15 @@ BEGIN
     ON CONFLICT ("userId", "organizationId") DO NOTHING;
 
     RAISE NOTICE '✓ 系统用户已绑定到印尼租户';
+  ELSE
+    RAISE NOTICE '⚠ 印尼租户或管理员角色不存在';
   END IF;
 
   -- 绑定到中国租户
   IF org_cn_id IS NOT NULL AND admin_role_id IS NOT NULL THEN
     INSERT INTO user_organizations ("userId", "organizationId", "roleId", "createdAt", "updatedAt")
     VALUES (
-      'bantu-system-001',
+      system_user_id,
       org_cn_id,
       admin_role_id,
       NOW(),
@@ -106,6 +108,8 @@ BEGIN
     ON CONFLICT ("userId", "organizationId") DO NOTHING;
 
     RAISE NOTICE '✓ 系统用户已绑定到中国租户';
+  ELSE
+    RAISE NOTICE '⚠ 中国租户或管理员角色不存在';
   END IF;
 END $$;
 
@@ -121,4 +125,4 @@ FROM users_auth u
 LEFT JOIN user_organizations uo ON u.id = uo."userId"
 LEFT JOIN organizations o ON uo."organizationId" = o.id
 LEFT JOIN roles r ON uo."roleId" = r.id
-WHERE u.id = 'bantu-system-001';
+WHERE u.id = '00000000-0000-0000-0000-000000000001';
