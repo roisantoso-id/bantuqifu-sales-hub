@@ -7,7 +7,6 @@ import { SecondarySidebar } from '@/components/layout/secondary-sidebar'
 import { WorkspacePane } from '@/components/workspace/workspace-pane'
 import { CustomerManagement } from '@/components/customers/customer-management'
 import { LeadManagementClient } from '@/components/leads/lead-management-client'
-import { OpportunityManagementClient } from '@/components/opportunities/opportunity-management-client'
 import { MyDashboard } from '@/components/dashboard/my-dashboard'
 import { AuditRail } from '@/components/audit-rail/audit-panel'
 import { mockOpportunities, mockProducts, mockActionLogs, mockUser, mockLeads } from '@/lib/mock-data'
@@ -38,11 +37,34 @@ export function DashboardClient({
   // 从 URL 读取当前导航状态
   const activeNav = (searchParams.get('nav') || initialNav) as NavSection
 
-  // 商机相关状态（保持原有逻辑）
-  const [opportunities, setOpportunities] = useState<Opportunity[]>(mockOpportunities)
+  // 商机相关状态 - 使用真实数据或 mock 数据
+  const [opportunities, setOpportunities] = useState<Opportunity[]>(
+    initialOpportunities && initialOpportunities.length > 0
+      ? initialOpportunities.map(opp => ({
+          id: opp.id,
+          customerId: opp.customerId,
+          customerName: '', // 需要从客户表获取
+          stageId: opp.stageId as StageId,
+          title: opp.serviceTypeLabel || opp.serviceType,
+          amount: opp.estimatedAmount,
+          currency: opp.currency as 'IDR' | 'CNY' | 'USD',
+          expectedCloseDate: opp.expectedCloseDate || undefined,
+          assignee: '', // 需要从用户表获取
+          createdAt: opp.createdAt,
+          updatedAt: opp.updatedAt,
+          requirements: opp.requirements || undefined,
+          products: [],
+          quote: undefined,
+        }))
+      : mockOpportunities
+  )
   const [leads, setLeads] = useState<Lead[]>(mockLeads)
-  const [selectedId, setSelectedId] = useState<string>(mockOpportunities[0].id)
-  const [viewingStage, setViewingStage] = useState<StageId>(mockOpportunities[0].stageId)
+  const [selectedId, setSelectedId] = useState<string>(
+    (initialOpportunities && initialOpportunities.length > 0 ? initialOpportunities[0].id : mockOpportunities[0].id)
+  )
+  const [viewingStage, setViewingStage] = useState<StageId>(
+    (initialOpportunities && initialOpportunities.length > 0 ? initialOpportunities[0].stageId : mockOpportunities[0].stageId) as StageId
+  )
   const [actionLogs, setActionLogs] = useState<Record<string, ActionLog[]>>(mockActionLogs)
   const [showAuditRail, setShowAuditRail] = useState(true)
 
@@ -185,11 +207,36 @@ export function DashboardClient({
           />
         </div>
       ) : activeNav === 'opportunities' ? (
-        <div className="flex-1 overflow-hidden">
-          <OpportunityManagementClient
-            initialOpportunities={initialOpportunities || []}
+        <>
+          {/* 商机列表 (280px) */}
+          <SecondarySidebar
+            activeNav={activeNav}
+            opportunities={opportunities}
+            selectedId={selectedId}
+            onSelect={handleSelectOpportunity}
           />
-        </div>
+
+          {/* 工作区 (flex-1) */}
+          <WorkspacePane
+            opportunity={selectedOpportunity}
+            allProducts={mockProducts}
+            viewingStage={viewingStage}
+            onViewingStageChange={setViewingStage}
+            onOpportunityUpdate={handleOpportunityUpdate}
+            onSave={handleSave}
+            onAdvanceStage={handleAdvanceStage}
+            onQuoteSent={handleQuoteSent}
+          />
+
+          {/* 审计栏 (256px) */}
+          <AuditRail
+            visible={showAuditRail}
+            onToggle={setShowAuditRail}
+            opportunity={selectedOpportunity}
+            logs={currentLogs}
+            onAddNote={handleAddNote}
+          />
+        </>
       ) : activeNav === 'customers' ? (
         <div className="flex-1 overflow-hidden">
           <CustomerManagement />
