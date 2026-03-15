@@ -157,6 +157,7 @@ export function LeadTable({
               const stagnant = isStagnant(lead)
               const countdown = getRecycleCountdown(lead)
               const urgency = getUrgencyIcon(lead.urgency)
+              const isConverted = lead.status === 'CONVERTED'
 
               return (
                 <tr
@@ -164,7 +165,7 @@ export function LeadTable({
                   onClick={(e) => handleRowClick(lead, e)}
                   className={`border-b hover:bg-slate-50 cursor-pointer transition-colors ${
                     stagnant ? 'bg-red-50/50' : ''
-                  }`}
+                  } ${isConverted ? 'opacity-60 bg-slate-50' : ''}`}
                 >
                   <td className="py-2.5 px-3">
                     <button className="text-blue-600 hover:underline font-mono">
@@ -173,6 +174,11 @@ export function LeadTable({
                     {stagnant && (
                       <Badge variant="destructive" className="ml-2 text-[10px] h-4">
                         停滞7天
+                      </Badge>
+                    )}
+                    {isConverted && (
+                      <Badge variant="secondary" className="ml-2 text-[10px] h-4">
+                        已转化
                       </Badge>
                     )}
                   </td>
@@ -216,11 +222,15 @@ export function LeadTable({
                         variant="outline"
                         className="h-7 text-[11px] gap-1"
                         onClick={(e) => handleClaimLead(lead, e)}
-                        disabled={claiming === lead.id}
+                        disabled={claiming === lead.id || isConverted}
                       >
                         <UserPlus className="h-3 w-3" />
                         {claiming === lead.id ? '认领中...' : '认领'}
                       </Button>
+                    ) : isConverted ? (
+                      <div className="flex items-center justify-center gap-1 text-slate-400 text-[11px]">
+                        <span>已转化为商机</span>
+                      </div>
                     ) : (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
