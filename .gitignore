@@ -19,3 +19,8 @@ next.user-config.*
 node_modules/
 .next/
 .DS_Store
+
+# Nginx SSL 证书和日志
+nginx/ssl/
+nginx/logs/
+nginx/certbot/
