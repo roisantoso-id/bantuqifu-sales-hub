@@ -57,8 +57,19 @@ export function SecondarySidebar({ opportunities, selectedId, onSelect, onToggle
 
   // 从商机数据中获取置顶状态
   const isPinnedByUser = (opp: Opportunity) => {
-    if (!currentUserId) return false
-    return (opp as any).pinnedByUsers?.includes(currentUserId) || false
+    if (!currentUserId) {
+      console.log('[isPinnedByUser] No currentUserId')
+      return false
+    }
+    const pinnedUsers = (opp as any).pinnedByUsers || []
+    const isPinned = pinnedUsers.includes(currentUserId)
+    console.log('[isPinnedByUser]', {
+      oppId: opp.id,
+      currentUserId,
+      pinnedUsers,
+      isPinned
+    })
+    return isPinned
   }
 
   const togglePin = async (e: React.MouseEvent, opp: Opportunity) => {

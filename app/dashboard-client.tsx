@@ -21,6 +21,7 @@ interface DashboardClientProps {
   initialLeadTab: string
   initialLeadSearch: string
   selectedLeadId: string | null
+  currentUserId?: string | null
 }
 
 export function DashboardClient({
@@ -30,6 +31,7 @@ export function DashboardClient({
   initialLeadTab,
   initialLeadSearch,
   selectedLeadId,
+  currentUserId,
 }: DashboardClientProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -282,7 +284,7 @@ export function DashboardClient({
             selectedId={selectedId}
             onSelect={handleSelectOpportunity}
             onTogglePin={handleTogglePin}
-            currentUserId={mockUser.id}
+            currentUserId={currentUserId || mockUser.id}
           />
 
           {/* 工作区 (flex-1) */}

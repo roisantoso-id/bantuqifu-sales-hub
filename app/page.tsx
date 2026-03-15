@@ -1,5 +1,6 @@
 import { getLeadsAction } from '@/app/actions/lead'
 import { getOpportunitiesAction } from '@/app/actions/opportunity'
+import { createClient } from '@/lib/supabase/server'
 import { DashboardClient } from '@/app/dashboard-client'
 
 export default async function DashboardPage({
@@ -15,6 +16,11 @@ export default async function DashboardPage({
   const leadTab = params.tab || 'my_leads'
   const leadSearch = params.q || ''
   const selectedLeadId = params.leadId || null
+
+  // 获取当前用户ID
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const currentUserId = user?.id || null
 
   // 根据导航模块预加载数据
   let initialLeads = null
@@ -37,6 +43,7 @@ export default async function DashboardPage({
       initialLeadTab={leadTab}
       initialLeadSearch={leadSearch}
       selectedLeadId={selectedLeadId}
+      currentUserId={currentUserId}
     />
   )
 }
