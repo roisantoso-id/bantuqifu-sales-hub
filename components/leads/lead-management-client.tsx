@@ -80,8 +80,8 @@ export function LeadManagementClient({
   // 数据统计
   const stats = {
     total: initialLeads.length,
-    new: initialLeads.filter(l => l.status === 'NEW').length,
-    pushing: initialLeads.filter(l => l.status === 'PUSHING').length,
+    new: initialLeads.filter(l => l.status === 'new').length,
+    pushing: initialLeads.filter(l => l.status === 'contacted' || l.status === 'ready_for_opportunity').length,
   }
 
   return (

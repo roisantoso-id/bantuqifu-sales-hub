@@ -50,15 +50,16 @@ function getCategoryIcon(category: string) {
 }
 
 function isStagnant(lead: LeadRow): boolean {
-  if (lead.status !== 'PUSHING') return false
+  // 只检查处于跟进中的状态
+  if (lead.status !== 'contacted' && lead.status !== 'ready_for_opportunity') return false
   const lastAction = lead.updatedAt ? new Date(lead.updatedAt) : new Date(lead.createdAt)
   const daysSince = Math.floor((Date.now() - lastAction.getTime()) / (1000 * 60 * 60 * 24))
   return daysSince > 7
 }
 
 function getRecycleCountdown(lead: LeadRow): { hours: number; isUrgent: boolean } | null {
-  // 已转化的线索不显示倒计时
-  if (lead.convertedOpportunityId || lead.status === 'CONVERTED') return null
+  // 已转化的线索不显示倒计时 (注意这里必须是小写 converted)
+  if (lead.convertedOpportunityId || lead.status === 'converted') return null
 
   // 只有已分配的线索才有回收倒计时
   if (!lead.assigneeId) return null
