@@ -11,7 +11,7 @@ import { MyDashboard } from '@/components/dashboard/my-dashboard'
 import { AuditRail } from '@/components/audit-rail/audit-panel'
 import { mockOpportunities, mockProducts, mockActionLogs, mockUser, mockLeads } from '@/lib/mock-data'
 import { addAuditNote } from '@/app/actions/audit'
-import type { Opportunity, NavSection, StageId, ActionLog, Lead, LeadRow, OpportunityRow } from '@/lib/types'
+import type { Opportunity, NavSection, StageId, ActionLog, Lead, LeadRow, OpportunityRow, OpportunityStatus, Currency } from '@/lib/types'
 
 interface DashboardClientProps {
   initialNav: NavSection
@@ -47,19 +47,28 @@ export function DashboardClient({
           customer: {
             id: opp.customer?.id || opp.customerId,
             name: opp.customer?.customerName || '未知客户',
+            passportNo: opp.customer?.customerId || '',
+            phone: '',
+            email: '',
+            wechat: '',
             level: 'L5' as const,
             industry: '',
             country: 'Indonesia',
           },
           stageId: opp.stageId as StageId,
-          title: opp.serviceTypeLabel || opp.serviceType,
-          amount: opp.estimatedAmount,
-          currency: opp.currency as 'IDR' | 'CNY' | 'USD',
-          expectedCloseDate: opp.expectedCloseDate || undefined,
-          assignee: '', // 需要从用户表获取
+          status: (opp.status as OpportunityStatus) || 'active',
+          serviceType: (opp.serviceType as 'VISA' | 'IMMIGRATION' | 'STUDY' | 'WORK') || 'VISA',
+          serviceTypeLabel: opp.serviceTypeLabel || opp.serviceType,
+          estimatedAmount: opp.estimatedAmount || 0,
+          currency: (opp.currency as Currency) || 'IDR',
+          requirements: opp.requirements || undefined,
+          notes: opp.notes || undefined,
+          destination: undefined,
+          travelDate: undefined,
+          assignee: '',
           createdAt: opp.createdAt,
           updatedAt: opp.updatedAt,
-          requirements: opp.requirements || undefined,
+          expectedCloseDate: opp.expectedCloseDate || undefined,
           products: [],
           quote: undefined,
         }))

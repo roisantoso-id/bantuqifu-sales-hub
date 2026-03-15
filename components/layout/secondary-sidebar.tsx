@@ -36,7 +36,10 @@ const SERVICE_BADGES: Record<string, string> = {
   WORK: '工签',
 }
 
-function formatAmount(amount: number, currency: string) {
+function formatAmount(amount: number | undefined, currency: string) {
+  if (!amount || amount === 0) {
+    return `${currency} 0`
+  }
   if (currency === 'CNY') {
     return amount >= 10000
       ? `¥${(amount / 10000).toFixed(amount % 10000 === 0 ? 0 : 1)}万`
