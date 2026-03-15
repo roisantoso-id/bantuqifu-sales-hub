@@ -45,7 +45,7 @@ export function OperationPane({
       <div className="flex items-center justify-between border-b border-[#e5e7eb] px-4 py-2">
         <BreadcrumbStepper currentStage={opportunity.stageId} />
         <div className="text-[12px] text-[#6b7280]">
-          商机 ID: <span className="font-mono">{opportunity.id}</span>
+          商机编号: <span className="font-mono">{opportunity.opportunityCode}</span>
         </div>
       </div>
 

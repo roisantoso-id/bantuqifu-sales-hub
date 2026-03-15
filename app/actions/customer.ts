@@ -15,7 +15,8 @@ async function getCurrentTenantId(): Promise<string> {
 
 export interface CustomerRow {
   id: string            // DB 主键 (UUID)
-  customerId: string    // 人读编号 CUST-2024-001
+  customerId: string    // 旧编号 (向后兼容)
+  customerCode?: string // 新编号 CUST-2024-001
   customerName: string
   phone: string | null
   email: string | null
@@ -68,6 +69,7 @@ export async function getCustomersAction(): Promise<CustomerRow[]> {
     .select(`
       id,
       customerId,
+      customerCode,
       customerName,
       phone,
       email,
@@ -91,6 +93,7 @@ export async function getCustomersAction(): Promise<CustomerRow[]> {
     return {
       id: c.id,
       customerId: c.customerId,
+      customerCode: c.customerCode ?? null,
       customerName: c.customerName,
       phone: c.phone ?? null,
       email: c.email ?? null,
@@ -232,7 +235,7 @@ export async function createCustomerAction(data: {
 
     if (codeError || !customerCode) {
       console.error('[customer action] generate customerCode error:', codeError)
-      throw new Error('生成客户编号失败')
+      throw new Error('生成客户编号��败')
     }
 
     // 2. 插入数据库（显式生成 id 避免 DEFAULT 缓存问题）

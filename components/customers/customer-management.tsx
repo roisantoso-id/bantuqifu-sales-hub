@@ -304,7 +304,7 @@ const result = await createCustomerAction({
 
   const filtered = useMemo(() => {
     return customers.filter((c) => {
-      const matchesQuery = !searchQuery || c.customerId.toLowerCase().includes(searchQuery.toLowerCase()) || c.customerName.toLowerCase().includes(searchQuery.toLowerCase())
+      const matchesQuery = !searchQuery || (c.customerCode?.toLowerCase().includes(searchQuery.toLowerCase())) || c.customerId.toLowerCase().includes(searchQuery.toLowerCase()) || c.customerName.toLowerCase().includes(searchQuery.toLowerCase())
       const matchesLevel = !selectedLevel || c.level === selectedLevel
       return matchesQuery && matchesLevel
     })
@@ -363,7 +363,7 @@ const result = await createCustomerAction({
                 {levelCustomers.map((customer) => (
                   <div key={customer.id} onClick={() => handleSelectCustomer(customer)} className={`px-3 py-2 border-b border-[#f3f4f6] cursor-pointer hover:bg-[#f9fafb] ${selectedCustomer?.id === customer.id ? 'bg-[#eff6ff]' : ''}`}>
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-[11px] text-[#2563eb]">{customer.customerId}</span>
+                      <span className="font-mono text-[11px] text-[#2563eb]">{customer.customerCode || customer.customerId}</span>
                       {customer.isLocked && <Lock size={10} className="text-[#9ca3af]" />}
                     </div>
                     <div className="text-[12px] font-medium text-[#111827] truncate">{customer.customerName}</div>
@@ -409,7 +409,7 @@ const result = await createCustomerAction({
                 <tbody className="divide-y divide-[#f3f4f6]">
                   {filtered.map((customer) => (
                     <tr key={customer.id} className="hover:bg-[#f9fafb] cursor-pointer" onClick={() => handleSelectCustomer(customer)}>
-                      <td className="px-4 py-2 font-mono text-[#2563eb]">{customer.customerId}</td>
+                      <td className="px-4 py-2 font-mono text-[#2563eb]">{customer.customerCode || customer.customerId}</td>
                       <td className="px-4 py-2 font-medium text-[#111827]">{customer.customerName}</td>
                       <td className="px-4 py-2"><span className={`px-1.5 py-0.5 rounded-sm text-[10px] font-semibold ${levelColors[customer.level] ?? 'bg-slate-100 text-slate-600'}`}>{customer.level}</span></td>
                       <td className="px-4 py-2 font-mono text-[11px] text-[#6b7280]">{customer.phone ?? '—'}</td>
@@ -430,7 +430,7 @@ const result = await createCustomerAction({
                 <div className="flex items-center gap-3">
                   <button onClick={() => setSelectedCustomer(null)} className="text-[12px] text-[#6b7280] hover:text-[#2563eb]">返回列表</button>
                   <ChevronRight size={12} className="text-[#9ca3af]" />
-                  <span className="font-mono text-[12px] text-[#2563eb]">{selectedCustomer.customerId}</span>
+                  <span className="font-mono text-[12px] text-[#2563eb]">{selectedCustomer.customerCode || selectedCustomer.customerId}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
