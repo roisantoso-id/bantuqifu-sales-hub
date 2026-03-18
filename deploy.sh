@@ -56,15 +56,14 @@ if [ ! -f nginx/ssl/fullchain.pem ] || [ ! -f nginx/ssl/privkey.pem ]; then
                 -v $(pwd)/nginx/certbot:/var/www/certbot \
                 certbot/certbot certonly --webroot \
                 -w /var/www/certbot \
-                -d www.oabantuqifu.com \
-                -d oabantuqifu.com \
+                -d sales.oabantuqifu.com \
                 --email $email \
                 --agree-tos \
                 --no-eff-email
 
             # 复制证书
-            sudo cp /etc/letsencrypt/live/www.oabantuqifu.com/fullchain.pem ./nginx/ssl/
-            sudo cp /etc/letsencrypt/live/www.oabantuqifu.com/privkey.pem ./nginx/ssl/
+            sudo cp /etc/letsencrypt/live/sales.oabantuqifu.com/fullchain.pem ./nginx/ssl/
+            sudo cp /etc/letsencrypt/live/sales.oabantuqifu.com/privkey.pem ./nginx/ssl/
             sudo chmod 644 ./nginx/ssl/*.pem
 
             docker-compose down
@@ -107,7 +106,7 @@ docker-compose logs --tail=50
 
 echo ""
 echo -e "${GREEN}✅ 部署完成！${NC}"
-echo -e "${GREEN}🌐 访问地址: https://www.oabantuqifu.com${NC}"
+echo -e "${GREEN}🌐 访问地址: https://sales.oabantuqifu.com${NC}"
 echo ""
 echo "常用命令："
 echo "  查看日志: docker-compose logs -f"

@@ -53,12 +53,18 @@ function LoginForm() {
       }
 
       if (data?.session) {
-        document.cookie = `selectedTenant=${selectedTenant.id}; path=/; max-age=86400`
+        document.cookie = `selectedTenant=${selectedTenant.id}; path=/; max-age=86400; domain=.oabantuqifu.com`
         localStorage.setItem('selectedTenant', selectedTenant.id)
         localStorage.setItem('selectedTenantName', selectedTenant.name)
         localStorage.setItem('currentSite', selectedTenant.site)
-        router.push(redirectPath)
-        router.refresh()
+
+        // 如果 redirect 是完整 URL（跨子域跳转），直接跳；否则用 router.push
+        if (redirectPath.startsWith('http')) {
+          window.location.href = redirectPath
+        } else {
+          router.push(redirectPath)
+          router.refresh()
+        }
       }
     } catch (err) {
       console.error('Login error:', err)
