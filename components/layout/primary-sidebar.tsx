@@ -3,12 +3,12 @@
 import { useRouter, usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
-  TrendingUp,
   Users,
   BarChart2,
   Settings,
   LogOut,
   Monitor,
+  List,
 } from 'lucide-react'
 import type { NavSection } from '@/lib/types'
 
@@ -21,7 +21,7 @@ interface PrimarySidebarProps {
 const navItems: { id: NavSection; icon: React.ReactNode; label: string; subtitle: string }[] = [
   { id: 'leads', icon: <LayoutDashboard size={18} />, label: '线索', subtitle: '线索' },
   { id: 'opportunities', icon: <Monitor size={18} />, label: '工作台', subtitle: '工作台' },
-  { id: 'opportunities', icon: <TrendingUp size={18} />, label: '商机', subtitle: '商机' },
+  { id: 'oppolist', icon: <List size={18} />, label: '商机列表', subtitle: '商机' },
   { id: 'customers', icon: <Users size={18} />, label: '客户', subtitle: '客户' },
   { id: 'analytics', icon: <BarChart2 size={18} />, label: '数据', subtitle: '看板' },
 ]

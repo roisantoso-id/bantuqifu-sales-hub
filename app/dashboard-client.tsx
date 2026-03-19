@@ -9,6 +9,7 @@ import { CustomerManagement } from '@/components/customers/customer-management'
 import { LeadManagementClient } from '@/components/leads/lead-management-client'
 import { MyDashboard } from '@/components/dashboard/my-dashboard'
 import { AuditRail } from '@/components/audit-rail/audit-panel'
+import { OpportunityListView } from '@/components/opportunities/opportunity-list-view'
 import { mockOpportunities, mockProducts, mockActionLogs, mockUser, mockLeads } from '@/lib/mock-data'
 import { addAuditNote } from '@/app/actions/audit'
 import { toggleOpportunityPinAction, getOpportunitiesAction } from '@/app/actions/opportunity'
@@ -364,6 +365,10 @@ export function DashboardClient({
             onAddNote={handleAddNote}
           />
         </>
+      ) : activeNav === 'oppolist' ? (
+        <div className="flex-1 overflow-hidden">
+          <OpportunityListView />
+        </div>
       ) : activeNav === 'customers' ? (
         <div className="flex-1 overflow-hidden">
           <CustomerManagement />
