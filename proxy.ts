@@ -1,14 +1,14 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
-  // 开发阶段：直接放行所有请求，不做认证检查
-  // 后续可启用完整的 Supabase 认证检查
+// Next.js 16 proxy function (replaces middleware)
+export async function proxy(request: NextRequest) {
+  // Development: pass through all requests without auth check
+  // Enable full Supabase auth check later
   return NextResponse.next()
 }
 
 export const config = {
   matcher: [
-    // 仅匹配需要保护的路由（目前暂不启用）
     '/((?!_next/static|_next/image|favicon.ico|api|.*\\.png|.*\\.jpg|.*\\.svg).*)',
   ],
 }
