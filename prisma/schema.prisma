@@ -88,11 +88,13 @@ model User {
   organizations UserOrganization[]
 
   // Relations
-  followups     CustomerFollowup[] @relation("FollowupOperator")
-  interactions  Interaction[] @relation("InteractionOperator")
-  leads         Lead[] @relation("LeadAssignee")
-  opportunities Opportunity[] @relation("OpportunityAssignee")
-  actionLogs    ActionLog[]
+  followups            CustomerFollowup[] @relation("FollowupOperator")
+  interactions         Interaction[] @relation("InteractionOperator")
+  leads                Lead[] @relation("LeadAssignee")
+  opportunities        Opportunity[] @relation("OpportunityAssignee")
+  actionLogs           ActionLog[]
+  deliveryAssignments  DeliveryAssignment[] @relation("DeliveryExecutor")
+  deliveryAssigned     DeliveryAssignment[] @relation("DeliveryAssigner")
 
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
@@ -522,13 +524,33 @@ model Opportunity {
   // Relations
   actionLogs              ActionLog[]
   interactions            Interaction[]
-  
+  deliveryAssignment      DeliveryAssignment?
+
   @@index([organizationId])
   @@index([customerId])
   @@index([stageId])
   @@index([assigneeId])
   @@unique([organizationId, opportunityCode])
   @@map("opportunities")
+}
+
+model DeliveryAssignment {
+  id             String      @id @default(cuid())
+  opportunityId  String      @unique
+  opportunity    Opportunity @relation(fields: [opportunityId], references: [id])
+  organizationId String
+  executorId     String
+  executor       User        @relation("DeliveryExecutor", fields: [executorId], references: [id])
+  assignedById   String
+  assignedBy     User        @relation("DeliveryAssigner", fields: [assignedById], references: [id])
+  notes          String?
+  status         String      @default("active") // active | blocked | completed
+  assignedAt     DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([organizationId])
+  @@index([executorId])
+  @@map("delivery_assignments")
 }
 
 // ── P2 Data: 方案匹配 ──
