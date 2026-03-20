@@ -40,6 +40,7 @@ export async function POST(request: Request) {
     response.cookies.set('selectedTenant', tenantId, {
       maxAge: 60 * 60 * 24 * 30, // 30 days
       path: '/',
+      domain: '.oabantuqifu.com',
       secure: process.env.NODE_ENV === 'production',
       httpOnly: false,
       sameSite: 'lax',
