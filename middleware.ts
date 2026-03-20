@@ -6,14 +6,11 @@ const AUTH_BASE = 'https://auth.oabantuqifu.com'
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
-  const host = request.headers.get('host') ?? ''
-  const isDelivery = host.startsWith('delivery.')
 
   // 公开路径直接放行
   if (
     pathname.startsWith('/api/') ||
-    pathname.startsWith('/login') ||
-    pathname.startsWith('/delivery/auth/callback')
+    pathname.startsWith('/login')
   ) {
     return NextResponse.next()
   }
@@ -44,24 +41,11 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  console.log('[middleware] host:', host, 'pathname:', pathname)
-  console.log('[middleware] cookies:', request.cookies.getAll().map(c => c.name))
-  console.log('[middleware] user:', user?.email ?? 'null')
-
   if (!user) {
-    const siteUrl = isDelivery
-      ? `https://${host}`
-      : (process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') ?? '')
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') ?? ''
     const redirectTarget = `${siteUrl}${pathname}${request.nextUrl.search}`
     const loginUrl = new URL(`${AUTH_BASE}/login?redirect=${encodeURIComponent(redirectTarget)}`)
     return NextResponse.redirect(loginUrl)
-  }
-
-  // delivery 子域名：rewrite 到 /delivery 路径前缀
-  if (isDelivery && !pathname.startsWith('/delivery')) {
-    const url = request.nextUrl.clone()
-    url.pathname = `/delivery${pathname}`
-    return NextResponse.rewrite(url)
   }
 
   return response
