@@ -268,6 +268,25 @@ export async function updateServiceTaskAction(
     return { success: false, error: '更新任务失败' }
   }
 
+  // 任务完成时自动创建提成记录
+  if (updates.status === 'COMPLETED') {
+    const { data: task } = await supabase
+      .from('service_tasks')
+      .select('executorId, commissionBase')
+      .eq('id', taskId)
+      .single()
+
+    if (task?.executorId && task?.commissionBase) {
+      await createCommissionRecordAction({
+        userId: task.executorId,
+        roleType: 'EXECUTOR',
+        sourceId: taskId,
+        sourceType: 'TASK',
+        amount: Number(task.commissionBase),
+      })
+    }
+  }
+
   return { success: true }
 }
 
@@ -437,4 +456,159 @@ export async function getDeliveryAssigneesAction(): Promise<
   }
 
   return (data ?? []).map((d: any) => d.user).filter(Boolean)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMMISSION RECORD
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── createCommissionRecordAction ─────────────────────────────────────────────
+export async function createCommissionRecordAction(data: {
+  userId: string
+  roleType: string
+  sourceId: string
+  sourceType?: string
+  amount: number
+}): Promise<{ success: boolean; data?: any; error?: string }> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  const recordData = {
+    id: crypto.randomUUID(),
+    organizationId: tenantId,
+    userId: data.userId,
+    roleType: data.roleType,
+    sourceId: data.sourceId,
+    sourceType: data.sourceType || 'TASK',
+    amount: data.amount,
+    status: 'PENDING',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+
+  const { data: record, error } = await supabase
+    .from('commission_records')
+    .insert(recordData)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('[createCommissionRecordAction] Error:', error.message)
+    return { success: false, error: '创建提成记录失败' }
+  }
+
+  return { success: true, data: record }
+}
+
+// ─── getCommissionRecordsAction ───────────────────────────────────────────────
+export async function getCommissionRecordsAction(filters?: {
+  status?: string
+  userId?: string
+}): Promise<any[]> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  let query = supabase
+    .from('commission_records')
+    .select(`
+      *,
+      user:users_auth!commission_records_userId_fkey (
+        id, name
+      )
+    `)
+    .eq('organizationId', tenantId)
+
+  if (filters?.status) {
+    query = query.eq('status', filters.status)
+  }
+  if (filters?.userId) {
+    query = query.eq('userId', filters.userId)
+  }
+
+  const { data, error } = await query.order('createdAt', { ascending: false })
+
+  if (error) {
+    console.error('[getCommissionRecordsAction] Error:', error.message)
+    return []
+  }
+
+  return data ?? []
+}
+
+// ─── approveCommissionAction ──────────────────────────────────────────────────
+export async function approveCommissionAction(
+  commissionId: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  const { error } = await supabase
+    .from('commission_records')
+    .update({
+      status: 'APPROVED',
+      updatedAt: new Date().toISOString(),
+    })
+    .eq('id', commissionId)
+    .eq('organizationId', tenantId)
+
+  if (error) {
+    console.error('[approveCommissionAction] Error:', error.message)
+    return { success: false, error: '审批提成失败' }
+  }
+
+  return { success: true }
+}
+
+// ─── settleCommissionAction ───────────────────────────────────────────────────
+export async function settleCommissionAction(
+  commissionId: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  const { error } = await supabase
+    .from('commission_records')
+    .update({
+      status: 'SETTLED',
+      settlementDate: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    })
+    .eq('id', commissionId)
+    .eq('organizationId', tenantId)
+
+  if (error) {
+    console.error('[settleCommissionAction] Error:', error.message)
+    return { success: false, error: '结算提成失败' }
+  }
+
+  return { success: true }
+}
+
+// ─── getCommissionStatsAction ─────────────────────────────────────────────────
+export async function getCommissionStatsAction(): Promise<{
+  totalPending: number
+  totalApproved: number
+  totalSettled: number
+  countPending: number
+  countApproved: number
+  countSettled: number
+}> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  const { data } = await supabase
+    .from('commission_records')
+    .select('amount, status')
+    .eq('organizationId', tenantId)
+
+  const records = data ?? []
+
+  return {
+    totalPending: records.filter(r => r.status === 'PENDING').reduce((s, r) => s + Number(r.amount), 0),
+    totalApproved: records.filter(r => r.status === 'APPROVED').reduce((s, r) => s + Number(r.amount), 0),
+    totalSettled: records.filter(r => r.status === 'SETTLED').reduce((s, r) => s + Number(r.amount), 0),
+    countPending: records.filter(r => r.status === 'PENDING').length,
+    countApproved: records.filter(r => r.status === 'APPROVED').length,
+    countSettled: records.filter(r => r.status === 'SETTLED').length,
+  }
 }

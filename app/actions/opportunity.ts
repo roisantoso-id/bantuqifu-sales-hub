@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
+import { createDeliveryProjectAction } from './delivery'
 
 export interface OpportunityRow {
   id: string
@@ -348,6 +349,30 @@ export async function updateOpportunityAction(
   if (error) {
     console.error('[updateOpportunityAction] Error:', error.message)
     return { success: false, error: '更新商机失败，请稍后重试' }
+  }
+
+  // 赢单时自动创建交付项目
+  if (updates.status === 'won') {
+    const { data: opp } = await supabase
+      .from('opportunities')
+      .select(`
+        id, customerId, opportunityCode, serviceTypeLabel,
+        customer:customers!opportunities_customerId_fkey (
+          customerName
+        )
+      `)
+      .eq('id', oppId)
+      .eq('organizationId', tenantId)
+      .single()
+
+    if (opp) {
+      const projectName = `${opp.customer?.customerName || '客户'} - ${opp.serviceTypeLabel || opp.opportunityCode}`
+      await createDeliveryProjectAction({
+        opportunityId: opp.id,
+        customerId: opp.customerId,
+        name: projectName,
+      })
+    }
   }
 
   return { success: true }
