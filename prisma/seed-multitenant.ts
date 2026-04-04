@@ -63,6 +63,18 @@ async function main() {
     { code: 'admin:users', name: '管理用户', module: 'ADMIN' },
     { code: 'admin:roles', name: '管理角色', module: 'ADMIN' },
     { code: 'admin:settings', name: '系统设置', module: 'ADMIN' },
+
+    // 交付模块
+    { code: 'delivery:view', name: '查看交付项目', module: 'DELIVERY' },
+    { code: 'delivery:create', name: '创建交付项目', module: 'DELIVERY' },
+    { code: 'delivery:edit', name: '编辑交付项目', module: 'DELIVERY' },
+    { code: 'delivery:tasks:view', name: '查看任务', module: 'DELIVERY' },
+    { code: 'delivery:tasks:create', name: '创建任务', module: 'DELIVERY' },
+    { code: 'delivery:tasks:edit', name: '编辑任务', module: 'DELIVERY' },
+    { code: 'delivery:tasks:review', name: '审核验收任务', module: 'DELIVERY' },
+    { code: 'delivery:nudge', name: '催办任务', module: 'DELIVERY' },
+    { code: 'delivery:commission:view', name: '查看提成', module: 'DELIVERY' },
+    { code: 'delivery:commission:approve', name: '审批提成', module: 'DELIVERY' },
   ]
 
   const permissionMap: Record<string, string> = {}
@@ -129,7 +141,41 @@ async function main() {
       },
     },
   })
-  console.log(`   ✓ FINANCE: ${financeRole.id}\n`)
+  console.log(`   ✓ FINANCE: ${financeRole.id}`)
+
+  const deliveryPmRole = await prisma.role.upsert({
+    where: { code: 'DELIVERY_PM' },
+    update: {},
+    create: {
+      code: 'DELIVERY_PM',
+      name: '交付主管',
+      permissions: {
+        create: [
+          'delivery:view', 'delivery:create', 'delivery:edit',
+          'delivery:tasks:view', 'delivery:tasks:create', 'delivery:tasks:edit', 'delivery:tasks:review',
+          'delivery:nudge',
+          'delivery:commission:view', 'delivery:commission:approve',
+        ].map(code => ({ permissionId: permissionMap[code] })),
+      },
+    },
+  })
+  console.log(`   ✓ DELIVERY_PM: ${deliveryPmRole.id}`)
+
+  const deliveryExecutorRole = await prisma.role.upsert({
+    where: { code: 'DELIVERY_EXECUTOR' },
+    update: {},
+    create: {
+      code: 'DELIVERY_EXECUTOR',
+      name: '交付执行',
+      permissions: {
+        create: [
+          'delivery:view',
+          'delivery:tasks:view', 'delivery:tasks:edit',
+        ].map(code => ({ permissionId: permissionMap[code] })),
+      },
+    },
+  })
+  console.log(`   ✓ DELIVERY_EXECUTOR: ${deliveryExecutorRole.id}\n`)
 
   // ═══════════════════════════════════════════════════════════════════════════
   // 第四步：创建测试用户

@@ -98,7 +98,7 @@ export interface Lead {
 }
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
-export type NavSection = 'leads' | 'opportunities' | 'customers' | 'analytics' | 'oppolist'
+export type NavSection = 'leads' | 'opportunities' | 'customers' | 'analytics' | 'oppolist' | 'delivery'
 
 // ─── Pipeline Stages ─────────────────────────────────────────────────────────
 export type StageId = 'P1' | 'P2' | 'P3' | 'P4' | 'P5' | 'P6' | 'P7' | 'P8'
@@ -342,4 +342,74 @@ export interface UserProfile {
   avatar?: string
   role: string
   company: string
+}
+
+// ─── Delivery Center ─────────────────────────────────────────────────────────
+export type DeliveryProjectStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SUSPENDED'
+export type ServiceTaskStatus = 'TODO' | 'IN_PROGRESS' | 'PENDING_REVIEW' | 'COMPLETED'
+export type DeliveryActionType = 'STATUS_CHANGE' | 'UPLOAD_FILE' | 'COMMENT' | 'NUDGE'
+export type CommissionStatus = 'PENDING' | 'APPROVED' | 'SETTLED'
+export type CommissionRoleType = 'SALES' | 'PM' | 'EXECUTOR'
+
+export interface DeliveryProjectRow {
+  id: string
+  organizationId: string
+  opportunityId: string
+  customerId: string
+  pmId?: string | null
+  name: string
+  status: DeliveryProjectStatus
+  deadline?: string | null
+  createdAt: string
+  updatedAt: string
+  // Joined
+  customer?: { id: string; customerName: string; customerId: string }
+  opportunity?: { id: string; opportunityCode: string; serviceTypeLabel: string }
+  pm?: { id: string; name: string } | null
+  tasks?: ServiceTaskRow[]
+}
+
+export interface ServiceTaskRow {
+  id: string
+  organizationId: string
+  projectId: string
+  executorId?: string | null
+  title: string
+  description?: string | null
+  status: ServiceTaskStatus
+  dueDate?: string | null
+  commissionBase?: number | null
+  createdAt: string
+  updatedAt: string
+  // Joined
+  executor?: { id: string; name: string } | null
+  project?: { id: string; name: string }
+}
+
+export interface DeliveryRecordRow {
+  id: string
+  taskId: string
+  userId: string
+  actionType: DeliveryActionType
+  content?: string | null
+  attachmentUrl?: string | null
+  createdAt: string
+  // Joined
+  user?: { id: string; name: string }
+}
+
+export interface CommissionRecordRow {
+  id: string
+  organizationId: string
+  userId: string
+  roleType: CommissionRoleType
+  sourceId: string
+  sourceType: string
+  amount: number
+  status: CommissionStatus
+  settlementDate?: string | null
+  createdAt: string
+  updatedAt: string
+  // Joined
+  user?: { id: string; name: string }
 }
