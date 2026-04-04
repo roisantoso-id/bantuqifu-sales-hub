@@ -9,6 +9,7 @@ import {
   LogOut,
   Monitor,
   List,
+  Truck,
 } from 'lucide-react'
 import type { NavSection } from '@/lib/types'
 
@@ -18,11 +19,17 @@ interface PrimarySidebarProps {
   userName: string
 }
 
+// 使用独立路由的模块（点击后跳转到对应路由而非 ?nav= 参数）
+const ROUTE_BASED_NAV: Partial<Record<NavSection, string>> = {
+  delivery: '/delivery',
+}
+
 const navItems: { id: NavSection; icon: React.ReactNode; label: string; subtitle: string }[] = [
   { id: 'leads', icon: <LayoutDashboard size={18} />, label: '线索', subtitle: '线索' },
   { id: 'opportunities', icon: <Monitor size={18} />, label: '工作台', subtitle: '工作台' },
   { id: 'oppolist', icon: <List size={18} />, label: '商机列表', subtitle: '商机' },
   { id: 'customers', icon: <Users size={18} />, label: '客户', subtitle: '客户' },
+  { id: 'delivery', icon: <Truck size={18} />, label: '交付中心', subtitle: '交付' },
   { id: 'analytics', icon: <BarChart2 size={18} />, label: '数据', subtitle: '看板' },
 ]
 
@@ -32,19 +39,26 @@ export function PrimarySidebar({ activeNav, onNavChange, userName }: PrimarySide
   const initials = userName.slice(-2)
 
   const handleLogout = () => {
-    // 清除本地认证状态
     localStorage.removeItem('authToken')
     localStorage.removeItem('currentTenant')
     localStorage.removeItem('currentSite')
-    // 重定向到登录页
     router.push('/login')
   }
 
   const handleNavClick = (navId: NavSection) => {
-    // 使用 URL 驱动导航
-    const params = new URLSearchParams()
-    params.set('nav', navId)
-    router.push(`${pathname}?${params.toString()}`, { scroll: false })
+    const route = ROUTE_BASED_NAV[navId]
+    if (route) {
+      // 独立路由模块：直接跳转
+      router.push(route)
+    } else if (pathname.startsWith('/delivery')) {
+      // 从独立路由页面回到主面板
+      router.push(`/?nav=${navId}`)
+    } else {
+      // 主面板内的 SPA 导航
+      const params = new URLSearchParams()
+      params.set('nav', navId)
+      router.push(`${pathname}?${params.toString()}`, { scroll: false })
+    }
   }
 
   return (

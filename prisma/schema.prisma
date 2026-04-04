@@ -31,10 +31,12 @@ model Organization {
   users             UserOrganization[]
   customerFollowups CustomerFollowup[]
   interactions      Interaction[]
-  
+  deliveryProjects  DeliveryProject[]
+  commissionRecords CommissionRecord[]
+
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
-  
+
   @@map("organizations")
 }
 
@@ -93,6 +95,10 @@ model User {
   leads         Lead[] @relation("LeadAssignee")
   opportunities Opportunity[] @relation("OpportunityAssignee")
   actionLogs    ActionLog[]
+  pmProjects        DeliveryProject[] @relation("ProjectPM")
+  executorTasks     ServiceTask[] @relation("TaskExecutor")
+  deliveryRecords   DeliveryRecord[] @relation("RecordOperator")
+  commissionRecords CommissionRecord[] @relation("CommissionUser")
 
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
@@ -268,7 +274,8 @@ model Customer {
   contacts        CustomerContact[]
   followups       CustomerFollowup[]
   interactions    Interaction[]
-  
+  deliveryProjects DeliveryProject[]
+
   @@index([organizationId])
   @@index([levelDictId])
   @@index([industryId])
@@ -522,7 +529,8 @@ model Opportunity {
   // Relations
   actionLogs              ActionLog[]
   interactions            Interaction[]
-  
+  deliveryProject         DeliveryProject?
+
   @@index([organizationId])
   @@index([customerId])
   @@index([stageId])
@@ -938,4 +946,116 @@ model InteractionAttachment {
   createdAt       DateTime    @default(now())
   
   @@map("interaction_attachments")
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// ── DELIVERY CENTER (交付中心) ──────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════════
+
+// 1. 交付项目主表 (承接已赢单的 Opportunity)
+model DeliveryProject {
+  id              String    @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  opportunityId   String    @unique
+  opportunity     Opportunity @relation(fields: [opportunityId], references: [id])
+
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+
+  pmId            String?
+  pm              User? @relation("ProjectPM", fields: [pmId], references: [id])
+
+  name            String
+  status          String    @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, SUSPENDED
+  deadline        DateTime?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  tasks           ServiceTask[]
+
+  @@index([organizationId])
+  @@index([customerId])
+  @@index([pmId])
+  @@index([status])
+  @@map("delivery_projects")
+}
+
+// 2. 服务任务表 (PM 拆解的具体交付项)
+model ServiceTask {
+  id              String    @id @default(cuid())
+  organizationId  String
+
+  projectId       String
+  project         DeliveryProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  executorId      String?
+  executor        User? @relation("TaskExecutor", fields: [executorId], references: [id])
+
+  title           String
+  description     String?
+  status          String    @default("TODO") // TODO, IN_PROGRESS, PENDING_REVIEW, COMPLETED
+  dueDate         DateTime?
+
+  commissionBase  Decimal?  @db.Decimal(12, 2)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  records         DeliveryRecord[]
+
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([executorId])
+  @@index([status])
+  @@map("service_tasks")
+}
+
+// 3. 交付纪录表 (Timeline 动作留痕与交付物凭证)
+model DeliveryRecord {
+  id              String    @id @default(cuid())
+
+  taskId          String
+  task            ServiceTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  userId          String
+  user            User @relation("RecordOperator", fields: [userId], references: [id])
+
+  actionType      String    // STATUS_CHANGE, UPLOAD_FILE, COMMENT, NUDGE
+  content         String?
+  attachmentUrl   String?
+
+  createdAt       DateTime  @default(now())
+
+  @@index([taskId])
+  @@index([userId])
+  @@map("delivery_records")
+}
+
+// 4. 提成结算记录表
+model CommissionRecord {
+  id              String    @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  userId          String
+  user            User @relation("CommissionUser", fields: [userId], references: [id])
+
+  roleType        String    // SALES, PM, EXECUTOR
+  sourceId        String    // OpportunityId 或 ServiceTaskId
+  sourceType      String    @default("TASK") // OPPORTUNITY, TASK
+  amount          Decimal   @db.Decimal(12, 2)
+  status          String    @default("PENDING") // PENDING, APPROVED, SETTLED
+  settlementDate  DateTime?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([status])
+  @@index([sourceId])
+  @@map("commission_records")
 }
