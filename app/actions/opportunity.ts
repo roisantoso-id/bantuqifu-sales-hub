@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
 import { createDeliveryProjectAction } from './delivery'
+import type { OpportunityP2Data, OpportunityP3Data } from '@/lib/types'
 
 export interface OpportunityRow {
   id: string
@@ -37,6 +38,132 @@ export interface OpportunityRow {
 async function getCurrentTenantId(): Promise<string> {
   const cookieStore = await cookies()
   return cookieStore.get('selectedTenant')?.value ?? 'org_bantu_id'
+}
+
+export async function saveOpportunityItemsAction(
+  oppId: string,
+  items: Array<OpportunityP2Data | OpportunityP3Data>
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  const { data: existingOpportunity, error: opportunityError } = await supabase
+    .from('opportunities')
+    .select('id')
+    .eq('id', oppId)
+    .eq('organizationId', tenantId)
+    .single()
+
+  if (opportunityError || !existingOpportunity) {
+    console.error('[saveOpportunityItemsAction] Opportunity not found:', opportunityError)
+    return { success: false, error: '商机不存在' }
+  }
+
+  const { error: deleteError } = await supabase
+    .from('opportunity_items')
+    .delete()
+    .eq('opportunityId', oppId)
+    .eq('organizationId', tenantId)
+
+  if (deleteError) {
+    console.error('[saveOpportunityItemsAction] Delete error:', deleteError)
+    return { success: false, error: '清除旧服务方案失败' }
+  }
+
+  if (items.length === 0) {
+    return { success: true }
+  }
+
+  const productIds = Array.from(new Set(items.map((item) => item.productId)))
+  const { data: productPrices, error: productPricesError } = await supabase
+    .from('product_prices')
+    .select('productId, costPriceIdr, costPriceCny, isCurrent')
+    .in('productId', productIds)
+    .eq('isCurrent', true)
+
+  if (productPricesError) {
+    console.error('[saveOpportunityItemsAction] Product prices error:', productPricesError)
+  }
+
+  const priceMap = new Map((productPrices ?? []).map((row) => [row.productId, row]))
+
+  const rows = items.map((item) => {
+    const price = priceMap.get(item.productId)
+    const unitPrice = 'lockedPrice' in item ? item.lockedPrice : item.basePrice
+    const currency = item.currency
+    const costFloor = currency === 'CNY'
+      ? (price?.costPriceCny ?? price?.costPriceIdr ?? 0)
+      : (price?.costPriceIdr ?? 0)
+
+    const profitMargin = costFloor > 0
+      ? Number((((unitPrice - costFloor) / costFloor) * 100).toFixed(2))
+      : null
+
+    return {
+      id: crypto.randomUUID(),
+      organizationId: tenantId,
+      opportunityId: oppId,
+      productId: item.productId,
+      targetName: item.targetName?.trim() || null,
+      unitPrice,
+      currency,
+      costFloor,
+      profitMargin,
+      settlementStatus: 'UNSETTLED',
+      salesRemarks: null,
+      deliveryRemarks: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+  })
+
+  const { error: insertError } = await supabase
+    .from('opportunity_items')
+    .insert(rows)
+
+  if (insertError) {
+    console.error('[saveOpportunityItemsAction] Insert error:', insertError)
+    return { success: false, error: '保存服务方案失败' }
+  }
+
+  return { success: true }
+}
+
+export async function getOpportunityItemsAction(oppId: string) {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  const { data, error } = await supabase
+    .from('opportunity_items')
+    .select(`
+      id,
+      productId,
+      targetName,
+      unitPrice,
+      currency,
+      costFloor,
+      profitMargin,
+      product:products (id, name)
+    `)
+    .eq('opportunityId', oppId)
+    .eq('organizationId', tenantId)
+    .order('createdAt', { ascending: true })
+
+  if (error) {
+    console.error('[getOpportunityItemsAction] Error:', error)
+    return []
+  }
+
+  return (data ?? []).map((item: any) => ({
+    tempId: item.id,
+    productId: item.productId,
+    productName: item.product?.name || '未命名产品',
+    targetName: item.targetName || '',
+    basePrice: item.unitPrice || 0,
+    currency: item.currency || 'IDR',
+    costFloor: typeof item.costFloor === 'number' ? item.costFloor : undefined,
+    profitMargin: typeof item.profitMargin === 'number' ? item.profitMargin : undefined,
+  }))
 }
 
 // ─── getOpportunityTimelineAction ──────────────────────────────────────────────

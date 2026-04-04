@@ -1,136 +1,148 @@
 'use client'
 
 import { Plus, Minus, Search } from 'lucide-react'
-import { useState, useMemo } from 'react'
-import type { OpportunityP2Data } from '@/lib/types'
+import { useMemo, useState } from 'react'
+
+export interface DraftOpportunityItem {
+  tempId: string
+  productId: string
+  productName: string
+  targetName: string
+  basePrice: number
+  currency: 'CNY' | 'IDR'
+}
 
 interface ProductLike {
   id: string
   name: string
-  category: string
   price: number
-  currency: string
+  currency: 'CNY' | 'IDR' | string
   description?: string | null
   difficulty?: number
+  categoryId?: string | null
+  categoryNameZh?: string | null
+  category?: {
+    nameZh?: string | null
+  } | null
 }
 
 interface P2ProductMatcherProps {
   allProducts: ProductLike[]
-  selectedData: OpportunityP2Data[]
-  onDataChange: (data: OpportunityP2Data[]) => void
+  productCategories?: Array<{ id: string; nameZh: string }>
+  selectedData: DraftOpportunityItem[]
+  onDataChange: (data: DraftOpportunityItem[]) => void
 }
 
-const CATEGORY_ORDER = ['签证服务', '移民服务', '留学服务', '工作签证', '增值服务']
+function getCategoryName(product: ProductLike) {
+  return product.categoryNameZh || product.category?.nameZh || product.categoryId || '未分类'
+}
 
 function groupByCategory(products: ProductLike[]): Record<string, ProductLike[]> {
   const groups: Record<string, ProductLike[]> = {}
-  for (const p of products) {
-    if (!groups[p.category]) groups[p.category] = []
-    groups[p.category].push(p)
+
+  for (const product of products) {
+    const categoryName = getCategoryName(product)
+    if (!groups[categoryName]) groups[categoryName] = []
+    groups[categoryName].push(product)
   }
+
   return groups
+}
+
+function createTempId() {
+  return `draft-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 }
 
 function getDifficultyStars(difficulty?: number): string {
   if (!difficulty) return ''
-  return '★'.repeat(difficulty) + '☆'.repeat(5 - difficulty)
+  return '★'.repeat(difficulty) + '☆'.repeat(Math.max(0, 5 - difficulty))
 }
 
 export function P2ProductMatcher({
   allProducts,
+  productCategories,
   selectedData,
   onDataChange,
 }: P2ProductMatcherProps) {
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeTab, setActiveTab] = useState<string>('')
+  const grouped = useMemo(() => groupByCategory(allProducts), [allProducts])
 
-  const grouped = groupByCategory(allProducts)
-  const sortedCategories = useMemo(
-    () => [
-      ...CATEGORY_ORDER.filter((c) => grouped[c]),
-      ...Object.keys(grouped).filter((c) => !CATEGORY_ORDER.includes(c)),
-    ],
-    [grouped]
+  const categories = useMemo(
+    () => (productCategories && productCategories.length > 0
+      ? productCategories.map((category) => category.nameZh)
+      : Object.keys(grouped)),
+    [grouped, productCategories]
   )
 
-  // 初始化 activeTab
-  if (!activeTab && sortedCategories.length > 0) {
-    setActiveTab(sortedCategories[0])
-  }
+  const [activeTab, setActiveTab] = useState<string>('')
 
-  const isSelected = (productId: string) => selectedData.some((sd) => sd.productId === productId)
+  const currentTab = activeTab || categories[0] || ''
 
   const filteredProducts = useMemo(() => {
-    const inCategory = grouped[activeTab] || []
+    const inCategory = grouped[currentTab] || []
     if (!searchQuery.trim()) return inCategory
+
     const q = searchQuery.toLowerCase()
     return inCategory.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q) ||
-        p.description?.toLowerCase().includes(q)
+      (product) =>
+        product.name.toLowerCase().includes(q) ||
+        getCategoryName(product).toLowerCase().includes(q) ||
+        product.description?.toLowerCase().includes(q)
     )
-  }, [grouped, activeTab, searchQuery])
+  }, [grouped, currentTab, searchQuery])
 
-  const addProduct = (product: ProductLike) => {
-    if (isSelected(product.id)) return
-    const newData: OpportunityP2Data = {
+  const addProductInstance = (product: ProductLike) => {
+    const newItem: DraftOpportunityItem = {
+      tempId: createTempId(),
       productId: product.id,
+      productName: product.name,
+      targetName: '',
+      basePrice: product.price,
+      currency: product.currency === 'CNY' ? 'CNY' : 'IDR',
     }
-    onDataChange([...selectedData, newData])
+
+    onDataChange([...selectedData, newItem])
   }
 
-  const removeProduct = (productId: string) => {
-    onDataChange(selectedData.filter((sd) => sd.productId !== productId))
+  const removeProductInstance = (tempId: string) => {
+    onDataChange(selectedData.filter((item) => item.tempId !== tempId))
   }
 
-  const updateCycle = (productId: string, cycle: string) => {
+  const updateTargetName = (tempId: string, targetName: string) => {
     onDataChange(
-      selectedData.map((sd) => (sd.productId === productId ? { ...sd, cycle } : sd))
+      selectedData.map((item) =>
+        item.tempId === tempId ? { ...item, targetName } : item
+      )
     )
   }
-
-  const selectedProductsMap = useMemo(() => {
-    return new Map(
-      selectedData.map((sd) => [
-        sd.productId,
-        allProducts.find((p) => p.id === sd.productId),
-      ])
-    )
-  }, [selectedData, allProducts])
 
   return (
     <div className="flex h-full flex-col bg-white">
-      {/* Header */}
       <div className="border-b border-[#e5e7eb] px-4 py-2.5">
         <h3 className="text-[13px] font-semibold text-[#111827]">P2: 确定服务方案</h3>
       </div>
 
-      {/* Category Tabs */}
-      <div className="flex border-b border-[#e5e7eb] bg-[#f9fafb] overflow-x-auto">
-        {sortedCategories.map((cat) => (
+      <div className="flex overflow-x-auto border-b border-[#e5e7eb] bg-[#f9fafb]">
+        {categories.map((category) => (
           <button
-            key={cat}
-            onClick={() => setActiveTab(cat)}
-            className={`relative px-3 py-1.5 text-[12px] font-medium transition-colors whitespace-nowrap ${
-              activeTab === cat
+            key={category}
+            onClick={() => setActiveTab(category)}
+            className={`relative whitespace-nowrap px-3 py-1.5 text-[12px] font-medium transition-colors ${
+              currentTab === category
                 ? 'text-[#2563eb]'
                 : 'text-[#6b7280] hover:text-[#374151]'
             }`}
           >
-            {cat}
-            {activeTab === cat && (
+            {category}
+            {currentTab === category && (
               <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#2563eb]" />
             )}
           </button>
         ))}
       </div>
 
-      {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left: Product Catalog */}
-        <div className="w-1/2 flex flex-col min-w-0 border-r border-[#e5e7eb]">
-          {/* Search */}
+        <div className="flex min-w-0 w-1/2 flex-col border-r border-[#e5e7eb]">
           <div className="border-b border-[#e5e7eb] p-2">
             <div className="flex items-center gap-1 rounded-sm border border-[#e5e7eb] bg-white px-2 py-1">
               <Search size={12} className="text-[#9ca3af]" />
@@ -144,109 +156,120 @@ export function P2ProductMatcher({
             </div>
           </div>
 
-          {/* Product List */}
           <div className="flex-1 overflow-y-auto p-2">
             <div className="space-y-1">
               {filteredProducts.map((product) => {
-                const selected = isSelected(product.id)
+                const categoryName = getCategoryName(product)
+
                 return (
                   <div
                     key={product.id}
-                    className={`flex items-start gap-2 rounded-sm border px-2 py-1.5 transition-colors ${
-                      selected
-                        ? 'border-[#2563eb] bg-[#eff6ff]'
-                        : 'border-[#e5e7eb] hover:border-[#d1d5db]'
-                    }`}
+                    className="flex items-start gap-2 rounded-sm border border-[#e5e7eb] px-2 py-1.5 transition-colors hover:border-[#d1d5db]"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <p className="text-[13px] font-medium text-[#111827] truncate">
+                        <p className="truncate text-[13px] font-medium text-[#111827]">
                           {product.name}
                         </p>
-                        {product.difficulty && (
+                        {product.difficulty ? (
                           <span className="shrink-0 text-[10px] text-[#f59e0b]">
                             {getDifficultyStars(product.difficulty)}
                           </span>
-                        )}
+                        ) : null}
                       </div>
-                      {product.description && (
-                        <p className="mt-0.5 text-[11px] text-[#9ca3af] line-clamp-1">
+
+                      <p className="mt-0.5 text-[11px] text-[#6b7280]">{categoryName}</p>
+
+                      {product.description ? (
+                        <p className="mt-0.5 line-clamp-1 text-[11px] text-[#9ca3af]">
                           {product.description}
                         </p>
-                      )}
+                      ) : null}
+
+                      <p className="mt-1 font-mono text-[11px] text-[#374151]">
+                        {product.currency === 'CNY' ? '¥' : 'Rp'}
+                        {Math.round(product.price).toLocaleString()}
+                      </p>
                     </div>
+
                     <button
-                      onClick={() => (selected ? removeProduct(product.id) : addProduct(product))}
-                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-sm transition-colors ${
-                        selected
-                          ? 'bg-[#fee2e2] text-[#dc2626] hover:bg-[#fecaca]'
-                          : 'bg-[#2563eb] text-white hover:bg-[#1d4ed8]'
-                      }`}
-                      aria-label={selected ? '移除' : '添加'}
+                      onClick={() => addProductInstance(product)}
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm bg-[#2563eb] text-white transition-colors hover:bg-[#1d4ed8]"
+                      aria-label="添加"
                     >
-                      {selected ? <Minus size={13} /> : <Plus size={13} />}
+                      <Plus size={13} />
                     </button>
                   </div>
                 )
               })}
+
+              {filteredProducts.length === 0 && (
+                <div className="flex items-center justify-center rounded-sm border border-dashed border-[#e5e7eb] py-8 text-[12px] text-[#9ca3af]">
+                  当前分类下暂无匹配产品
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Right: Selected Services */}
-        <div className="w-1/2 shrink-0 flex flex-col p-2">
-          <div className="mb-2 pb-1 border-b border-[#e5e7eb]">
+        <div className="flex w-1/2 shrink-0 flex-col p-2">
+          <div className="mb-2 border-b border-[#e5e7eb] pb-1">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">
-              已选服务清单
+              已选服务实例
             </span>
           </div>
 
           {selectedData.length === 0 ? (
             <div className="flex flex-1 items-center justify-center text-[13px] text-[#9ca3af]">
-              从左侧添加服务
+              从左侧添加服务实例
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto">
-              {/* Table header */}
-              <div className="grid grid-cols-[1fr_60px_24px] items-center gap-x-2 border-b border-[#e5e7eb] px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#9ca3af]">
-                <span>服务名称</span>
-                <span>难度</span>
-                <span />
-              </div>
+            <div className="flex-1 space-y-2 overflow-y-auto">
+              {selectedData.map((item, index) => (
+                <div
+                  key={item.tempId}
+                  className="rounded-sm border border-[#e5e7eb] bg-white p-3 transition-colors hover:border-[#d1d5db]"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-[13px] font-medium text-[#111827]">
+                          {item.productName}
+                        </p>
+                        <span className="rounded-sm bg-[#f3f4f6] px-1.5 py-0.5 text-[10px] text-[#6b7280]">
+                          实例 {index + 1}
+                        </span>
+                      </div>
 
-              {/* Table rows */}
-              {selectedData.map((sd, idx) => {
-                const product = selectedProductsMap.get(sd.productId)
-                if (!product) return null
+                      <p className="mt-1 font-mono text-[11px] text-[#6b7280]">
+                        {item.currency === 'CNY' ? '¥' : 'Rp'}
+                        {Math.round(item.basePrice).toLocaleString()}
+                      </p>
+                    </div>
 
-                return (
-                  <div
-                    key={sd.productId}
-                    className={`grid grid-cols-[1fr_60px_24px] items-center gap-x-2 px-2 py-1.5 text-[12px] ${
-                      idx % 2 === 0 ? 'bg-white' : 'bg-[#f9fafb]'
-                    } hover:bg-[#eff6ff]`}
-                  >
-                    {/* Name */}
-                    <span className="truncate font-medium text-[#111827]" title={product.name}>
-                      {product.name}
-                    </span>
-
-                    {/* Difficulty */}
-                    <span className="text-[10px] text-[#f59e0b] tracking-tighter">
-                      {getDifficultyStars(product.difficulty) || '—'}
-                    </span>
-
-                    {/* Remove */}
                     <button
-                      onClick={() => removeProduct(sd.productId)}
-                      className="flex h-5 w-5 items-center justify-center rounded-sm text-[#9ca3af] hover:bg-[#fee2e2] hover:text-[#dc2626]"
+                      onClick={() => removeProductInstance(item.tempId)}
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm bg-[#fee2e2] text-[#dc2626] transition-colors hover:bg-[#fecaca]"
                       aria-label="移除"
                     >
-                      <Minus size={11} />
+                      <Minus size={13} />
                     </button>
                   </div>
-                )
-              })}
+
+                  <div className="mt-3">
+                    <label className="mb-1 block text-[11px] font-medium text-[#6b7280]">
+                      办理人 / 标的
+                    </label>
+                    <input
+                      type="text"
+                      value={item.targetName}
+                      onChange={(e) => updateTargetName(item.tempId, e.target.value)}
+                      placeholder="请输入办理人姓名，如: 张三"
+                      className="h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#111827] outline-none placeholder:text-[#9ca3af] focus:border-[#2563eb]"
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

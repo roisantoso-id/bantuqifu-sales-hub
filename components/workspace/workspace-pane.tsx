@@ -1,6 +1,6 @@
 'use client'
 
-import type { Opportunity, Product, StageId, OpportunityP2Data, OpportunityP3Data, OpportunityP4Data, OpportunityP5Data, OpportunityP6Data, OpportunityP7Data, OpportunityP8Data } from '@/lib/types'
+import type { Opportunity, Product, StageId, OpportunityP4Data, OpportunityP5Data, OpportunityP6Data, OpportunityP7Data, OpportunityP8Data } from '@/lib/types'
 import { BreadcrumbStepper } from './breadcrumb-stepper'
 import { P1RequirementForm } from './p1-requirement-form'
 import { P2ProductMatcher } from './p2-product-matcher'
@@ -15,6 +15,7 @@ import { ChevronRight, Save } from 'lucide-react'
 interface WorkspaceProps {
   opportunity: Opportunity
   allProducts: Product[]
+  productCategories?: Array<{ id: string; nameZh: string }>
   viewingStage: StageId
   onViewingStageChange: (stage: StageId) => void
   onOpportunityUpdate: (data: Partial<Opportunity>) => void
@@ -38,6 +39,7 @@ const STAGE_NEXT_LABEL: Record<StageId, string> = {
 export function WorkspacePane({
   opportunity,
   allProducts,
+  productCategories,
   viewingStage,
   onViewingStageChange,
   onOpportunityUpdate,
@@ -105,6 +107,7 @@ export function WorkspacePane({
         {viewingStage === 'P2' && (
           <P2ProductMatcher
             allProducts={allProducts}
+            productCategories={productCategories}
             selectedData={opportunity.p2Data || []}
             onDataChange={(data) => onOpportunityUpdate({ p2Data: data })}
           />

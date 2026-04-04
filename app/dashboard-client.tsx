@@ -12,8 +12,8 @@ import { AuditRail } from '@/components/audit-rail/audit-panel'
 import { OpportunityListView } from '@/components/opportunities/opportunity-list-view'
 import { mockActionLogs, mockUser, mockLeads } from '@/lib/mock-data'
 import { addAuditNote } from '@/app/actions/audit'
-import { toggleOpportunityPinAction, getOpportunitiesAction } from '@/app/actions/opportunity'
-import { getProductsAction } from '@/app/actions/product'
+import { toggleOpportunityPinAction, getOpportunitiesAction, saveOpportunityItemsAction, getOpportunityItemsAction } from '@/app/actions/opportunity'
+import { getProductsByCategoryAction } from '@/app/actions/product'
 import type { Opportunity, NavSection, StageId, ActionLog, Lead, LeadRow, OpportunityRow, OpportunityStatus, Currency, Product } from '@/lib/types'
 
 interface DashboardClientProps {
@@ -100,20 +100,33 @@ export function DashboardClient({
   const [actionLogs, setActionLogs] = useState<Record<string, ActionLog[]>>(mockActionLogs)
   const [showAuditRail, setShowAuditRail] = useState(true)
   const [realProducts, setRealProducts] = useState<Product[]>([])
+  const [productCategories, setProductCategories] = useState<Array<{ id: string; nameZh: string }>>([])
 
   // 加载真实产品数据
   useEffect(() => {
-    getProductsAction().then(rows => {
-      setRealProducts(rows.map(p => ({
-        id: p.id,
-        name: p.name,
-        category: p.category,
-        price: p.price,
-        currency: p.currency,
-        description: p.description ?? undefined,
-        difficulty: p.difficulty,
-        billingCycles: ['一次性'],
-      } as Product)))
+    getProductsByCategoryAction().then(groups => {
+      setProductCategories(
+        groups
+          .filter(group => group.category)
+          .map(group => ({ id: group.category!.id, nameZh: group.category!.nameZh }))
+      )
+
+      setRealProducts(
+        groups.flatMap(group =>
+          group.products.map(p => ({
+            id: p.id,
+            name: p.name,
+            category: group.categoryName,
+            categoryId: p.categoryId,
+            categoryNameZh: p.categoryNameZh,
+            price: p.price,
+            currency: p.currency,
+            description: p.description ?? undefined,
+            difficulty: p.difficulty,
+            billingCycles: ['一次性'],
+          } as Product))
+        )
+      )
     })
   }, [])
 
@@ -149,44 +162,65 @@ export function DashboardClient({
   // 切换到商机页时重新拉取数据
   useEffect(() => {
     if (activeNav !== 'opportunities') return
-    getOpportunitiesAction().then((data) => {
+    getOpportunitiesAction().then(async (data) => {
       if (!data) return
-      setOpportunities(data.map(opp => ({
-        id: opp.id,
-        opportunityCode: opp.opportunityCode,
-        customerId: opp.customerId,
-        customerName: opp.customer?.customerName || '未知客户',
-        customer: {
-          id: opp.customer?.id || opp.customerId,
-          name: opp.customer?.customerName || '未知客户',
-          passportNo: opp.customer?.customerId || '',
-          phone: '',
-          email: '',
-          wechat: '',
-          level: 'L5' as const,
-          industry: '',
-          country: 'Indonesia',
-        },
-        stageId: opp.stageId as StageId,
-        status: (opp.status as OpportunityStatus) || 'active',
-        serviceType: (opp.serviceType as 'VISA' | 'COMPANY_REGISTRATION' | 'FACTORY_SETUP' | 'TAX_SERVICES' | 'PERMIT_SERVICES' | 'FINANCIAL_SERVICES' | 'IMMIGRATION' | 'OTHER') || 'VISA',
-        serviceTypeLabel: opp.serviceTypeLabel || opp.serviceType,
-        estimatedAmount: opp.estimatedAmount || 0,
-        currency: (opp.currency as Currency) || 'IDR',
-        requirements: opp.requirements || undefined,
-        notes: opp.notes || undefined,
-        wechatGroupId: opp.wechatGroupId || undefined,
-        wechatGroupName: opp.wechatGroupName || undefined,
-        destination: undefined,
-        travelDate: undefined,
-        assignee: '',
-        createdAt: opp.createdAt,
-        updatedAt: opp.updatedAt,
-        expectedCloseDate: opp.expectedCloseDate || undefined,
-        products: [],
-        quote: undefined,
-        pinnedByUsers: opp.pinnedByUsers || [],
-      } as any)))
+
+      const opportunitiesWithItems = await Promise.all(
+        data.map(async (opp) => {
+          const p2Data = await getOpportunityItemsAction(opp.id)
+          const p3Data = p2Data.map((item) => ({
+            tempId: item.tempId,
+            productId: item.productId,
+            productName: item.productName,
+            targetName: item.targetName,
+            lockedPrice: item.basePrice,
+            currency: item.currency,
+            costFloor: item.costFloor,
+            profitMargin: item.profitMargin,
+            approvalStatus: 'auto-approved' as const,
+          }))
+          return {
+            id: opp.id,
+            opportunityCode: opp.opportunityCode,
+            customerId: opp.customerId,
+            customerName: opp.customer?.customerName || '未知客户',
+            customer: {
+              id: opp.customer?.id || opp.customerId,
+              name: opp.customer?.customerName || '未知客户',
+              passportNo: opp.customer?.customerId || '',
+              phone: '',
+              email: '',
+              wechat: '',
+              level: 'L5' as const,
+              industry: '',
+              country: 'Indonesia',
+            },
+            stageId: opp.stageId as StageId,
+            status: (opp.status as OpportunityStatus) || 'active',
+            serviceType: (opp.serviceType as 'VISA' | 'COMPANY_REGISTRATION' | 'FACTORY_SETUP' | 'TAX_SERVICES' | 'PERMIT_SERVICES' | 'FINANCIAL_SERVICES' | 'IMMIGRATION' | 'OTHER') || 'VISA',
+            serviceTypeLabel: opp.serviceTypeLabel || opp.serviceType,
+            estimatedAmount: opp.estimatedAmount || 0,
+            currency: (opp.currency as Currency) || 'IDR',
+            requirements: opp.requirements || undefined,
+            notes: opp.notes || undefined,
+            wechatGroupId: opp.wechatGroupId || undefined,
+            wechatGroupName: opp.wechatGroupName || undefined,
+            destination: undefined,
+            travelDate: undefined,
+            assignee: '',
+            createdAt: opp.createdAt,
+            updatedAt: opp.updatedAt,
+            expectedCloseDate: opp.expectedCloseDate || undefined,
+            products: [],
+            quote: undefined,
+            p2Data,
+            p3Data,
+            pinnedByUsers: opp.pinnedByUsers || [],
+          } as any
+        })
+      )
+
+      setOpportunities(opportunitiesWithItems)
     })
   }, [activeNav])
 
@@ -230,7 +264,21 @@ export function DashboardClient({
     )
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (!selectedOpportunity) return
+
+    if (viewingStage === 'P2' || viewingStage === 'P3') {
+      const sourceItems = viewingStage === 'P3' && selectedOpportunity.p3Data && selectedOpportunity.p3Data.length > 0
+        ? selectedOpportunity.p3Data
+        : (selectedOpportunity.p2Data || [])
+
+      const result = await saveOpportunityItemsAction(selectedOpportunity.id, sourceItems as any)
+      if (!result.success) {
+        console.error(`[handleSave] Failed to save ${viewingStage} items:`, result.error)
+        return
+      }
+    }
+
     appendLog(selectedId, { actionType: 'FORM', actionLabel: '保存草稿' })
   }
 
@@ -365,7 +413,11 @@ export function DashboardClient({
           {/* 工作区 (flex-1) */}
           <WorkspacePane
             opportunity={selectedOpportunity}
-            allProducts={realProducts}
+            allProducts={realProducts.map(product => ({
+              ...product,
+              category: product.categoryNameZh || product.category,
+            }))}
+            productCategories={productCategories}
             viewingStage={viewingStage}
             onViewingStageChange={setViewingStage}
             onOpportunityUpdate={handleOpportunityUpdate}

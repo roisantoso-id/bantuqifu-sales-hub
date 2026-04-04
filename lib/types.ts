@@ -117,19 +117,24 @@ export interface Customer {
 export type OpportunityStatus = 'active' | 'won' | 'lost'
 
 export interface OpportunityP2Data {
+  tempId: string
   productId: string
-  cycle?: string // 服务周期（如"1个月"、"12个月"）
+  productName: string
+  targetName: string
+  basePrice: number
+  currency: Currency
 }
 
 export interface OpportunityP3Data {
+  tempId: string
   productId: string
-  quantity: number // 数量，默认 1
-  lockedPrice: number // 当前售价（可编辑）
-  currency: Currency // IDR or CNY
-  recommendedPrice?: number // 推荐价格（取自 Product.recommendedPrice）
-  costFloor?: number // 成本底线（取自 Product.costPrice）
-  profitMargin?: number // 利润率 = (lockedPrice - costFloor) / costFloor * 100
-  approvalStatus: 'auto-approved' | 'admin-required' | 'pending' // 自动审批 | 需管理员审核 | 待审批
+  productName: string
+  targetName: string
+  lockedPrice: number
+  currency: Currency
+  costFloor?: number
+  profitMargin?: number
+  approvalStatus: 'auto-approved' | 'admin-required' | 'pending'
   approvedAt?: string
   approvedBy?: string
 }
@@ -277,7 +282,7 @@ export interface Opportunity {
   assignee: string
   wechatGroupId?: number | null
   wechatGroupName?: string | null
-  p2Data?: OpportunityP2Data[] // P2阶段选中的产品
+  p2Data?: OpportunityP2Data[] // P2阶段服务实例（基于 opportunity_items）
   p3Data?: OpportunityP3Data[] // P3阶段的报价数据
   p4Data?: OpportunityP4Data // P4: 合同签署
   p5Data?: OpportunityP5Data // P5: 财务确认
@@ -293,6 +298,8 @@ export interface Product {
   id: string
   name: string
   category: string
+  categoryId?: string | null
+  categoryNameZh?: string | null
   price: number
   currency: string
   description?: string

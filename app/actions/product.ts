@@ -3,12 +3,25 @@
 import { createClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
 
+export interface ProductCategoryRow {
+  id: string
+  organizationId: string
+  code: string
+  nameZh: string
+  nameId?: string | null
+  nameEn?: string | null
+  description?: string | null
+  sortOrder: number
+  isActive: boolean
+}
+
 export interface ProductRow {
   id: string
   organizationId: string
   productCode: string
   name: string
-  category: string
+  categoryId?: string | null
+  categoryNameZh?: string
   description: string | null
   difficulty: number
   isExpertMode: boolean
@@ -19,9 +32,38 @@ export interface ProductRow {
   costPrice: number
 }
 
+export interface ProductCategoryGroup {
+  category: ProductCategoryRow | null
+  categoryName: string
+  products: ProductRow[]
+}
+
 async function getCurrentTenantId(): Promise<string> {
   const cookieStore = await cookies()
   return cookieStore.get('selectedTenant')?.value ?? 'org_bantu_id'
+}
+
+/**
+ * 获取当前租户的产品分类
+ */
+export async function getProductCategoriesAction(): Promise<ProductCategoryRow[]> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  const { data, error } = await supabase
+    .from('dict_product_categories')
+    .select('*')
+    .eq('organizationId', tenantId)
+    .eq('isActive', true)
+    .order('sortOrder', { ascending: true })
+    .order('nameZh', { ascending: true })
+
+  if (error) {
+    console.error('[getProductCategoriesAction] Error fetching categories:', error)
+    return []
+  }
+
+  return (data ?? []) as ProductCategoryRow[]
 }
 
 /**
@@ -32,12 +74,13 @@ export async function getProductsAction(currency?: 'IDR' | 'CNY'): Promise<Produ
   const tenantId = await getCurrentTenantId()
   const curr = currency || 'IDR'
 
+  const categories = await getProductCategoriesAction()
+
   // 1. 获取产品列表
   const { data: products, error: productsError } = await supabase
     .from('products')
     .select('*')
     .eq('organizationId', tenantId)
-    .order('category')
     .order('name')
 
   if (productsError || !products) {
@@ -64,15 +107,20 @@ export async function getProductsAction(currency?: 'IDR' | 'CNY'): Promise<Produ
     (prices || []).map(p => [p.productId, p])
   )
 
+  // 4. 分类映射
+  const categoryMap = new Map(categories.map((category) => [category.id, category]))
+
   // 4. 合并产品 + 价格
   return products.map(p => {
     const priceData = priceMap.get(p.id)
+    const category = p.categoryId ? categoryMap.get(p.categoryId) : undefined
     return {
       id: p.id,
       organizationId: p.organizationId,
       productCode: p.productCode,
       name: p.name,
-      category: p.category,
+      categoryId: p.categoryId,
+      categoryNameZh: category?.nameZh || '未分类',
       description: p.description,
       difficulty: p.difficulty,
       isExpertMode: p.isExpertMode,
@@ -87,6 +135,20 @@ export async function getProductsAction(currency?: 'IDR' | 'CNY'): Promise<Produ
         : (priceData?.costPriceIdr ?? 0),
     }
   })
+}
+
+/**
+ * 按产品分类返回产品
+ */
+export async function getProductsByCategoryAction(currency?: 'IDR' | 'CNY'): Promise<ProductCategoryGroup[]> {
+  const categories = await getProductCategoriesAction()
+  const products = await getProductsAction(currency)
+
+  return categories.map((category) => ({
+    category,
+    categoryName: category.nameZh,
+    products: products.filter((product) => product.categoryId === category.id),
+  }))
 }
 
 /**
