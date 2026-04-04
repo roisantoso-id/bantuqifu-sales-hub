@@ -58,9 +58,13 @@ function LoginForm() {
         localStorage.setItem('selectedTenantName', selectedTenant.name)
         localStorage.setItem('currentSite', selectedTenant.site)
 
-        // 如果 redirect 是完整 URL（跨子域跳转），直接跳；否则用 router.push
         if (redirectPath.startsWith('http')) {
-          window.location.href = redirectPath
+          const redirectUrl = new URL(redirectPath)
+          const callbackUrl = new URL(`https://${redirectUrl.host}/delivery/auth/callback`)
+          callbackUrl.searchParams.set('access_token', data.session.access_token)
+          callbackUrl.searchParams.set('refresh_token', data.session.refresh_token)
+          callbackUrl.searchParams.set('next', redirectUrl.pathname || '/delivery')
+          window.location.href = callbackUrl.toString()
         } else {
           router.push(redirectPath)
           router.refresh()
