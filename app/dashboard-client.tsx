@@ -10,10 +10,11 @@ import { LeadManagementClient } from '@/components/leads/lead-management-client'
 import { MyDashboard } from '@/components/dashboard/my-dashboard'
 import { AuditRail } from '@/components/audit-rail/audit-panel'
 import { OpportunityListView } from '@/components/opportunities/opportunity-list-view'
-import { mockOpportunities, mockProducts, mockActionLogs, mockUser, mockLeads } from '@/lib/mock-data'
+import { mockActionLogs, mockUser, mockLeads } from '@/lib/mock-data'
 import { addAuditNote } from '@/app/actions/audit'
 import { toggleOpportunityPinAction, getOpportunitiesAction } from '@/app/actions/opportunity'
-import type { Opportunity, NavSection, StageId, ActionLog, Lead, LeadRow, OpportunityRow, OpportunityStatus, Currency } from '@/lib/types'
+import { getProductsAction } from '@/app/actions/product'
+import type { Opportunity, NavSection, StageId, ActionLog, Lead, LeadRow, OpportunityRow, OpportunityStatus, Currency, Product } from '@/lib/types'
 
 interface DashboardClientProps {
   initialNav: NavSection
@@ -98,6 +99,23 @@ export function DashboardClient({
   })
   const [actionLogs, setActionLogs] = useState<Record<string, ActionLog[]>>(mockActionLogs)
   const [showAuditRail, setShowAuditRail] = useState(true)
+  const [realProducts, setRealProducts] = useState<Product[]>([])
+
+  // 加载真实产品数据
+  useEffect(() => {
+    getProductsAction().then(rows => {
+      setRealProducts(rows.map(p => ({
+        id: p.id,
+        name: p.name,
+        category: p.category,
+        price: p.price,
+        currency: p.currency,
+        description: p.description ?? undefined,
+        difficulty: p.difficulty,
+        billingCycles: ['一次性'],
+      } as Product)))
+    })
+  }, [])
 
   // URL 更新辅助函数
   const updateUrl = useCallback(
@@ -347,7 +365,7 @@ export function DashboardClient({
           {/* 工作区 (flex-1) */}
           <WorkspacePane
             opportunity={selectedOpportunity}
-            allProducts={mockProducts}
+            allProducts={realProducts}
             viewingStage={viewingStage}
             onViewingStageChange={setViewingStage}
             onOpportunityUpdate={handleOpportunityUpdate}

@@ -2,18 +2,28 @@
 
 import { Plus, Minus, Search } from 'lucide-react'
 import { useState, useMemo } from 'react'
-import type { Product, OpportunityP2Data } from '@/lib/types'
+import type { OpportunityP2Data } from '@/lib/types'
+
+interface ProductLike {
+  id: string
+  name: string
+  category: string
+  price: number
+  currency: string
+  description?: string | null
+  difficulty?: number
+}
 
 interface P2ProductMatcherProps {
-  allProducts: Product[]
+  allProducts: ProductLike[]
   selectedData: OpportunityP2Data[]
   onDataChange: (data: OpportunityP2Data[]) => void
 }
 
 const CATEGORY_ORDER = ['签证服务', '移民服务', '留学服务', '工作签证', '增值服务']
 
-function groupByCategory(products: Product[]): Record<string, Product[]> {
-  const groups: Record<string, Product[]> = {}
+function groupByCategory(products: ProductLike[]): Record<string, ProductLike[]> {
+  const groups: Record<string, ProductLike[]> = {}
   for (const p of products) {
     if (!groups[p.category]) groups[p.category] = []
     groups[p.category].push(p)
@@ -62,11 +72,10 @@ export function P2ProductMatcher({
     )
   }, [grouped, activeTab, searchQuery])
 
-  const addProduct = (product: Product) => {
+  const addProduct = (product: ProductLike) => {
     if (isSelected(product.id)) return
     const newData: OpportunityP2Data = {
       productId: product.id,
-      cycle: product.billingCycles?.[0],
     }
     onDataChange([...selectedData, newData])
   }
@@ -199,10 +208,9 @@ export function P2ProductMatcher({
           ) : (
             <div className="flex-1 overflow-y-auto">
               {/* Table header */}
-              <div className="grid grid-cols-[1fr_60px_80px_24px] items-center gap-x-2 border-b border-[#e5e7eb] px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#9ca3af]">
+              <div className="grid grid-cols-[1fr_60px_24px] items-center gap-x-2 border-b border-[#e5e7eb] px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#9ca3af]">
                 <span>服务名称</span>
                 <span>难度</span>
-                <span>周期</span>
                 <span />
               </div>
 
@@ -214,7 +222,7 @@ export function P2ProductMatcher({
                 return (
                   <div
                     key={sd.productId}
-                    className={`grid grid-cols-[1fr_60px_80px_24px] items-center gap-x-2 px-2 py-1.5 text-[12px] ${
+                    className={`grid grid-cols-[1fr_60px_24px] items-center gap-x-2 px-2 py-1.5 text-[12px] ${
                       idx % 2 === 0 ? 'bg-white' : 'bg-[#f9fafb]'
                     } hover:bg-[#eff6ff]`}
                   >
@@ -227,23 +235,6 @@ export function P2ProductMatcher({
                     <span className="text-[10px] text-[#f59e0b] tracking-tighter">
                       {getDifficultyStars(product.difficulty) || '—'}
                     </span>
-
-                    {/* Cycle selector */}
-                    {product.billingCycles && product.billingCycles.length > 0 ? (
-                      <select
-                        value={sd.cycle || ''}
-                        onChange={(e) => updateCycle(sd.productId, e.target.value)}
-                        className="h-6 w-full rounded-sm border border-[#e5e7eb] bg-white px-1 text-[11px] text-[#111827] outline-none focus:border-[#2563eb]"
-                      >
-                        {product.billingCycles.map((cycle) => (
-                          <option key={cycle} value={cycle}>
-                            {cycle}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span className="text-[11px] text-[#9ca3af]">—</span>
-                    )}
 
                     {/* Remove */}
                     <button

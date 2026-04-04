@@ -9,28 +9,29 @@ datasource db {
 }
 
 model Organization {
-  id                 String               @id @default(cuid())
-  code               String               @unique
-  name               String
-  site               String               @default("ID")
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  wecomCorpId        String?              @unique
-  actionLogs         ActionLog[]
-  bank_transactions  bank_transactions[]
-  commission_records commission_records[]
-  customerFollowups  CustomerFollowup[]
-  customers          Customer[]
-  delivery_items     delivery_items[]
-  departments        departments[]
-  import_batches     import_batches[]
-  interactions       Interaction[]
-  leads              Lead[]
-  opportunities      Opportunity[]
-  products           Product[]
-  users              UserOrganization[]
-  vendors            vendors[]
-  wecom_bots         wecom_bots[]
+  id                      String                    @id @default(cuid())
+  code                    String                    @unique
+  name                    String
+  site                    String                    @default("ID")
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  wecomCorpId             String?                   @unique
+  actionLogs              ActionLog[]
+  bank_transactions       bank_transactions[]
+  commission_records      commission_records[]
+  customerFollowups       CustomerFollowup[]
+  customers               Customer[]
+  delivery_items          delivery_items[]
+  departments             departments[]
+  dict_product_categories dict_product_categories[]
+  import_batches          import_batches[]
+  interactions            Interaction[]
+  leads                   Lead[]
+  opportunities           Opportunity[]
+  products                Product[]
+  users                   UserOrganization[]
+  vendors                 vendors[]
+  wecom_bots              wecom_bots[]
 
   @@map("organizations")
 }
@@ -301,12 +302,14 @@ model Product {
   isExpertMode            Boolean                   @default(false)
   sla                     Int?
   expertTag               String[]                  @default([])
+  categoryId              String?
   materials               MaterialItem[]
   material_items_template material_items_template[]
   opportunity_items       opportunity_items[]
   p2Data                  OpportunityP2Data[]
   p3Data                  OpportunityP3Data[]
   product_prices          product_prices[]
+  dict_product_categories dict_product_categories?  @relation(fields: [categoryId], references: [id])
   organization            Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   progressPoints          ProgressPoint[]
   vendor_products         vendor_products[]
@@ -1072,6 +1075,24 @@ model opportunity_items {
   @@index([opportunityId])
   @@index([organizationId])
   @@index([productId])
+}
+
+model dict_product_categories {
+  id             String       @id
+  organizationId String
+  code           String
+  nameZh         String
+  nameId         String?
+  nameEn         String?
+  description    String?
+  sortOrder      Int          @default(0)
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @default(now())
+  organizations  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, map: "dict_product_categories_org_fkey")
+  products       Product[]
+
+  @@unique([organizationId, code], map: "dict_product_categories_code_key")
 }
 
 enum LeadSource {
