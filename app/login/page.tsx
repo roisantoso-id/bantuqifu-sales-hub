@@ -53,7 +53,20 @@ function LoginForm() {
       }
 
       if (data?.session) {
-        document.cookie = `selectedTenant=${selectedTenant.id}; path=/; max-age=86400; domain=.oabantuqifu.com`
+        const tenantResponse = await fetch('/api/auth/tenant', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ tenantId: selectedTenant.id }),
+        })
+
+        if (!tenantResponse.ok) {
+          const tenantResult = await tenantResponse.json().catch(() => null)
+          setError(tenantResult?.error || '设置组织失败，请重新登录')
+          setIsLoading(false)
+          return
+        }
         localStorage.setItem('selectedTenant', selectedTenant.id)
         localStorage.setItem('selectedTenantName', selectedTenant.name)
         localStorage.setItem('currentSite', selectedTenant.site)

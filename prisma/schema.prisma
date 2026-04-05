@@ -399,13 +399,18 @@ model OpportunityP3Data {
 }
 
 model OpportunityP4Data {
-  id              String      @id @default(cuid())
-  opportunityId   String      @unique
-  contractFileUrl String?
-  contractStatus  String      @default("pending")
-  uploadedAt      DateTime?
-  notes           String?
-  opportunity     Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  id                String      @id @default(cuid())
+  opportunityId     String      @unique
+  contractFileUrl   String?
+  contractFileName  String?
+  contractFileSize  Int?
+  contractStatus    String      @default("pending")
+  uploadedAt        DateTime?
+  notes             String?
+  sealVisible       Boolean     @default(false)
+  signatureComplete Boolean     @default(false)
+  qualityClear      Boolean     @default(false)
+  opportunity       Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
 
   @@map("opportunity_p4_data")
 }

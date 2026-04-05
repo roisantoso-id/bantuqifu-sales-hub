@@ -1,9 +1,10 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { uploadContractToOss } from '@/lib/oss'
 import { cookies } from 'next/headers'
 import { createDeliveryProjectAction } from './delivery'
-import type { OpportunityP2Data, OpportunityP3Data, StageId } from '@/lib/types'
+import type { OpportunityP2Data, OpportunityP3Data, OpportunityP4Data, StageId } from '@/lib/types'
 
 export interface OpportunityRow {
   id: string
@@ -43,6 +44,50 @@ export interface OpportunityRow {
 export interface HydratedOpportunityRow extends OpportunityRow {
   p2Data: OpportunityP2Data[]
   p3Data: OpportunityP3Data[]
+  p4Data?: OpportunityP4Data
+}
+
+const DEFAULT_P4_DATA: OpportunityP4Data = {
+  contractStatus: 'pending',
+  notes: '',
+  sealVisible: false,
+  signatureComplete: false,
+  qualityClear: false,
+}
+
+function mapP4DataRow(row: any): OpportunityP4Data {
+  return {
+    contractFileUrl: row?.contractFileUrl ?? undefined,
+    contractFileName: row?.contractFileName ?? undefined,
+    contractFileSize: typeof row?.contractFileSize === 'number' ? row.contractFileSize : undefined,
+    contractStatus: row?.contractStatus === 'returned' || row?.contractStatus === 'archived' ? row.contractStatus : 'pending',
+    uploadedAt: row?.uploadedAt ?? undefined,
+    notes: row?.notes ?? '',
+    sealVisible: Boolean(row?.sealVisible),
+    signatureComplete: Boolean(row?.signatureComplete),
+    qualityClear: Boolean(row?.qualityClear),
+  }
+}
+
+function buildP4UpsertPayload(
+  oppId: string,
+  data: OpportunityP4Data,
+  overrides?: Partial<Record<'contractFileUrl' | 'contractFileName' | 'contractFileSize' | 'contractStatus' | 'uploadedAt', string | number | null>>
+) {
+  return {
+    id: crypto.randomUUID(),
+    opportunityId: oppId,
+    contractFileUrl: data.contractFileUrl ?? null,
+    contractFileName: data.contractFileName ?? null,
+    contractFileSize: data.contractFileSize ?? null,
+    contractStatus: data.contractStatus,
+    uploadedAt: data.uploadedAt ?? null,
+    notes: data.notes?.trim() || null,
+    sealVisible: data.sealVisible,
+    signatureComplete: data.signatureComplete,
+    qualityClear: data.qualityClear,
+    ...overrides,
+  }
 }
 
 function buildP3DataFromItems(items: OpportunityP2Data[]): OpportunityP3Data[] {
@@ -482,13 +527,232 @@ export async function getOpportunityWorkspaceAction(oppId: string): Promise<Hydr
     return null
   }
 
-  const p2Data = await getOpportunityItemsAction(oppId)
+  const [p2Data, p4Data] = await Promise.all([
+    getOpportunityItemsAction(oppId),
+    getOpportunityP4DataAction(oppId),
+  ])
 
   return {
     ...opportunity,
     p2Data,
     p3Data: buildP3DataFromItems(p2Data),
+    p4Data,
   }
+}
+
+export async function getOpportunityP4DataAction(oppId: string): Promise<OpportunityP4Data | undefined> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  const { data: opportunity, error: opportunityError } = await supabase
+    .from('opportunities')
+    .select('id')
+    .eq('id', oppId)
+    .eq('organizationId', tenantId)
+    .single()
+
+  if (opportunityError || !opportunity) {
+    console.error('[getOpportunityP4DataAction] Opportunity not found:', opportunityError)
+    return undefined
+  }
+
+  const { data, error } = await supabase
+    .from('opportunity_p4_data')
+    .select('contractFileUrl, contractFileName, contractFileSize, contractStatus, uploadedAt, notes, sealVisible, signatureComplete, qualityClear')
+    .eq('opportunityId', oppId)
+    .maybeSingle()
+
+  if (error) {
+    console.error('[getOpportunityP4DataAction] Error:', error)
+    return undefined
+  }
+
+  if (!data) {
+    return undefined
+  }
+
+  return mapP4DataRow(data)
+}
+
+export async function saveOpportunityP4DraftAction(
+  oppId: string,
+  data: OpportunityP4Data
+): Promise<{ success: boolean; data?: HydratedOpportunityRow; error?: string }> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  const { data: opportunity, error: opportunityError } = await supabase
+    .from('opportunities')
+    .select('id')
+    .eq('id', oppId)
+    .eq('organizationId', tenantId)
+    .single()
+
+  if (opportunityError || !opportunity) {
+    console.error('[saveOpportunityP4DraftAction] Opportunity not found:', opportunityError)
+    return { success: false, error: '商机不存在' }
+  }
+
+  const nextData: OpportunityP4Data = {
+    ...DEFAULT_P4_DATA,
+    ...data,
+    contractStatus: data.contractFileUrl ? data.contractStatus : 'pending',
+  }
+
+  const { error: upsertError } = await supabase
+    .from('opportunity_p4_data')
+    .upsert(buildP4UpsertPayload(oppId, nextData), { onConflict: 'opportunityId' })
+
+  if (upsertError) {
+    console.error('[saveOpportunityP4DraftAction] Upsert error:', upsertError)
+    return { success: false, error: '保存合同草稿失败' }
+  }
+
+  const hydrated = await getOpportunityWorkspaceAction(oppId)
+
+  if (!hydrated) {
+    return { success: false, error: '刷新合同数据失败' }
+  }
+
+  return { success: true, data: hydrated }
+}
+
+export async function submitOpportunityContractAction(
+  oppId: string,
+  formData: FormData
+): Promise<{ success: boolean; data?: HydratedOpportunityRow; error?: string }> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  const userId = user?.id
+
+  if (!userId) {
+    const cookieStore = await cookies()
+    const { data: authSession } = await supabase.auth.getSession()
+
+    console.error('[submitOpportunityContractAction] Missing auth user', {
+      hasSession: Boolean(authSession.session),
+      tenantId,
+      oppId,
+      cookieNames: cookieStore.getAll().map((cookie) => cookie.name),
+    })
+
+    return { success: false, error: '用户未登录' }
+  }
+
+  const { data: opportunity, error: opportunityError } = await supabase
+    .from('opportunities')
+    .select('id, customerId, stageId')
+    .eq('id', oppId)
+    .eq('organizationId', tenantId)
+    .single()
+
+  if (opportunityError || !opportunity) {
+    console.error('[submitOpportunityContractAction] Opportunity not found:', opportunityError)
+    return { success: false, error: '商机不存在' }
+  }
+
+  if (opportunity.stageId !== 'P4') {
+    return { success: false, error: '当前商机不在 P4 阶段' }
+  }
+
+  const fileEntry = formData.get('file')
+  if (!(fileEntry instanceof File)) {
+    return { success: false, error: '请先上传合同 PDF' }
+  }
+
+  const payload: OpportunityP4Data = {
+    contractStatus: 'returned',
+    notes: String(formData.get('notes') ?? ''),
+    sealVisible: String(formData.get('sealVisible') ?? 'false') === 'true',
+    signatureComplete: String(formData.get('signatureComplete') ?? 'false') === 'true',
+    qualityClear: String(formData.get('qualityClear') ?? 'false') === 'true',
+  }
+
+  if (!payload.sealVisible || !payload.signatureComplete || !payload.qualityClear) {
+    return { success: false, error: '请先完成合同质检清单' }
+  }
+
+  let uploadedFile
+  try {
+    uploadedFile = await uploadContractToOss({
+      file: fileEntry,
+      tenantId,
+      opportunityId: oppId,
+    })
+  } catch (error) {
+    console.error('[submitOpportunityContractAction] OSS upload error:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '合同上传失败，请稍后重试',
+    }
+  }
+
+  const uploadedAt = new Date().toISOString()
+  const persistedP4Data: OpportunityP4Data = {
+    ...payload,
+    contractFileUrl: uploadedFile.url,
+    contractFileName: uploadedFile.fileName,
+    contractFileSize: uploadedFile.fileSize,
+    uploadedAt,
+  }
+
+  const { error: p4Error } = await supabase
+    .from('opportunity_p4_data')
+    .upsert(
+      buildP4UpsertPayload(oppId, persistedP4Data, {
+        contractFileUrl: uploadedFile.url,
+        contractFileName: uploadedFile.fileName,
+        contractFileSize: uploadedFile.fileSize,
+        contractStatus: 'returned',
+        uploadedAt,
+      }),
+      { onConflict: 'opportunityId' }
+    )
+
+  if (p4Error) {
+    console.error('[submitOpportunityContractAction] P4 upsert error:', p4Error)
+    return { success: false, error: '保存合同信息失败' }
+  }
+
+  const { error: stageError } = await supabase
+    .from('opportunities')
+    .update({
+      stageId: 'P5',
+      updatedAt: new Date().toISOString(),
+    })
+    .eq('id', oppId)
+    .eq('organizationId', tenantId)
+
+  if (stageError) {
+    console.error('[submitOpportunityContractAction] Stage update error:', stageError)
+    return { success: false, error: '合同已上传，但推进到 P5 失败' }
+  }
+
+  const { error: interactionError } = await supabase.from('interactions').insert({
+    id: crypto.randomUUID(),
+    organizationId: tenantId,
+    customerId: opportunity.customerId,
+    opportunityId: oppId,
+    operatorId: userId,
+    type: 'STAGE_CHANGE',
+    content: '合同已上传并通过质检，商机阶段变更为：P5',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  })
+
+  if (interactionError) {
+    console.error('[submitOpportunityContractAction] Interaction log error:', interactionError)
+  }
+
+  const hydrated = await getOpportunityWorkspaceAction(oppId)
+
+  if (!hydrated) {
+    return { success: false, error: '刷新合同数据失败' }
+  }
+
+  return { success: true, data: hydrated }
 }
 
 // ─── updateOpportunityStageAction ──────────────────────────────────────────────

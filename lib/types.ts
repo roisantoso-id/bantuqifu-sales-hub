@@ -156,9 +156,14 @@ export interface OpportunityP3Data {
 // ─── Stage P4-P7 Data ────────────────────────────────────────────────────────
 export interface OpportunityP4Data {
   contractFileUrl?: string // 合同PDF文件URL
+  contractFileName?: string
+  contractFileSize?: number
   contractStatus: 'pending' | 'returned' | 'archived' // 待签署 | 已回传 | 归档中
   uploadedAt?: string
   notes?: string
+  sealVisible: boolean
+  signatureComplete: boolean
+  qualityClear: boolean
 }
 
 export interface OpportunityP5Data {

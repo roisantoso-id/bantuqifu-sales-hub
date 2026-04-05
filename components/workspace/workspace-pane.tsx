@@ -21,6 +21,8 @@ interface WorkspaceProps {
   onOpportunityUpdate: (data: Partial<Opportunity>) => void
   onSave: (stage?: StageId) => Promise<boolean>
   onAdvanceStage: (stage?: StageId) => Promise<boolean>
+  onP4DraftSave: (data: OpportunityP4Data) => Promise<{ success: boolean; error?: string }>
+  onP4Submit: (formData: FormData) => Promise<{ success: boolean; error?: string }>
   onQuoteSent: () => void
 }
 
@@ -45,6 +47,8 @@ export function WorkspacePane({
   onOpportunityUpdate,
   onSave,
   onAdvanceStage,
+  onP4DraftSave,
+  onP4Submit,
   onQuoteSent,
 }: WorkspaceProps) {
   // Guard against undefined opportunity
@@ -131,6 +135,9 @@ export function WorkspacePane({
             opportunity={opportunity}
             p4Data={opportunity.p4Data}
             onDataChange={(data) => onOpportunityUpdate({ p4Data: data })}
+            onSaveDraft={onP4DraftSave}
+            onSubmitContract={onP4Submit}
+            isReadonly={!isOnCurrentStage}
           />
         )}
         {viewingStage === 'P5' && (
@@ -192,7 +199,7 @@ export function WorkspacePane({
               )}
             </>
           )}
-          {['P4', 'P5', 'P6', 'P7'].includes(viewingStage) && isOnCurrentStage && (
+          {['P5', 'P6', 'P7'].includes(viewingStage) && isOnCurrentStage && (
             <button
               onClick={() => onAdvanceStage(viewingStage)}
               className="ml-auto flex h-8 items-center gap-1.5 rounded-sm bg-[#2563eb] px-3 text-[13px] font-medium text-white hover:bg-[#1d4ed8]"

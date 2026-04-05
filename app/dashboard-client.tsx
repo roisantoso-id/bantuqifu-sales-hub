@@ -12,9 +12,9 @@ import { AuditRail } from '@/components/audit-rail/audit-panel'
 import { OpportunityListView } from '@/components/opportunities/opportunity-list-view'
 import { mockActionLogs, mockUser, mockLeads } from '@/lib/mock-data'
 import { addAuditNote } from '@/app/actions/audit'
-import { toggleOpportunityPinAction, getOpportunitiesAction, saveOpportunityItemsAction, getOpportunityWorkspaceAction, updateOpportunityAction, updateOpportunityStageAction } from '@/app/actions/opportunity'
+import { toggleOpportunityPinAction, getOpportunitiesAction, saveOpportunityItemsAction, getOpportunityWorkspaceAction, updateOpportunityAction, updateOpportunityStageAction, saveOpportunityP4DraftAction, submitOpportunityContractAction } from '@/app/actions/opportunity'
 import { getProductsByCategoryAction } from '@/app/actions/product'
-import type { Opportunity, NavSection, StageId, ActionLog, Lead, LeadRow, OpportunityRow, OpportunityStatus, Currency, Product, OpportunityP2Data, OpportunityP3Data } from '@/lib/types'
+import type { Opportunity, NavSection, StageId, ActionLog, Lead, LeadRow, OpportunityRow, OpportunityStatus, Currency, Product, OpportunityP2Data, OpportunityP3Data, OpportunityP4Data } from '@/lib/types'
 
 interface DashboardClientProps {
   initialNav: NavSection
@@ -50,7 +50,7 @@ function buildP3Data(items: OpportunityP2Data[]): OpportunityP3Data[] {
 
 function mapOpportunityRowToOpportunity(
   opp: OpportunityRow,
-  workspaceData?: { p2Data: OpportunityP2Data[]; p3Data?: OpportunityP3Data[] }
+  workspaceData?: { p2Data: OpportunityP2Data[]; p3Data?: OpportunityP3Data[]; p4Data?: OpportunityP4Data }
 ): Opportunity {
   const serviceType = (opp.serviceType as Opportunity['serviceType']) || DEFAULT_SERVICE_TYPE
   const p2Data = workspaceData?.p2Data ?? []
@@ -90,6 +90,7 @@ function mapOpportunityRowToOpportunity(
     wechatGroupName: opp.wechatGroupName || undefined,
     p2Data,
     p3Data,
+    p4Data: workspaceData?.p4Data,
   } as Opportunity
 }
 
@@ -250,6 +251,7 @@ export function DashboardClient({
       const mapped = mapOpportunityRowToOpportunity(hydrated, {
         p2Data: hydrated.p2Data,
         p3Data: hydrated.p3Data,
+        p4Data: hydrated.p4Data,
       })
 
       setOpportunities((prev) => mergeOpportunityIntoList(prev, mapped))
@@ -278,7 +280,7 @@ export function DashboardClient({
   )
 
   const appendLog = useCallback(
-    (oppId: string, log: Omit<ActionLog, 'id' | 'opportunityId' | 'operatorId' | 'operatorName'>) => {
+    (oppId: string, log: Omit<ActionLog, 'id' | 'opportunityId' | 'operatorId' | 'operatorName' | 'timestamp'>) => {
       const entry: ActionLog = {
         id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         opportunityId: oppId,
@@ -366,6 +368,80 @@ export function DashboardClient({
     [appendLog, persistCurrentStageData, reloadOpportunity, selectedOpportunity, viewingStage]
   )
 
+  const handleP4DraftSave = useCallback(
+    async (data: OpportunityP4Data) => {
+      if (!selectedOpportunity) {
+        return { success: false, error: '未选择商机' }
+      }
+
+      const result = await saveOpportunityP4DraftAction(selectedOpportunity.id, data)
+      if (!result.success) {
+        console.error('[handleP4DraftSave] Failed:', result.error)
+        return { success: false, error: result.error }
+      }
+
+      if (result.data) {
+        const mapped = mapOpportunityRowToOpportunity(result.data, {
+          p2Data: result.data.p2Data,
+          p3Data: result.data.p3Data,
+          p4Data: result.data.p4Data,
+        })
+        setOpportunities((prev) => mergeOpportunityIntoList(prev, mapped))
+      } else {
+        await reloadOpportunity(selectedOpportunity.id)
+      }
+
+      appendLog(selectedOpportunity.id, {
+        actionType: 'FORM',
+        actionLabel: '保存 P4 草稿',
+        stageId: 'P4',
+      })
+
+      return { success: true }
+    },
+    [appendLog, reloadOpportunity, selectedOpportunity]
+  )
+
+  const handleP4Submit = useCallback(
+    async (formData: FormData) => {
+      if (!selectedOpportunity) {
+        return { success: false, error: '未选择商机' }
+      }
+
+      const result = await submitOpportunityContractAction(selectedOpportunity.id, formData)
+      if (!result.success) {
+        console.error('[handleP4Submit] Failed:', result.error)
+        return { success: false, error: result.error }
+      }
+
+      let nextOpportunity: Opportunity | null = null
+      if (result.data) {
+        nextOpportunity = mapOpportunityRowToOpportunity(result.data, {
+          p2Data: result.data.p2Data,
+          p3Data: result.data.p3Data,
+          p4Data: result.data.p4Data,
+        })
+        setOpportunities((prev) => mergeOpportunityIntoList(prev, nextOpportunity!))
+      } else {
+        nextOpportunity = await reloadOpportunity(selectedOpportunity.id)
+      }
+
+      if (nextOpportunity) {
+        setViewingStage(nextOpportunity.stageId)
+      }
+
+      appendLog(selectedOpportunity.id, {
+        actionType: 'STAGE_CHANGE',
+        actionLabel: '提交合同并推进至 P5',
+        remark: '合同已上传到 OSS 并完成持久化',
+        stageId: 'P5',
+      })
+
+      return { success: true }
+    },
+    [appendLog, reloadOpportunity, selectedOpportunity]
+  )
+
   const handleQuoteSent = () => {
     appendLog(selectedId, {
       actionType: 'QUOTE',
@@ -404,6 +480,7 @@ export function DashboardClient({
                 return mapOpportunityRowToOpportunity(opp, existing ? {
                   p2Data: existing.p2Data || [],
                   p3Data: existing.p3Data,
+                  p4Data: existing.p4Data,
                 } : undefined)
               })
             })
@@ -455,6 +532,8 @@ export function DashboardClient({
             onOpportunityUpdate={handleOpportunityUpdate}
             onSave={handleSave}
             onAdvanceStage={handleAdvanceStage}
+            onP4DraftSave={handleP4DraftSave}
+            onP4Submit={handleP4Submit}
             onQuoteSent={handleQuoteSent}
           />
 
