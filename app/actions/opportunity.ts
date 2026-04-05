@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
 import { createDeliveryProjectAction } from './delivery'
-import type { OpportunityP2Data, OpportunityP3Data } from '@/lib/types'
+import type { OpportunityP2Data, OpportunityP3Data, StageId } from '@/lib/types'
 
 export interface OpportunityRow {
   id: string
@@ -31,7 +31,38 @@ export interface OpportunityRow {
     id: string
     customerName: string
     customerId: string
+    passportNo?: string | null
+    phone?: string | null
+    email?: string | null
+    wechat?: string | null
+    level?: string | null
+    industryId?: string | null
   }
+}
+
+export interface HydratedOpportunityRow extends OpportunityRow {
+  p2Data: OpportunityP2Data[]
+  p3Data: OpportunityP3Data[]
+}
+
+function buildP3DataFromItems(items: OpportunityP2Data[]): OpportunityP3Data[] {
+  return items.map((item) => ({
+    tempId: item.tempId,
+    productId: item.productId,
+    productName: item.productName,
+    targetName: item.targetName,
+    lockedPrice: item.basePrice,
+    currency: item.currency,
+    costFloor: item.costFloor,
+    profitMargin: item.profitMargin,
+    costPriceCny: item.costPriceCny,
+    costPriceIdr: item.costPriceIdr,
+    partnerPriceCny: item.partnerPriceCny,
+    partnerPriceIdr: item.partnerPriceIdr,
+    retailPriceCny: item.retailPriceCny,
+    retailPriceIdr: item.retailPriceIdr,
+    approvalStatus: 'auto-approved',
+  }))
 }
 
 // ─── getCurrentTenantId helper ─────────────────────────────────────────────────
@@ -418,7 +449,20 @@ export async function getOpportunityByIdAction(oppId: string): Promise<Opportuni
 
   const { data, error } = await supabase
     .from('opportunities')
-    .select('*')
+    .select(`
+      *,
+      customer:customers!opportunities_customerId_fkey (
+        id,
+        customerName,
+        customerId,
+        passportNo,
+        phone,
+        email,
+        wechat,
+        level,
+        industryId
+      )
+    `)
     .eq('id', oppId)
     .eq('organizationId', tenantId)
     .single()
@@ -429,6 +473,22 @@ export async function getOpportunityByIdAction(oppId: string): Promise<Opportuni
   }
 
   return data as OpportunityRow
+}
+
+export async function getOpportunityWorkspaceAction(oppId: string): Promise<HydratedOpportunityRow | null> {
+  const opportunity = await getOpportunityByIdAction(oppId)
+
+  if (!opportunity) {
+    return null
+  }
+
+  const p2Data = await getOpportunityItemsAction(oppId)
+
+  return {
+    ...opportunity,
+    p2Data,
+    p3Data: buildP3DataFromItems(p2Data),
+  }
 }
 
 // ─── updateOpportunityStageAction ──────────────────────────────────────────────

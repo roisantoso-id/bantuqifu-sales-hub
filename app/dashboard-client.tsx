@@ -12,9 +12,9 @@ import { AuditRail } from '@/components/audit-rail/audit-panel'
 import { OpportunityListView } from '@/components/opportunities/opportunity-list-view'
 import { mockActionLogs, mockUser, mockLeads } from '@/lib/mock-data'
 import { addAuditNote } from '@/app/actions/audit'
-import { toggleOpportunityPinAction, getOpportunitiesAction, saveOpportunityItemsAction, getOpportunityItemsAction } from '@/app/actions/opportunity'
+import { toggleOpportunityPinAction, getOpportunitiesAction, saveOpportunityItemsAction, getOpportunityWorkspaceAction, updateOpportunityAction, updateOpportunityStageAction } from '@/app/actions/opportunity'
 import { getProductsByCategoryAction } from '@/app/actions/product'
-import type { Opportunity, NavSection, StageId, ActionLog, Lead, LeadRow, OpportunityRow, OpportunityStatus, Currency, Product } from '@/lib/types'
+import type { Opportunity, NavSection, StageId, ActionLog, Lead, LeadRow, OpportunityRow, OpportunityStatus, Currency, Product, OpportunityP2Data, OpportunityP3Data } from '@/lib/types'
 
 interface DashboardClientProps {
   initialNav: NavSection
@@ -24,6 +24,103 @@ interface DashboardClientProps {
   initialLeadSearch: string
   selectedLeadId: string | null
   currentUserId?: string | null
+}
+
+const DEFAULT_SERVICE_TYPE: Opportunity['serviceType'] = 'VISA'
+
+function buildP3Data(items: OpportunityP2Data[]): OpportunityP3Data[] {
+  return items.map((item) => ({
+    tempId: item.tempId,
+    productId: item.productId,
+    productName: item.productName,
+    targetName: item.targetName,
+    lockedPrice: item.basePrice,
+    currency: item.currency,
+    costFloor: item.costFloor,
+    profitMargin: item.profitMargin,
+    costPriceCny: item.costPriceCny,
+    costPriceIdr: item.costPriceIdr,
+    partnerPriceCny: item.partnerPriceCny,
+    partnerPriceIdr: item.partnerPriceIdr,
+    retailPriceCny: item.retailPriceCny,
+    retailPriceIdr: item.retailPriceIdr,
+    approvalStatus: 'auto-approved',
+  }))
+}
+
+function mapOpportunityRowToOpportunity(
+  opp: OpportunityRow,
+  workspaceData?: { p2Data: OpportunityP2Data[]; p3Data?: OpportunityP3Data[] }
+): Opportunity {
+  const serviceType = (opp.serviceType as Opportunity['serviceType']) || DEFAULT_SERVICE_TYPE
+  const p2Data = workspaceData?.p2Data ?? []
+  const p3Data = workspaceData?.p3Data ?? buildP3Data(p2Data)
+
+  return {
+    id: opp.id,
+    opportunityCode: opp.opportunityCode,
+    customerId: opp.customerId,
+    customer: {
+      id: opp.customer?.id || opp.customerId,
+      name: opp.customer?.customerName || '未知客户',
+      passportNo: opp.customer?.passportNo || '',
+      phone: opp.customer?.phone || '',
+      email: opp.customer?.email || '',
+      wechat: opp.customer?.wechat || '',
+      level: 'L5',
+    },
+    stageId: opp.stageId as StageId,
+    status: (opp.status as OpportunityStatus) || 'active',
+    serviceType,
+    serviceTypeLabel: opp.serviceTypeLabel || opp.serviceType,
+    estimatedAmount: opp.estimatedAmount || 0,
+    currency: (opp.currency as Currency) || 'IDR',
+    requirements: opp.requirements || undefined,
+    notes: opp.notes || undefined,
+    destination: undefined,
+    travelDate: undefined,
+    assignee: '',
+    createdAt: opp.createdAt,
+    updatedAt: opp.updatedAt,
+    expectedCloseDate: opp.expectedCloseDate || undefined,
+    products: [],
+    quote: undefined,
+    pinnedByUsers: opp.pinnedByUsers || [],
+    wechatGroupId: opp.wechatGroupId || undefined,
+    wechatGroupName: opp.wechatGroupName || undefined,
+    p2Data,
+    p3Data,
+  } as Opportunity
+}
+
+function mergeOpportunityIntoList(opportunities: Opportunity[], updated: Opportunity): Opportunity[] {
+  const exists = opportunities.some((opp) => opp.id === updated.id)
+
+  if (!exists) {
+    return [updated, ...opportunities]
+  }
+
+  return opportunities.map((opp) => (opp.id === updated.id ? updated : opp))
+}
+
+const STAGE_MAP: Record<StageId, StageId | null> = {
+  P1: 'P2',
+  P2: 'P3',
+  P3: 'P4',
+  P4: 'P5',
+  P5: 'P6',
+  P6: 'P7',
+  P7: 'P8',
+  P8: null,
+}
+
+function getPersistableP1Updates(opportunity: Opportunity) {
+  return {
+    requirements: opportunity.requirements ?? '',
+    serviceType: opportunity.serviceType,
+    serviceTypeLabel: opportunity.serviceTypeLabel,
+    notes: opportunity.notes ?? '',
+  }
 }
 
 export function DashboardClient({
@@ -45,42 +142,7 @@ export function DashboardClient({
   // 商机相关状态 - 使用真实数据或 mock 数据
   const [opportunities, setOpportunities] = useState<Opportunity[]>(() => {
     if (initialOpportunities && initialOpportunities.length > 0) {
-      return initialOpportunities.map(opp => ({
-        id: opp.id,
-        opportunityCode: opp.opportunityCode,
-        customerId: opp.customerId,
-        customerName: opp.customer?.customerName || '未知客户',
-        customer: {
-          id: opp.customer?.id || opp.customerId,
-          name: opp.customer?.customerName || '未知客户',
-          passportNo: opp.customer?.customerId || '',
-          phone: '',
-          email: '',
-          wechat: '',
-          level: 'L5' as const,
-          industry: '',
-          country: 'Indonesia',
-        },
-        stageId: opp.stageId as StageId,
-        status: (opp.status as OpportunityStatus) || 'active',
-        serviceType: (opp.serviceType as 'VISA' | 'COMPANY_REGISTRATION' | 'FACTORY_SETUP' | 'TAX_SERVICES' | 'PERMIT_SERVICES' | 'FINANCIAL_SERVICES' | 'IMMIGRATION' | 'OTHER') || 'VISA',
-        serviceTypeLabel: opp.serviceTypeLabel || opp.serviceType,
-        estimatedAmount: opp.estimatedAmount || 0,
-        currency: (opp.currency as Currency) || 'IDR',
-        requirements: opp.requirements || undefined,
-        notes: opp.notes || undefined,
-        wechatGroupId: opp.wechatGroupId || undefined,
-        wechatGroupName: opp.wechatGroupName || undefined,
-        destination: undefined,
-        travelDate: undefined,
-        assignee: '',
-        createdAt: opp.createdAt,
-        updatedAt: opp.updatedAt,
-        expectedCloseDate: opp.expectedCloseDate || undefined,
-        products: [],
-        quote: undefined,
-        pinnedByUsers: opp.pinnedByUsers || [],
-      } as any))
+      return initialOpportunities.map((opp) => mapOpportunityRowToOpportunity(opp))
     }
     return []
   })
@@ -162,71 +224,10 @@ export function DashboardClient({
   // 切换到商机页时重新拉取数据
   useEffect(() => {
     if (activeNav !== 'opportunities') return
-    getOpportunitiesAction().then(async (data) => {
+
+    getOpportunitiesAction().then((data) => {
       if (!data) return
-
-      const opportunitiesWithItems = await Promise.all(
-        data.map(async (opp) => {
-          const p2Data = await getOpportunityItemsAction(opp.id)
-          const p3Data = p2Data.map((item) => ({
-            tempId: item.tempId,
-            productId: item.productId,
-            productName: item.productName,
-            targetName: item.targetName,
-            lockedPrice: item.basePrice,
-            currency: item.currency,
-            costFloor: item.costFloor,
-            profitMargin: item.profitMargin,
-            costPriceCny: item.costPriceCny,
-            costPriceIdr: item.costPriceIdr,
-            partnerPriceCny: item.partnerPriceCny,
-            partnerPriceIdr: item.partnerPriceIdr,
-            retailPriceCny: item.retailPriceCny,
-            retailPriceIdr: item.retailPriceIdr,
-            approvalStatus: 'auto-approved' as const,
-          }))
-          return {
-            id: opp.id,
-            opportunityCode: opp.opportunityCode,
-            customerId: opp.customerId,
-            customerName: opp.customer?.customerName || '未知客户',
-            customer: {
-              id: opp.customer?.id || opp.customerId,
-              name: opp.customer?.customerName || '未知客户',
-              passportNo: opp.customer?.customerId || '',
-              phone: '',
-              email: '',
-              wechat: '',
-              level: 'L5' as const,
-              industry: '',
-              country: 'Indonesia',
-            },
-            stageId: opp.stageId as StageId,
-            status: (opp.status as OpportunityStatus) || 'active',
-            serviceType: (opp.serviceType as 'VISA' | 'COMPANY_REGISTRATION' | 'FACTORY_SETUP' | 'TAX_SERVICES' | 'PERMIT_SERVICES' | 'FINANCIAL_SERVICES' | 'IMMIGRATION' | 'OTHER') || 'VISA',
-            serviceTypeLabel: opp.serviceTypeLabel || opp.serviceType,
-            estimatedAmount: opp.estimatedAmount || 0,
-            currency: (opp.currency as Currency) || 'IDR',
-            requirements: opp.requirements || undefined,
-            notes: opp.notes || undefined,
-            wechatGroupId: opp.wechatGroupId || undefined,
-            wechatGroupName: opp.wechatGroupName || undefined,
-            destination: undefined,
-            travelDate: undefined,
-            assignee: '',
-            createdAt: opp.createdAt,
-            updatedAt: opp.updatedAt,
-            expectedCloseDate: opp.expectedCloseDate || undefined,
-            products: [],
-            quote: undefined,
-            p2Data,
-            p3Data,
-            pinnedByUsers: opp.pinnedByUsers || [],
-          } as any
-        })
-      )
-
-      setOpportunities(opportunitiesWithItems)
+      setOpportunities(data.map((opp) => mapOpportunityRowToOpportunity(opp)))
     })
   }, [activeNav])
 
@@ -239,34 +240,39 @@ export function DashboardClient({
   const currentLogs = useMemo(() => actionLogs[selectedId] ?? [], [actionLogs, selectedId])
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
-  const reloadOpportunityItems = useCallback(
+  const reloadOpportunity = useCallback(
     async (oppId: string) => {
-      const items = await getOpportunityItemsAction(oppId)
-      const p3Data = items.map((item) => ({
-        tempId: item.tempId,
-        productId: item.productId,
-        productName: item.productName,
-        targetName: item.targetName,
-        lockedPrice: item.basePrice,
-        currency: item.currency,
-        costFloor: item.costFloor,
-        profitMargin: item.profitMargin,
-        costPriceCny: item.costPriceCny,
-        costPriceIdr: item.costPriceIdr,
-        partnerPriceCny: item.partnerPriceCny,
-        partnerPriceIdr: item.partnerPriceIdr,
-        retailPriceCny: item.retailPriceCny,
-        retailPriceIdr: item.retailPriceIdr,
-        approvalStatus: item.approvalStatus || 'auto-approved' as const,
-      }))
+      const hydrated = await getOpportunityWorkspaceAction(oppId)
+      if (!hydrated) {
+        return null
+      }
 
-      setOpportunities((prev) =>
-        prev.map((o) =>
-          o.id === oppId
-            ? { ...o, p2Data: items, p3Data, updatedAt: new Date().toISOString() }
-            : o
-        )
-      )
+      const mapped = mapOpportunityRowToOpportunity(hydrated, {
+        p2Data: hydrated.p2Data,
+        p3Data: hydrated.p3Data,
+      })
+
+      setOpportunities((prev) => mergeOpportunityIntoList(prev, mapped))
+      return mapped
+    },
+    []
+  )
+
+  const persistCurrentStageData = useCallback(
+    async (opportunity: Opportunity, stage: StageId) => {
+      if (stage === 'P1') {
+        return updateOpportunityAction(opportunity.id, getPersistableP1Updates(opportunity))
+      }
+
+      if (stage === 'P2' || stage === 'P3') {
+        const sourceItems = stage === 'P3' && opportunity.p3Data && opportunity.p3Data.length > 0
+          ? opportunity.p3Data
+          : (opportunity.p2Data || [])
+
+        return saveOpportunityItemsAction(opportunity.id, sourceItems as Array<OpportunityP2Data | OpportunityP3Data>)
+      }
+
+      return { success: true }
     },
     []
   )
@@ -278,6 +284,7 @@ export function DashboardClient({
         opportunityId: oppId,
         operatorId: mockUser.id,
         operatorName: mockUser.name,
+        timestamp: new Date().toISOString(),
         ...log,
       }
       setActionLogs((prev) => ({
@@ -288,7 +295,6 @@ export function DashboardClient({
     []
   )
 
-  // ── Handlers ─────────────────────────────────────────────────────────────────
   const handleSelectOpportunity = (opp: Opportunity) => {
     setSelectedId(opp.id)
     setViewingStage(opp.stageId)
@@ -302,51 +308,63 @@ export function DashboardClient({
     )
   }
 
-  const handleSave = async () => {
-    if (!selectedOpportunity) return
+  const handleSave = useCallback(
+    async (stage: StageId = viewingStage) => {
+      if (!selectedOpportunity) return false
 
-    if (viewingStage === 'P2' || viewingStage === 'P3') {
-      const sourceItems = viewingStage === 'P3' && selectedOpportunity.p3Data && selectedOpportunity.p3Data.length > 0
-        ? selectedOpportunity.p3Data
-        : (selectedOpportunity.p2Data || [])
-
-      const result = await saveOpportunityItemsAction(selectedOpportunity.id, sourceItems as any)
+      const result = await persistCurrentStageData(selectedOpportunity, stage)
       if (!result.success) {
-        console.error(`[handleSave] Failed to save ${viewingStage} items:`, result.error)
-        return
+        console.error(`[handleSave] Failed to save ${stage}:`, result.error)
+        return false
       }
 
-      await reloadOpportunityItems(selectedOpportunity.id)
-    }
+      const reloaded = await reloadOpportunity(selectedOpportunity.id)
+      if (!reloaded) {
+        return false
+      }
 
-    appendLog(selectedId, { actionType: 'FORM', actionLabel: '保存草稿' })
-  }
+      appendLog(selectedOpportunity.id, { actionType: 'FORM', actionLabel: '保存草稿', stageId: stage })
+      return true
+    },
+    [appendLog, persistCurrentStageData, reloadOpportunity, selectedOpportunity, viewingStage]
+  )
 
-  const handleAdvanceStage = () => {
-    const stageMap: Record<StageId, StageId | null> = {
-      P1: 'P2',
-      P2: 'P3',
-      P3: 'P4',
-      P4: 'P5',
-      P5: 'P6',
-      P6: 'P7',
-      P7: 'P8',
-      P8: null,
-    }
-    const next = stageMap[selectedOpportunity.stageId]
-    if (!next) return
-    setOpportunities((prev) =>
-      prev.map((o) =>
-        o.id === selectedId ? { ...o, stageId: next, updatedAt: new Date().toISOString() } : o
-      )
-    )
-    setViewingStage(next)
-    appendLog(selectedId, {
-      actionType: 'STAGE_CHANGE',
-      actionLabel: `推进至 ${next}`,
-      remark: `从 ${selectedOpportunity.stageId} 推进`,
-    })
-  }
+  const handleAdvanceStage = useCallback(
+    async (stage: StageId = selectedOpportunity?.stageId || viewingStage) => {
+      if (!selectedOpportunity) return false
+
+      const next = STAGE_MAP[stage]
+      if (!next) return false
+
+      const saveResult = await persistCurrentStageData(selectedOpportunity, stage)
+      if (!saveResult.success) {
+        console.error(`[handleAdvanceStage] Failed to save ${stage}:`, saveResult.error)
+        return false
+      }
+
+      const stageResult = await updateOpportunityStageAction(selectedOpportunity.id, next)
+      if (!stageResult.success) {
+        console.error('[handleAdvanceStage] Failed to advance stage:', stageResult.error)
+        await reloadOpportunity(selectedOpportunity.id)
+        return false
+      }
+
+      const reloaded = await reloadOpportunity(selectedOpportunity.id)
+      if (!reloaded) {
+        return false
+      }
+
+      setViewingStage(reloaded.stageId)
+      appendLog(selectedOpportunity.id, {
+        actionType: 'STAGE_CHANGE',
+        actionLabel: `推进至 ${reloaded.stageId}`,
+        remark: `从 ${stage} 推进`,
+        stageId: reloaded.stageId,
+      })
+      return true
+    },
+    [appendLog, persistCurrentStageData, reloadOpportunity, selectedOpportunity, viewingStage]
+  )
 
   const handleQuoteSent = () => {
     appendLog(selectedId, {
@@ -377,44 +395,18 @@ export function DashboardClient({
       try {
         const result = await toggleOpportunityPinAction(oppId, isPinned)
         if (result.success) {
-          // 重新加载商机列表以获取最新的置顶状态
           const updatedOpps = await getOpportunitiesAction()
           if (updatedOpps && updatedOpps.length > 0) {
-            setOpportunities(updatedOpps.map(opp => ({
-              id: opp.id,
-              customerId: opp.customerId,
-              customerName: opp.customer?.customerName || '未知客户',
-              customer: {
-                id: opp.customer?.id || opp.customerId,
-                name: opp.customer?.customerName || '未知客户',
-                passportNo: opp.opportunityCode,
-                phone: '',
-                email: '',
-                wechat: '',
-                level: 'L5' as const,
-                industry: '',
-                country: 'Indonesia',
-              },
-              stageId: opp.stageId as StageId,
-              status: (opp.status as OpportunityStatus) || 'active',
-              serviceType: (opp.serviceType as 'VISA' | 'COMPANY_REGISTRATION' | 'FACTORY_SETUP' | 'TAX_SERVICES' | 'PERMIT_SERVICES' | 'FINANCIAL_SERVICES' | 'IMMIGRATION' | 'OTHER') || 'VISA',
-              serviceTypeLabel: opp.serviceTypeLabel || opp.serviceType,
-              estimatedAmount: opp.estimatedAmount || 0,
-              currency: (opp.currency as Currency) || 'IDR',
-              requirements: opp.requirements || undefined,
-              notes: opp.notes || undefined,
-              destination: undefined,
-              travelDate: undefined,
-              assignee: '',
-              wechatGroupId: opp.wechatGroupId ?? null,
-              wechatGroupName: opp.wechatGroupName ?? null,
-              createdAt: opp.createdAt,
-              updatedAt: opp.updatedAt,
-              expectedCloseDate: opp.expectedCloseDate || undefined,
-              products: [],
-              quote: undefined,
-              pinnedByUsers: opp.pinnedByUsers || [],
-            } as any)))
+            setOpportunities((prev) => {
+              const workspaceById = new Map(prev.map((opp) => [opp.id, opp]))
+              return updatedOpps.map((opp) => {
+                const existing = workspaceById.get(opp.id)
+                return mapOpportunityRowToOpportunity(opp, existing ? {
+                  p2Data: existing.p2Data || [],
+                  p3Data: existing.p3Data,
+                } : undefined)
+              })
+            })
           }
         }
       } catch (err) {

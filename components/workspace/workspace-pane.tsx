@@ -19,8 +19,8 @@ interface WorkspaceProps {
   viewingStage: StageId
   onViewingStageChange: (stage: StageId) => void
   onOpportunityUpdate: (data: Partial<Opportunity>) => void
-  onSave: () => void
-  onAdvanceStage: () => void
+  onSave: (stage?: StageId) => Promise<boolean>
+  onAdvanceStage: (stage?: StageId) => Promise<boolean>
   onQuoteSent: () => void
 }
 
@@ -102,7 +102,12 @@ export function WorkspacePane({
       {/* Stage content — scrollable */}
       <div className="flex-1 overflow-hidden">
         {viewingStage === 'P1' && (
-          <P1RequirementForm opportunity={opportunity} onUpdate={onOpportunityUpdate} onAdvance={onAdvanceStage} />
+          <P1RequirementForm
+            opportunity={opportunity}
+            onUpdate={onOpportunityUpdate}
+            onSave={() => onSave('P1')}
+            onAdvance={() => onAdvanceStage('P1')}
+          />
         )}
         {viewingStage === 'P2' && (
           <P2ProductMatcher
@@ -170,7 +175,7 @@ export function WorkspacePane({
           {['P2', 'P3'].includes(viewingStage) && (
             <>
               <button
-                onClick={onSave}
+                onClick={() => onSave(viewingStage)}
                 className="flex h-8 items-center gap-1.5 rounded-sm border border-[#e5e7eb] bg-white px-3 text-[13px] text-[#374151] hover:bg-white hover:border-[#d1d5db]"
               >
                 <Save size={13} />
@@ -178,7 +183,7 @@ export function WorkspacePane({
               </button>
               {isOnCurrentStage && (
                 <button
-                  onClick={onAdvanceStage}
+                  onClick={() => onAdvanceStage(viewingStage)}
                   className="flex h-8 items-center gap-1.5 rounded-sm bg-[#2563eb] px-3 text-[13px] font-medium text-white hover:bg-[#1d4ed8]"
                 >
                   {STAGE_NEXT_LABEL[opportunity.stageId]}
@@ -189,7 +194,7 @@ export function WorkspacePane({
           )}
           {['P4', 'P5', 'P6', 'P7'].includes(viewingStage) && isOnCurrentStage && (
             <button
-              onClick={onAdvanceStage}
+              onClick={() => onAdvanceStage(viewingStage)}
               className="ml-auto flex h-8 items-center gap-1.5 rounded-sm bg-[#2563eb] px-3 text-[13px] font-medium text-white hover:bg-[#1d4ed8]"
             >
               {STAGE_NEXT_LABEL[opportunity.stageId]}
