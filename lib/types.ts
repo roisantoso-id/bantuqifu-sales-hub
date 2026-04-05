@@ -123,6 +123,14 @@ export interface OpportunityP2Data {
   targetName: string
   basePrice: number
   currency: Currency
+  costFloor?: number
+  profitMargin?: number
+  costPriceCny?: number
+  costPriceIdr?: number
+  partnerPriceCny?: number
+  partnerPriceIdr?: number
+  retailPriceCny?: number
+  retailPriceIdr?: number
 }
 
 export interface OpportunityP3Data {
@@ -134,6 +142,12 @@ export interface OpportunityP3Data {
   currency: Currency
   costFloor?: number
   profitMargin?: number
+  costPriceCny?: number
+  costPriceIdr?: number
+  partnerPriceCny?: number
+  partnerPriceIdr?: number
+  retailPriceCny?: number
+  retailPriceIdr?: number
   approvalStatus: 'auto-approved' | 'admin-required' | 'pending'
   approvedAt?: string
   approvedBy?: string

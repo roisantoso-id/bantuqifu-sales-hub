@@ -3,7 +3,6 @@
 import { Send, FileText } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { Opportunity, Product, Currency, OpportunityP3Data } from '@/lib/types'
-import { EXCHANGE_RATES } from '@/lib/mock-data'
 
 interface P3QuoteViewProps {
   opportunity: Opportunity
@@ -21,6 +20,14 @@ function formatDate(iso: string) {
   })
 }
 
+function formatCurrency(price?: number, currency: Currency = 'CNY') {
+  if (typeof price !== 'number' || Number.isNaN(price)) return '—'
+  if (currency === 'IDR') {
+    return `Rp ${Math.round(price).toLocaleString('id-ID')}`
+  }
+  return `¥${Math.round(price).toLocaleString('zh-CN')}`
+}
+
 export function P3QuoteView({
   opportunity,
   allProducts,
@@ -34,42 +41,86 @@ export function P3QuoteView({
     return new Map(allProducts.map((p) => [p.id, p]))
   }, [allProducts])
 
-
   useEffect(() => {
     if (p3Data.length > 0 || !opportunity.p2Data || opportunity.p2Data.length === 0) return
 
-    const initialized: OpportunityP3Data[] = opportunity.p2Data.map((item) => ({
-      tempId: item.tempId,
-      productId: item.productId,
-      productName: item.productName,
-      targetName: item.targetName,
-      lockedPrice: item.basePrice,
-      currency: item.currency,
-      costFloor: item.costFloor,
-      profitMargin: item.profitMargin,
-      approvalStatus: 'auto-approved',
-    }))
+    const initialized: OpportunityP3Data[] = opportunity.p2Data.map((item) => {
+      const initialLockedPrice = currentCurrency === 'CNY' ? item.retailPriceCny : item.retailPriceIdr
+      const initialCostFloor = currentCurrency === 'CNY' ? item.costPriceCny : item.costPriceIdr
+      const lockedPrice = typeof initialLockedPrice === 'number' ? initialLockedPrice : item.basePrice
+      const profitMargin = typeof initialCostFloor === 'number' && initialCostFloor > 0
+        ? Number((((lockedPrice - initialCostFloor) / initialCostFloor) * 100).toFixed(2))
+        : undefined
+
+      return {
+        tempId: item.tempId,
+        productId: item.productId,
+        productName: item.productName,
+        targetName: item.targetName,
+        lockedPrice,
+        currency: currentCurrency,
+        costFloor: initialCostFloor,
+        profitMargin,
+        costPriceCny: item.costPriceCny,
+        costPriceIdr: item.costPriceIdr,
+        partnerPriceCny: item.partnerPriceCny,
+        partnerPriceIdr: item.partnerPriceIdr,
+        retailPriceCny: item.retailPriceCny,
+        retailPriceIdr: item.retailPriceIdr,
+        approvalStatus: 'auto-approved',
+      }
+    })
 
     onP3DataChange(initialized)
-  }, [p3Data, opportunity.p2Data, onP3DataChange])
+  }, [currentCurrency, p3Data, opportunity.p2Data, onP3DataChange])
 
   const displayData = useMemo(() => {
     if (p3Data.length > 0) return p3Data
     return []
   }, [p3Data])
 
+  useEffect(() => {
+    if (displayData.length === 0) return
+
+    onP3DataChange(
+      displayData.map((item) => {
+        const nextRetailPrice = currentCurrency === 'CNY' ? item.retailPriceCny : item.retailPriceIdr
+        const nextCostFloor = currentCurrency === 'CNY' ? item.costPriceCny : item.costPriceIdr
+        const nextLockedPrice = typeof nextRetailPrice === 'number' ? nextRetailPrice : 0
+        const profitMargin = typeof nextCostFloor === 'number' && nextCostFloor > 0
+          ? Number((((nextLockedPrice - nextCostFloor) / nextCostFloor) * 100).toFixed(2))
+          : undefined
+
+        return {
+          ...item,
+          lockedPrice: nextLockedPrice,
+          currency: currentCurrency,
+          costFloor: nextCostFloor,
+          profitMargin,
+          approvalStatus: 'auto-approved' as const,
+        }
+      })
+    )
+  }, [currentCurrency])
+
   const updatePrice = (tempId: string, price: number) => {
     onP3DataChange(
       displayData.map((item) => {
         if (item.tempId !== tempId) return item
-        const costFloor = item.costFloor
-        const profitMargin = typeof costFloor === 'number' && costFloor > 0
-          ? Number((((price - costFloor) / costFloor) * 100).toFixed(2))
+
+        const nextCostFloor = currentCurrency === 'CNY'
+          ? item.costPriceCny
+          : item.costPriceIdr
+
+        const profitMargin = typeof nextCostFloor === 'number' && nextCostFloor > 0
+          ? Number((((price - nextCostFloor) / nextCostFloor) * 100).toFixed(2))
           : undefined
+
         return {
           ...item,
           lockedPrice: price,
           currency: currentCurrency,
+          costFloor: nextCostFloor,
           profitMargin,
           approvalStatus: 'auto-approved' as const,
         }
@@ -79,34 +130,30 @@ export function P3QuoteView({
 
   const subtotal = useMemo(() => {
     return displayData.reduce((sum, item) => {
-      const inCNY = item.lockedPrice / EXCHANGE_RATES[item.currency]
-      const inDisplayCurrency = inCNY * EXCHANGE_RATES[currentCurrency]
-      return sum + inDisplayCurrency
+      if (item.currency !== currentCurrency) return sum
+      return sum + item.lockedPrice
     }, 0)
   }, [displayData, currentCurrency])
 
+  const totalCost = useMemo(() => {
+    return displayData.reduce((sum, item) => {
+      const activeCost = currentCurrency === 'CNY' ? item.costPriceCny : item.costPriceIdr
+      return sum + (activeCost || 0)
+    }, 0)
+  }, [displayData, currentCurrency])
+
+  const totalProfit = subtotal - totalCost
   const tax = Math.round(subtotal * 0.06)
   const total = subtotal + tax
-
-  const formatPrice = (price: number, currency: Currency = currentCurrency) => {
-    const symbol = currency === 'CNY' ? '¥' : 'Rp'
-    return `${symbol}${Math.round(price).toLocaleString()}`
-  }
 
   const formatMargin = (profitMargin?: number) => {
     if (typeof profitMargin !== 'number' || Number.isNaN(profitMargin)) return '—'
     return `${profitMargin.toFixed(2)}%`
   }
 
-  const convertToDisplay = (price: number, fromCurrency: Currency) => {
-    if (fromCurrency === currentCurrency) return price
-    const inCNY = price / EXCHANGE_RATES[fromCurrency]
-    return inCNY * EXCHANGE_RATES[currentCurrency]
-  }
-
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="border-b border-[#e5e7eb] px-4 py-2.5 flex items-center justify-between">
+      <div className="flex items-center justify-between border-b border-[#e5e7eb] px-4 py-2.5">
         <h3 className="text-[13px] font-semibold text-[#111827]">P3: 报价单与币种</h3>
         <div className="flex items-center gap-1">
           <button
@@ -132,7 +179,7 @@ export function P3QuoteView({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+      <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
         <div className="rounded-sm border border-[#e5e7eb] bg-white p-3">
           <div className="mb-2 flex items-start justify-between">
             <div>
@@ -143,13 +190,11 @@ export function P3QuoteView({
             </div>
             <div className="text-right">
               <p className="text-[11px] text-[#9ca3af]">生成日期</p>
-              <p className="font-mono text-[12px] text-[#374151]">
-                {formatDate(opportunity.updatedAt)}
-              </p>
+              <p className="font-mono text-[12px] text-[#374151]">{formatDate(opportunity.updatedAt)}</p>
             </div>
           </div>
 
-          <div className="border-t border-[#e5e7eb] pt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[12px]">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 border-t border-[#e5e7eb] pt-2 text-[12px]">
             <div className="flex justify-between">
               <span className="text-[#9ca3af]">客户姓名</span>
               <span className="font-medium text-[#111827]">{opportunity.customer.name}</span>
@@ -174,31 +219,33 @@ export function P3QuoteView({
             暂无服务实例，请先在 P2 阶段添加
           </div>
         ) : (
-          <div className="rounded-sm border border-[#e5e7eb] bg-white overflow-hidden">
-            <div className="grid grid-cols-[1fr_120px_90px_70px_68px] gap-1 border-b border-[#e5e7eb] bg-[#f9fafb] px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#9ca3af]">
+          <div className="overflow-hidden rounded-sm border border-[#e5e7eb] bg-white">
+            <div className="grid grid-cols-[1fr_120px_110px_120px_120px_120px_68px] gap-1 border-b border-[#e5e7eb] bg-[#f9fafb] px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#9ca3af]">
               <div>服务实例</div>
               <div>办理人/标的</div>
-              <div className="text-right">单价</div>
-              <div className="text-right">小计</div>
-              <div className="text-center">审批</div>
+              <div className="text-right">报价单价</div>
+              <div className="text-right">成本价</div>
+              <div className="text-right">合伙人价</div>
+              <div className="text-right">零售价</div>
+              <div className="text-center">状态</div>
             </div>
 
             <div className="divide-y divide-[#f3f4f6]">
               {displayData.map((item) => {
                 const product = productMap.get(item.productId)
-                const displayPrice = convertToDisplay(item.lockedPrice, item.currency)
-                const lineTotal = displayPrice
+                const currentCost = currentCurrency === 'CNY' ? item.costPriceCny : item.costPriceIdr
+                const currentPartner = currentCurrency === 'CNY' ? item.partnerPriceCny : item.partnerPriceIdr
+                const currentRetail = currentCurrency === 'CNY' ? item.retailPriceCny : item.retailPriceIdr
 
                 return (
                   <div
                     key={item.tempId}
-                    className="grid grid-cols-[1fr_120px_90px_70px_68px] gap-1 items-center px-3 py-1.5 text-[12px] bg-white"
+                    className="grid grid-cols-[1fr_120px_110px_120px_120px_120px_68px] gap-1 items-center px-3 py-1.5 text-[12px] bg-white"
                   >
                     <div className="min-w-0">
-                      <p className="font-medium text-[#111827] truncate">{item.productName}</p>
+                      <p className="truncate font-medium text-[#111827]">{item.productName}</p>
                       <p className="text-[10px] text-[#9ca3af]">{product?.categoryNameZh || product?.category || ''}</p>
                       <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-[#6b7280]">
-                        <span>成本底线 {typeof item.costFloor === 'number' ? formatPrice(convertToDisplay(item.costFloor, item.currency), currentCurrency) : '—'}</span>
                         <span>利润率 {formatMargin(item.profitMargin)}</span>
                       </div>
                     </div>
@@ -208,19 +255,28 @@ export function P3QuoteView({
                     <div>
                       <input
                         type="number"
-                        value={item.lockedPrice}
+                        value={item.currency === currentCurrency ? item.lockedPrice : ''}
                         onChange={(e) => updatePrice(item.tempId, parseFloat(e.target.value) || 0)}
                         className="h-6 w-full rounded-sm border border-[#e5e7eb] bg-white px-1 font-mono text-[11px] text-right text-[#111827] outline-none focus:border-[#2563eb]"
+                        placeholder={item.currency}
                       />
                     </div>
 
-                    <div className="font-mono text-right text-[12px] font-semibold text-[#111827]">
-                      {formatPrice(lineTotal, currentCurrency)}
+                    <div className="font-mono text-right text-[12px] text-[#111827]">
+                      {formatCurrency(currentCost, currentCurrency)}
+                    </div>
+
+                    <div className="font-mono text-right text-[12px] text-[#111827]">
+                      {formatCurrency(currentPartner, currentCurrency)}
+                    </div>
+
+                    <div className="font-mono text-right text-[12px] text-[#111827]">
+                      {formatCurrency(currentRetail, currentCurrency)}
                     </div>
 
                     <div className="text-center">
                       <span className="inline-flex items-center rounded-sm bg-[#dcfce7] px-1.5 py-0.5 text-[10px] font-semibold text-[#16a34a]">
-                        通过
+                        正常
                       </span>
                     </div>
                   </div>
@@ -228,25 +284,33 @@ export function P3QuoteView({
               })}
             </div>
 
-            <div className="border-t border-[#e5e7eb] bg-[#f9fafb] px-3 py-1 space-y-0.5 text-[12px]">
+            <div className="space-y-0.5 border-t border-[#e5e7eb] bg-[#f9fafb] px-3 py-2 text-[12px]">
               <div className="flex justify-between">
-                <span className="text-[#6b7280]">小计</span>
-                <span className="font-mono text-[#111827]">{formatPrice(subtotal)}</span>
+                <span className="text-[#6b7280]">报价小计</span>
+                <span className="font-mono text-[#111827]">{formatCurrency(subtotal, currentCurrency)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#6b7280]">成本小计</span>
+                <span className="font-mono text-[#111827]">{formatCurrency(totalCost, currentCurrency)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#6b7280]">毛利</span>
+                <span className="font-mono text-[#111827]">{formatCurrency(totalProfit, currentCurrency)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-[#6b7280]">税费 (6%)</span>
-                <span className="font-mono text-[#111827]">{formatPrice(tax)}</span>
+                <span className="font-mono text-[#111827]">{formatCurrency(tax, currentCurrency)}</span>
               </div>
               <div className="flex justify-between border-t border-[#e5e7eb] pt-0.5 font-semibold">
                 <span className="text-[#111827]">总计</span>
-                <span className="font-mono text-[#111827]">{formatPrice(total)}</span>
+                <span className="font-mono text-[#111827]">{formatCurrency(total, currentCurrency)}</span>
               </div>
             </div>
           </div>
         )}
       </div>
 
-      <div className="border-t border-[#e5e7eb] bg-[#f9fafb] px-4 py-2 flex gap-2">
+      <div className="flex gap-2 border-t border-[#e5e7eb] bg-[#f9fafb] px-4 py-2">
         <button
           className="flex h-8 items-center gap-1.5 rounded-sm border border-[#e5e7eb] bg-white px-3 text-[13px] text-[#374151] hover:bg-white"
           aria-label="导出PDF"

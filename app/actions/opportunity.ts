@@ -141,9 +141,19 @@ export async function getOpportunityItemsAction(oppId: string) {
       targetName,
       unitPrice,
       currency,
-      costFloor,
-      profitMargin,
-      product:products (id, name)
+      product:products (
+        id,
+        name,
+        product_prices (
+          costPriceIdr,
+          costPriceCny,
+          partnerPriceIdr,
+          partnerPriceCny,
+          retailPriceIdr,
+          retailPriceCny,
+          isCurrent
+        )
+      )
     `)
     .eq('opportunityId', oppId)
     .eq('organizationId', tenantId)
@@ -154,16 +164,32 @@ export async function getOpportunityItemsAction(oppId: string) {
     return []
   }
 
-  return (data ?? []).map((item: any) => ({
-    tempId: item.id,
-    productId: item.productId,
-    productName: item.product?.name || '未命名产品',
-    targetName: item.targetName || '',
-    basePrice: item.unitPrice || 0,
-    currency: item.currency || 'IDR',
-    costFloor: typeof item.costFloor === 'number' ? item.costFloor : undefined,
-    profitMargin: typeof item.profitMargin === 'number' ? item.profitMargin : undefined,
-  }))
+  return (data ?? []).map((item: any) => {
+    const currentPrice = (item.product?.product_prices || []).find((price: any) => price.isCurrent) || item.product?.product_prices?.[0]
+    const costFloor = item.currency === 'CNY'
+      ? currentPrice?.costPriceCny
+      : currentPrice?.costPriceIdr
+    const profitMargin = typeof costFloor === 'number' && costFloor > 0
+      ? Number((((item.unitPrice || 0) - costFloor) / costFloor * 100).toFixed(2))
+      : undefined
+
+    return {
+      tempId: item.id,
+      productId: item.productId,
+      productName: item.product?.name || '未命名产品',
+      targetName: item.targetName || '',
+      basePrice: item.unitPrice || (item.currency === 'CNY' ? (currentPrice?.retailPriceCny ?? 0) : (currentPrice?.retailPriceIdr ?? 0)),
+      currency: item.currency || 'IDR',
+      costFloor,
+      profitMargin,
+      costPriceCny: typeof currentPrice?.costPriceCny === 'number' ? currentPrice.costPriceCny : undefined,
+      costPriceIdr: typeof currentPrice?.costPriceIdr === 'number' ? currentPrice.costPriceIdr : undefined,
+      partnerPriceCny: typeof currentPrice?.partnerPriceCny === 'number' ? currentPrice.partnerPriceCny : undefined,
+      partnerPriceIdr: typeof currentPrice?.partnerPriceIdr === 'number' ? currentPrice.partnerPriceIdr : undefined,
+      retailPriceCny: typeof currentPrice?.retailPriceCny === 'number' ? currentPrice.retailPriceCny : undefined,
+      retailPriceIdr: typeof currentPrice?.retailPriceIdr === 'number' ? currentPrice.retailPriceIdr : undefined,
+    }
+  })
 }
 
 // ─── getOpportunityTimelineAction ──────────────────────────────────────────────

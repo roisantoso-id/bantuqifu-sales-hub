@@ -177,6 +177,12 @@ export function DashboardClient({
             currency: item.currency,
             costFloor: item.costFloor,
             profitMargin: item.profitMargin,
+            costPriceCny: item.costPriceCny,
+            costPriceIdr: item.costPriceIdr,
+            partnerPriceCny: item.partnerPriceCny,
+            partnerPriceIdr: item.partnerPriceIdr,
+            retailPriceCny: item.retailPriceCny,
+            retailPriceIdr: item.retailPriceIdr,
             approvalStatus: 'auto-approved' as const,
           }))
           return {
@@ -233,6 +239,38 @@ export function DashboardClient({
   const currentLogs = useMemo(() => actionLogs[selectedId] ?? [], [actionLogs, selectedId])
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
+  const reloadOpportunityItems = useCallback(
+    async (oppId: string) => {
+      const items = await getOpportunityItemsAction(oppId)
+      const p3Data = items.map((item) => ({
+        tempId: item.tempId,
+        productId: item.productId,
+        productName: item.productName,
+        targetName: item.targetName,
+        lockedPrice: item.basePrice,
+        currency: item.currency,
+        costFloor: item.costFloor,
+        profitMargin: item.profitMargin,
+        costPriceCny: item.costPriceCny,
+        costPriceIdr: item.costPriceIdr,
+        partnerPriceCny: item.partnerPriceCny,
+        partnerPriceIdr: item.partnerPriceIdr,
+        retailPriceCny: item.retailPriceCny,
+        retailPriceIdr: item.retailPriceIdr,
+        approvalStatus: item.approvalStatus || 'auto-approved' as const,
+      }))
+
+      setOpportunities((prev) =>
+        prev.map((o) =>
+          o.id === oppId
+            ? { ...o, p2Data: items, p3Data, updatedAt: new Date().toISOString() }
+            : o
+        )
+      )
+    },
+    []
+  )
+
   const appendLog = useCallback(
     (oppId: string, log: Omit<ActionLog, 'id' | 'opportunityId' | 'operatorId' | 'operatorName'>) => {
       const entry: ActionLog = {
@@ -277,6 +315,8 @@ export function DashboardClient({
         console.error(`[handleSave] Failed to save ${viewingStage} items:`, result.error)
         return
       }
+
+      await reloadOpportunityItems(selectedOpportunity.id)
     }
 
     appendLog(selectedId, { actionType: 'FORM', actionLabel: '保存草稿' })
