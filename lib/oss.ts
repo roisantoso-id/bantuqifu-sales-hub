@@ -3,6 +3,7 @@
 import OSS from 'ali-oss'
 
 const MAX_PDF_SIZE_BYTES = 50 * 1024 * 1024
+const MAX_INTERACTION_ATTACHMENT_SIZE_BYTES = 50 * 1024 * 1024
 const ALLOWED_PDF_MIME_TYPES = new Set([
   'application/pdf',
   'application/x-pdf',
@@ -15,6 +16,21 @@ export interface UploadContractToOssParams {
 }
 
 export interface UploadedContractFile {
+  url: string
+  fileName: string
+  fileSize: number
+  mimeType: string
+  objectKey: string
+}
+
+export interface UploadInteractionAttachmentToOssParams {
+  file: File
+  tenantId: string
+  opportunityId: string
+  interactionId: string
+}
+
+export interface UploadedInteractionAttachmentFile {
   url: string
   fileName: string
   fileSize: number
@@ -73,6 +89,20 @@ function assertValidPdf(file: File) {
   }
 }
 
+function assertValidInteractionAttachment(file: File) {
+  if (!file.name.trim()) {
+    throw new Error('附件文件名不能为空')
+  }
+
+  if (file.size <= 0) {
+    throw new Error(`附件 ${file.name} 不能为空`)
+  }
+
+  if (file.size > MAX_INTERACTION_ATTACHMENT_SIZE_BYTES) {
+    throw new Error(`附件 ${file.name} 不能超过 50MB`)
+  }
+}
+
 function inferRegionFromEndpoint(endpoint?: string): string | undefined {
   if (!endpoint) {
     return undefined
@@ -99,6 +129,16 @@ function getOssRegion(): string {
 function buildObjectKey(tenantId: string, opportunityId: string, fileName: string): string {
   const safeName = sanitizeFileName(fileName)
   return `contracts/${tenantId}/${opportunityId}/${Date.now()}-${safeName}`
+}
+
+function buildInteractionAttachmentObjectKey(
+  tenantId: string,
+  opportunityId: string,
+  interactionId: string,
+  fileName: string
+): string {
+  const safeName = sanitizeFileName(fileName)
+  return `interactions/${tenantId}/${opportunityId}/${interactionId}/${Date.now()}-${safeName}`
 }
 
 function buildPublicUrl(bucket: string, region: string, objectKey: string): string {
@@ -148,6 +188,37 @@ export async function uploadContractToOss({
     fileName: file.name,
     fileSize: file.size,
     mimeType: file.type || 'application/pdf',
+    objectKey,
+  }
+}
+
+export async function uploadInteractionAttachmentToOss({
+  file,
+  tenantId,
+  opportunityId,
+  interactionId,
+}: UploadInteractionAttachmentToOssParams): Promise<UploadedInteractionAttachmentFile> {
+  assertValidInteractionAttachment(file)
+
+  const bucket = getRequiredEnv('ALIYUN_OSS_BUCKET', 'OSS_BUCKET', 'OSS_BUCKET_NAME')
+  const region = getOssRegion()
+  const objectKey = buildInteractionAttachmentObjectKey(tenantId, opportunityId, interactionId, file.name)
+  const client = createOssClient()
+  const arrayBuffer = await file.arrayBuffer()
+  const buffer = Buffer.from(arrayBuffer)
+
+  await client.put(objectKey, buffer, {
+    mime: file.type || 'application/octet-stream',
+    headers: {
+      'Content-Type': file.type || 'application/octet-stream',
+    },
+  })
+
+  return {
+    url: buildPublicUrl(bucket, region, objectKey),
+    fileName: file.name,
+    fileSize: file.size,
+    mimeType: file.type || 'application/octet-stream',
     objectKey,
   }
 }

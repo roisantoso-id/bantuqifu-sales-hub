@@ -37,6 +37,20 @@ export function P3QuoteView({
 }: P3QuoteViewProps) {
   const [currentCurrency, setCurrentCurrency] = useState<Currency>('CNY')
 
+  useEffect(() => {
+    if (p3Data.length > 0) {
+      setCurrentCurrency(p3Data[0].currency)
+      return
+    }
+
+    if (opportunity.p2Data && opportunity.p2Data.length > 0) {
+      setCurrentCurrency(opportunity.p2Data[0].currency)
+      return
+    }
+
+    setCurrentCurrency('CNY')
+  }, [opportunity.id, opportunity.p2Data, p3Data])
+
   const productMap = useMemo(() => {
     return new Map(allProducts.map((p) => [p.id, p]))
   }, [allProducts])

@@ -2,6 +2,8 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useCallback, useState, useMemo, useEffect } from 'react'
+import { toast } from 'sonner'
+import { PanelRightOpen } from 'lucide-react'
 import { PrimarySidebar } from '@/components/layout/primary-sidebar'
 import { SecondarySidebar } from '@/components/layout/secondary-sidebar'
 import { WorkspacePane } from '@/components/workspace/workspace-pane'
@@ -11,8 +13,7 @@ import { MyDashboard } from '@/components/dashboard/my-dashboard'
 import { AuditRail } from '@/components/audit-rail/audit-panel'
 import { OpportunityListView } from '@/components/opportunities/opportunity-list-view'
 import { mockActionLogs, mockUser, mockLeads } from '@/lib/mock-data'
-import { addAuditNote } from '@/app/actions/audit'
-import { toggleOpportunityPinAction, getOpportunitiesAction, saveOpportunityItemsAction, getOpportunityWorkspaceAction, updateOpportunityAction, updateOpportunityStageAction, saveOpportunityP4DraftAction, submitOpportunityContractAction } from '@/app/actions/opportunity'
+import { toggleOpportunityPinAction, getOpportunitiesAction, saveOpportunityItemsAction, getOpportunityWorkspaceAction, updateOpportunityAction, updateOpportunityStageAction, saveOpportunityP4DraftAction, submitOpportunityContractAction, createOpportunityNoteWithAttachmentsAction } from '@/app/actions/opportunity'
 import { getProductsByCategoryAction } from '@/app/actions/product'
 import type { Opportunity, NavSection, StageId, ActionLog, Lead, LeadRow, OpportunityRow, OpportunityStatus, Currency, Product, OpportunityP2Data, OpportunityP3Data, OpportunityP4Data } from '@/lib/types'
 
@@ -50,7 +51,15 @@ function buildP3Data(items: OpportunityP2Data[]): OpportunityP3Data[] {
 
 function mapOpportunityRowToOpportunity(
   opp: OpportunityRow,
-  workspaceData?: { p2Data: OpportunityP2Data[]; p3Data?: OpportunityP3Data[]; p4Data?: OpportunityP4Data }
+  workspaceData?: {
+    p2Data: OpportunityP2Data[]
+    p3Data?: OpportunityP3Data[]
+    p4Data?: OpportunityP4Data
+    p5Data?: Opportunity['p5Data']
+    p6Data?: Opportunity['p6Data']
+    p7Data?: Opportunity['p7Data']
+    p8Data?: Opportunity['p8Data']
+  }
 ): Opportunity {
   const serviceType = (opp.serviceType as Opportunity['serviceType']) || DEFAULT_SERVICE_TYPE
   const p2Data = workspaceData?.p2Data ?? []
@@ -91,6 +100,10 @@ function mapOpportunityRowToOpportunity(
     p2Data,
     p3Data,
     p4Data: workspaceData?.p4Data,
+    p5Data: workspaceData?.p5Data,
+    p6Data: workspaceData?.p6Data,
+    p7Data: workspaceData?.p7Data,
+    p8Data: workspaceData?.p8Data,
   } as Opportunity
 }
 
@@ -140,7 +153,8 @@ export function DashboardClient({
   // 从 URL 读取当前导航状态
   const activeNav = (searchParams.get('nav') || initialNav) as NavSection
 
-  // 商机相关状态 - 使用真实数据或 mock 数据
+  const initialOpportunityId = searchParams.get('oppId') || initialOpportunities?.[0]?.id || ''
+
   const [opportunities, setOpportunities] = useState<Opportunity[]>(() => {
     if (initialOpportunities && initialOpportunities.length > 0) {
       return initialOpportunities.map((opp) => mapOpportunityRowToOpportunity(opp))
@@ -148,20 +162,13 @@ export function DashboardClient({
     return []
   })
   const [leads, setLeads] = useState<Lead[]>(mockLeads)
-  const [selectedId, setSelectedId] = useState<string>(() => {
-    if (initialOpportunities && initialOpportunities.length > 0) {
-      return initialOpportunities[0].id
-    }
-    return ''
-  })
-  const [viewingStage, setViewingStage] = useState<StageId>(() => {
-    if (initialOpportunities && initialOpportunities.length > 0) {
-      return initialOpportunities[0].stageId as StageId
-    }
-    return 'P1'
-  })
+  const [selectedId, setSelectedId] = useState<string>(initialOpportunityId)
+  const [activeOpportunity, setActiveOpportunity] = useState<Opportunity | null>(null)
+  const [isOpportunityLoading, setIsOpportunityLoading] = useState(false)
+  const [viewingStage, setViewingStage] = useState<StageId>('P1')
   const [actionLogs, setActionLogs] = useState<Record<string, ActionLog[]>>(mockActionLogs)
   const [showAuditRail, setShowAuditRail] = useState(true)
+  const [auditRailReloadToken, setAuditRailReloadToken] = useState(0)
   const [realProducts, setRealProducts] = useState<Product[]>([])
   const [productCategories, setProductCategories] = useState<Array<{ id: string; nameZh: string }>>([])
 
@@ -193,7 +200,31 @@ export function DashboardClient({
     })
   }, [])
 
-  // URL 更新辅助函数
+  useEffect(() => {
+    if (activeNav !== 'opportunities') return
+
+    getOpportunitiesAction().then((data) => {
+      if (!data) return
+      setOpportunities((prev) => {
+        const workspaceById = new Map(prev.map((opp) => [opp.id, opp]))
+        return data.map((opp) => {
+          const existing = workspaceById.get(opp.id)
+          return mapOpportunityRowToOpportunity(opp, existing ? {
+            p2Data: existing.p2Data || [],
+            p3Data: existing.p3Data,
+            p4Data: existing.p4Data,
+            p5Data: existing.p5Data,
+            p6Data: existing.p6Data,
+            p7Data: existing.p7Data,
+            p8Data: existing.p8Data,
+          } : undefined)
+        })
+      })
+    })
+  }, [activeNav])
+
+  // ── Derived ──────────────────────────────────────────────────────────────────
+  const selectedOpportunity = activeOpportunity
   const updateUrl = useCallback(
     (updates: Record<string, string | null>) => {
       const params = new URLSearchParams(searchParams.toString())
@@ -224,27 +255,67 @@ export function DashboardClient({
 
   // 切换到商机页时重新拉取数据
   useEffect(() => {
-    if (activeNav !== 'opportunities') return
+    if (activeNav !== 'opportunities') {
+      return
+    }
 
-    getOpportunitiesAction().then((data) => {
-      if (!data) return
-      setOpportunities(data.map((opp) => mapOpportunityRowToOpportunity(opp)))
-    })
-  }, [activeNav])
+    const oppIdFromUrl = searchParams.get('oppId') || opportunities[0]?.id || ''
+    if (oppIdFromUrl !== selectedId) {
+      setSelectedId(oppIdFromUrl)
+    }
+  }, [activeNav, opportunities, searchParams, selectedId])
 
-  // ── Derived ──────────────────────────────────────────────────────────────────
-  const selectedOpportunity = useMemo(
-    () => opportunities.find((o) => o.id === selectedId) ?? opportunities[0],
-    [opportunities, selectedId]
-  )
+  useEffect(() => {
+    if (activeNav !== 'opportunities' || !selectedId) {
+      setActiveOpportunity(null)
+      return
+    }
 
-  const currentLogs = useMemo(() => actionLogs[selectedId] ?? [], [actionLogs, selectedId])
+    let cancelled = false
 
-  // ── Helpers ──────────────────────────────────────────────────────────────────
+    setIsOpportunityLoading(true)
+    setActiveOpportunity(null)
+
+    getOpportunityWorkspaceAction(selectedId)
+      .then((hydrated) => {
+        if (cancelled || !hydrated) {
+          if (!cancelled) {
+            setActiveOpportunity(null)
+          }
+          return
+        }
+
+        const mapped = mapOpportunityRowToOpportunity(hydrated, {
+          p2Data: hydrated.p2Data,
+          p3Data: hydrated.p3Data,
+          p4Data: hydrated.p4Data,
+          p5Data: hydrated.p5Data,
+          p6Data: hydrated.p6Data,
+          p7Data: hydrated.p7Data,
+          p8Data: hydrated.p8Data,
+        })
+
+        setOpportunities((prev) => mergeOpportunityIntoList(prev, mapped))
+        setActiveOpportunity(mapped)
+        setViewingStage(mapped.stageId)
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsOpportunityLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeNav, selectedId])
+
+
   const reloadOpportunity = useCallback(
     async (oppId: string) => {
       const hydrated = await getOpportunityWorkspaceAction(oppId)
       if (!hydrated) {
+        setActiveOpportunity((current) => (current?.id === oppId ? null : current))
         return null
       }
 
@@ -252,13 +323,26 @@ export function DashboardClient({
         p2Data: hydrated.p2Data,
         p3Data: hydrated.p3Data,
         p4Data: hydrated.p4Data,
+        p5Data: hydrated.p5Data,
+        p6Data: hydrated.p6Data,
+        p7Data: hydrated.p7Data,
+        p8Data: hydrated.p8Data,
       })
 
       setOpportunities((prev) => mergeOpportunityIntoList(prev, mapped))
+      setActiveOpportunity(mapped)
       return mapped
     },
     []
   )
+
+  useEffect(() => {
+    if (!selectedOpportunity?.id) {
+      return
+    }
+
+    setAuditRailReloadToken((prev) => prev + 1)
+  }, [selectedOpportunity?.id])
 
   const persistCurrentStageData = useCallback(
     async (opportunity: Opportunity, stage: StageId) => {
@@ -299,10 +383,17 @@ export function DashboardClient({
 
   const handleSelectOpportunity = (opp: Opportunity) => {
     setSelectedId(opp.id)
-    setViewingStage(opp.stageId)
+    updateUrl({ nav: 'opportunities', oppId: opp.id })
   }
 
   const handleOpportunityUpdate = (data: Partial<Opportunity>) => {
+    if (!selectedId) {
+      return
+    }
+
+    setActiveOpportunity((prev) =>
+      prev && prev.id === selectedId ? { ...prev, ...data, updatedAt: new Date().toISOString() } : prev
+    )
     setOpportunities((prev) =>
       prev.map((o) =>
         o.id === selectedId ? { ...o, ...data, updatedAt: new Date().toISOString() } : o
@@ -385,8 +476,13 @@ export function DashboardClient({
           p2Data: result.data.p2Data,
           p3Data: result.data.p3Data,
           p4Data: result.data.p4Data,
+          p5Data: result.data.p5Data,
+          p6Data: result.data.p6Data,
+          p7Data: result.data.p7Data,
+          p8Data: result.data.p8Data,
         })
         setOpportunities((prev) => mergeOpportunityIntoList(prev, mapped))
+        setActiveOpportunity(mapped)
       } else {
         await reloadOpportunity(selectedOpportunity.id)
       }
@@ -420,8 +516,13 @@ export function DashboardClient({
           p2Data: result.data.p2Data,
           p3Data: result.data.p3Data,
           p4Data: result.data.p4Data,
+          p5Data: result.data.p5Data,
+          p6Data: result.data.p6Data,
+          p7Data: result.data.p7Data,
+          p8Data: result.data.p8Data,
         })
         setOpportunities((prev) => mergeOpportunityIntoList(prev, nextOpportunity!))
+        setActiveOpportunity(nextOpportunity)
       } else {
         nextOpportunity = await reloadOpportunity(selectedOpportunity.id)
       }
@@ -452,16 +553,30 @@ export function DashboardClient({
 
   const handleAddNote = useCallback(
     async (remark: string, files: File[]) => {
-      try {
-        const newLog = await addAuditNote(selectedId, remark, files)
-        setActionLogs((prev) => ({
-          ...prev,
-          [selectedId]: [...(prev[selectedId] ?? []), newLog],
-        }))
-      } catch (err) {
-        console.error('[v0] Error adding note:', err)
-        throw err
+      if (!selectedId) {
+        return
       }
+
+      const formData = new FormData()
+      formData.set('opportunityId', selectedId)
+      formData.set('content', remark)
+      files.forEach((file) => {
+        formData.append('files', file)
+      })
+
+      const result = await createOpportunityNoteWithAttachmentsAction(formData)
+
+      if (!result.success) {
+        throw new Error(result.error || '保存备注失败')
+      }
+
+      if (result.attachmentErrors?.length) {
+        toast.warning('备注已保存，部分附件上传失败', {
+          description: result.attachmentErrors.join('；'),
+        })
+      }
+
+      setAuditRailReloadToken((prev) => prev + 1)
     },
     [selectedId]
   )
@@ -509,7 +624,7 @@ export function DashboardClient({
           />
         </div>
       ) : activeNav === 'opportunities' ? (
-        <>
+        <div className="relative flex flex-1 overflow-hidden">
           {/* 商机列表 (280px) */}
           <SecondarySidebar
             opportunities={opportunities}
@@ -520,32 +635,53 @@ export function DashboardClient({
           />
 
           {/* 工作区 (flex-1) */}
-          <WorkspacePane
-            opportunity={selectedOpportunity}
-            allProducts={realProducts.map(product => ({
-              ...product,
-              category: product.categoryNameZh || product.category,
-            }))}
-            productCategories={productCategories}
-            viewingStage={viewingStage}
-            onViewingStageChange={setViewingStage}
-            onOpportunityUpdate={handleOpportunityUpdate}
-            onSave={handleSave}
-            onAdvanceStage={handleAdvanceStage}
-            onP4DraftSave={handleP4DraftSave}
-            onP4Submit={handleP4Submit}
-            onQuoteSent={handleQuoteSent}
-          />
+          {isOpportunityLoading ? (
+            <div className="flex h-full flex-1 items-center justify-center bg-white text-[14px] text-[#6b7280]">
+              正在加载商机数据...
+            </div>
+          ) : (
+            <WorkspacePane
+              key={selectedOpportunity?.id || selectedId || 'empty-opportunity'}
+              opportunity={selectedOpportunity}
+              allProducts={realProducts.map(product => ({
+                ...product,
+                category: product.categoryNameZh || product.category,
+              }))}
+              productCategories={productCategories}
+              viewingStage={viewingStage}
+              onViewingStageChange={setViewingStage}
+              onOpportunityUpdate={handleOpportunityUpdate}
+              onSave={handleSave}
+              onAdvanceStage={handleAdvanceStage}
+              onP4DraftSave={handleP4DraftSave}
+              onP4Submit={handleP4Submit}
+              onQuoteSent={handleQuoteSent}
+            />
+          )}
 
-          {/* 审计栏 (256px) */}
+          {!showAuditRail && selectedOpportunity ? (
+            <button
+              type="button"
+              onClick={() => {
+                setShowAuditRail(true)
+                setAuditRailReloadToken((prev) => prev + 1)
+              }}
+              className="absolute right-3 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-[#e5e7eb] bg-white text-[#6b7280] shadow-sm transition hover:text-[#111827]"
+              aria-label="重新打开跟进记录"
+              title="重新打开跟进记录"
+            >
+              <PanelRightOpen size={16} />
+            </button>
+          ) : null}
+
           <AuditRail
             visible={showAuditRail}
             onToggle={setShowAuditRail}
             opportunity={selectedOpportunity}
-            logs={currentLogs}
+            reloadToken={auditRailReloadToken}
             onAddNote={handleAddNote}
           />
-        </>
+        </div>
       ) : activeNav === 'oppolist' ? (
         <div className="flex-1 overflow-hidden">
           <OpportunityListView />

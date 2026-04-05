@@ -13,7 +13,7 @@ import { P8Settlement } from './p8-settlement'
 import { ChevronRight, Save } from 'lucide-react'
 
 interface WorkspaceProps {
-  opportunity: Opportunity
+  opportunity?: Opportunity | null
   allProducts: Product[]
   productCategories?: Array<{ id: string; nameZh: string }>
   viewingStage: StageId
@@ -104,7 +104,7 @@ export function WorkspacePane({
       )}
 
       {/* Stage content — scrollable */}
-      <div className="flex-1 overflow-hidden">
+      <div key={opportunity.id} className="flex-1 overflow-hidden">
         {viewingStage === 'P1' && (
           <P1RequirementForm
             opportunity={opportunity}

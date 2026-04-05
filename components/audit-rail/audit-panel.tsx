@@ -1,327 +1,345 @@
 'use client'
 
-import { X, ClipboardList, Upload, FileText, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
-import { useState, useRef, useMemo, useEffect, useCallback } from 'react'
-import type { ActionLog, ActionType, StageId } from '@/lib/types'
+import { X, ClipboardList, Send, Paperclip, Clock, MessageSquare, Phone, Users, Mail, TrendingUp, Info, FileText } from 'lucide-react'
+import { useState, useMemo, useEffect, useCallback, useRef, type ChangeEvent } from 'react'
+import { toast } from 'sonner'
+import { getOpportunityTimelineAction } from '@/app/actions/opportunity'
+import type { InteractionAttachmentRow, InteractionWithAttachmentsRow } from '@/app/actions/interaction'
 
 interface AuditRailProps {
-  logs: ActionLog[]
   opportunity?: { id: string }
   visible: boolean
+  reloadToken?: number
   onToggle: (visible: boolean) => void
   onAddNote?: (remark: string, files: File[]) => Promise<void>
 }
 
-const ACTION_META: Record<ActionType, { label: string; color: string; bg: string }> = {
-  CREATE:       { label: '创建',   color: '#374151', bg: '#f3f4f6' },
-  FORM:         { label: '表单',   color: '#1d4ed8', bg: '#eff6ff' },
-  STAGE_CHANGE: { label: '推进',   color: '#065f46', bg: '#ecfdf5' },
-  MATCH:        { label: '匹配',   color: '#92400e', bg: '#fffbeb' },
-  QUOTE:        { label: '报价',   color: '#6d28d9', bg: '#f5f3ff' },
-  NOTE:         { label: '备注',   color: '#374151', bg: '#f9fafb' },
+const INTERACTION_ICONS = {
+  NOTE: MessageSquare,
+  CALL: Phone,
+  VISIT: Users,
+  MEETING: Users,
+  EMAIL: Mail,
+  STAGE_CHANGE: TrendingUp,
+  SYSTEM: Info,
 }
 
-const STAGE_BADGE: Record<StageId, { label: string; bg: string; color: string }> = {
-  P1: { label: 'P1', bg: '#eff6ff', color: '#1d4ed8' },
-  P2: { label: 'P2', bg: '#eff6ff', color: '#1d4ed8' },
-  P3: { label: 'P3', bg: '#eff6ff', color: '#1d4ed8' },
-  P4: { label: 'P4', bg: '#f0fdf4', color: '#065f46' },
-  P5: { label: 'P5', bg: '#fff7ed', color: '#b45309' },
-  P6: { label: 'P6', bg: '#f3e8ff', color: '#6d28d9' },
-  P7: { label: 'P7', bg: '#fdf2f8', color: '#be185d' },
+const INTERACTION_LABELS = {
+  NOTE: '备注',
+  CALL: '电话',
+  VISIT: '拜访',
+  MEETING: '会议',
+  EMAIL: '邮件',
+  STAGE_CHANGE: '阶段变更',
+  SYSTEM: '系统',
 }
 
-function formatTimestamp(iso: string) {
-  const d = new Date(iso)
-  // 使用 UTC 格式避免时区导致的 hydration 不匹配
-  const date = d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit', timeZone: 'UTC' })
-  // 固定格式：HH:MM
-  const hours = String(d.getUTCHours()).padStart(2, '0')
-  const minutes = String(d.getUTCMinutes()).padStart(2, '0')
-  const time = `${hours}:${minutes}`
-  return { date, time }
+function formatDateTime(value: string, options?: Intl.DateTimeFormatOptions) {
+  return new Date(value).toLocaleString('zh-CN', options)
 }
 
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes}B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
+function getOperatorLabel(interaction: InteractionWithAttachmentsRow) {
+  return interaction.operatorName?.trim() || interaction.operatorEmail?.trim() || '系统'
 }
 
-function countLines(text: string): number {
-  return text.split('\n').length
+function formatFileSize(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return '0 B'
+  }
+
+  if (bytes < 1024) {
+    return `${bytes} B`
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`
+  }
+
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export function AuditRail({ logs, opportunity, visible, onToggle, onAddNote }: AuditRailProps) {
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+function renderAttachmentLabel(attachment: Pick<InteractionAttachmentRow, 'fileName' | 'fileSize'>) {
+  return `${attachment.fileName} · ${formatFileSize(attachment.fileSize)}`
+}
+
+function SelectedFileRow({ file, onRemove }: { file: File; onRemove: (file: File) => void }) {
+  return (
+    <div className="flex items-center gap-1 text-[10px] text-[#4b5563]">
+      <FileText className="h-3 w-3 shrink-0 text-[#6b7280]" />
+      <span className="min-w-0 flex-1 truncate">{renderAttachmentLabel({ fileName: file.name, fileSize: file.size })}</span>
+      <button
+        type="button"
+        onClick={() => onRemove(file)}
+        className="text-[#9ca3af] hover:text-[#374151]"
+        aria-label={`移除附件 ${file.name}`}
+      >
+        <X size={12} />
+      </button>
+    </div>
+  )
+}
+
+export function AuditRail({ opportunity, visible, reloadToken = 0, onToggle, onAddNote }: AuditRailProps) {
   const [inputValue, setInputValue] = useState('')
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [mounted, setMounted] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [interactions, setInteractions] = useState<InteractionWithAttachmentsRow[]>([])
+  const [hasLeadHistory, setHasLeadHistory] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
-  // 客户端挂载后才显示时间，避免 hydration 不匹配
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const loadTimeline = useCallback(async () => {
+    if (!opportunity?.id) {
+      setInteractions([])
+      setHasLeadHistory(false)
+      return
+    }
 
-  const sorted = useMemo(
-    () => [...logs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()),
-    [logs]
-  )
-
-  // 预格式化所有日志的时间戳，避免 hydration 不匹配
-  const formattedLogs = useMemo(
-    () => sorted.map(log => ({ ...log, formattedTime: formatTimestamp(log.timestamp) })),
-    [sorted]
-  )
-
-  const toggleExpand = useCallback((id: string) => {
-    setExpandedIds(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(id)) {
-        newSet.delete(id)
+    setIsLoading(true)
+    try {
+      const result = await getOpportunityTimelineAction(opportunity.id)
+      if (result.success && result.data) {
+        setInteractions(result.data.interactions)
+        setHasLeadHistory(result.data.hasLeadHistory)
       } else {
-        newSet.add(id)
+        setInteractions([])
+        setHasLeadHistory(false)
       }
-      return newSet
+    } catch (error) {
+      console.error('[AuditRail] Failed to load timeline:', error)
+      setInteractions([])
+      setHasLeadHistory(false)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [opportunity?.id])
+
+  useEffect(() => {
+    if (!visible) {
+      return
+    }
+
+    void loadTimeline()
+  }, [loadTimeline, reloadToken, visible])
+
+  useEffect(() => {
+    setInputValue('')
+    setSelectedFiles([])
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }, [opportunity?.id])
+
+  const handleFileSelect = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const nextFiles = Array.from(event.target.files ?? [])
+    if (nextFiles.length === 0) {
+      return
+    }
+
+    setSelectedFiles((prev) => {
+      const fileMap = new Map(prev.map((file) => [`${file.name}-${file.size}-${file.lastModified}`, file]))
+      nextFiles.forEach((file) => {
+        fileMap.set(`${file.name}-${file.size}-${file.lastModified}`, file)
+      })
+      return Array.from(fileMap.values())
     })
+
+    event.target.value = ''
   }, [])
 
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || [])
-    setUploadedFiles((prev) => [...prev, ...files])
-    if (fileInputRef.current) fileInputRef.current.value = ''
-  }, [])
-
-  const removeFile = useCallback((index: number) => {
-    setUploadedFiles((prev) => prev.filter((_, i) => i !== index))
+  const handleRemoveSelectedFile = useCallback((target: File) => {
+    setSelectedFiles((prev) => prev.filter((file) => file !== target))
   }, [])
 
   const handleSubmit = useCallback(async () => {
-    if (!inputValue.trim() && uploadedFiles.length === 0) return
+    if (!inputValue.trim() || !opportunity?.id || !onAddNote) return
 
     setIsSubmitting(true)
     try {
-      if (onAddNote) {
-        await onAddNote(inputValue, uploadedFiles)
-      }
+      await onAddNote(inputValue, selectedFiles)
       setInputValue('')
-      setUploadedFiles([])
+      setSelectedFiles([])
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
     } catch (err) {
-      console.error('[v0] Failed to add note:', err)
+      console.error('[AuditRail] Failed to add note:', err)
+      toast.error(err instanceof Error ? err.message : '保存备注失败')
     } finally {
       setIsSubmitting(false)
     }
-  }, [inputValue, uploadedFiles, onAddNote])
+  }, [inputValue, onAddNote, opportunity?.id, selectedFiles])
 
-  // 如果不可见，在所有 hooks 之后返回 null
+  const timelineContent = useMemo(() => {
+    if (isLoading) {
+      return <div className="mt-6 text-center text-[12px] text-[#9ca3af]">加载中...</div>
+    }
+
+    if (interactions.length === 0) {
+      return <div className="mt-6 text-center text-[12px] text-[#9ca3af]">暂无跟进记录</div>
+    }
+
+    const orderedInteractions = [...interactions].reverse()
+
+    return (
+      <div className="space-y-2">
+        {hasLeadHistory && (
+          <div className="border-b border-blue-100 pb-2 text-[10px] leading-4 text-blue-700">
+            <span className="font-medium">含线索历史</span>
+            <span className="ml-1 text-blue-500">当前时间轴已合并线索阶段记录</span>
+          </div>
+        )}
+
+        <ul className="space-y-0">
+          {orderedInteractions.map((interaction, index) => {
+            const Icon = INTERACTION_ICONS[interaction.type] || MessageSquare
+            const isLast = index === orderedInteractions.length - 1
+            const isFromLead = Boolean(interaction.leadId && !interaction.opportunityId)
+
+            return (
+              <li key={interaction.id} className="flex gap-2 py-1">
+                <div className="flex flex-col items-center pt-0.5">
+                  <div
+                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${
+                      isFromLead ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    <Icon className="h-2.5 w-2.5" />
+                  </div>
+                  {!isLast && <div className="mt-0.5 w-px flex-1 bg-[#e5e7eb]" />}
+                </div>
+
+                <div className="min-w-0 flex-1 border-b border-[#f3f4f6] pb-2 text-[10px] leading-4 text-[#4b5563] last:border-b-0">
+                  <div className="flex items-center gap-1.5 text-[10px] text-[#6b7280]">
+                    <span className="font-medium text-[#111827] truncate">{getOperatorLabel(interaction)}</span>
+                    <span>·</span>
+                    <span>{INTERACTION_LABELS[interaction.type]}</span>
+                    {isFromLead ? <span className="text-blue-600">· 线索阶段</span> : null}
+                    <span className="ml-auto shrink-0 text-[#9ca3af]">
+                      {formatDateTime(interaction.createdAt, {
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  </div>
+
+                  <div className="mt-0.5 break-words text-[#111827]">{interaction.content}</div>
+
+                  {interaction.attachments && interaction.attachments.length > 0 ? (
+                    <div className="mt-1 flex flex-col gap-1">
+                      {interaction.attachments.map((attachment) => (
+                        <a
+                          key={attachment.id}
+                          href={attachment.fileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex min-w-0 items-center gap-1 rounded-sm border border-[#e5e7eb] px-1.5 py-1 text-[10px] text-[#2563eb] hover:bg-[#f8fafc]"
+                        >
+                          <FileText className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{renderAttachmentLabel(attachment)}</span>
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {interaction.nextAction ? (
+                    <div className="mt-0.5 text-[#6b7280]">
+                      下次：{interaction.nextAction}
+                      {interaction.nextActionDate ? (
+                        <span className="ml-1 text-[#9ca3af]">
+                          {formatDateTime(interaction.nextActionDate, {
+                            month: '2-digit',
+                            day: '2-digit',
+                          })}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+    )
+  }, [hasLeadHistory, interactions, isLoading])
+
   if (!visible) return null
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-l border-[#e5e7eb] bg-white">
-      {/* Header */}
       <div className="flex items-center justify-between border-b border-[#e5e7eb] px-3 py-2">
         <div className="flex items-center gap-1.5">
           <ClipboardList size={13} className="text-[#6b7280]" />
-          <span className="text-[12px] font-semibold text-[#374151]">操作记录</span>
+          <span className="text-[12px] font-semibold text-[#374151]">跟进记录</span>
           <span className="rounded-sm bg-[#f3f4f6] px-1 py-0.5 font-mono text-[10px] text-[#6b7280]">
-            {logs.length}
+            {interactions.length}
           </span>
         </div>
         <button
           onClick={() => onToggle(false)}
-          aria-label="关闭操作记录"
+          aria-label="关闭跟进记录"
           className="flex h-5 w-5 items-center justify-center rounded-sm text-[#9ca3af] hover:bg-[#f3f4f6] hover:text-[#374151]"
         >
           <X size={12} />
         </button>
       </div>
 
-      {/* Timeline entries */}
-      <div className="flex-1 overflow-y-auto px-3 py-2">
-        {sorted.length === 0 ? (
-          <div className="mt-6 text-center text-[12px] text-[#9ca3af]">暂无操作记录</div>
-        ) : (
-          <ul className="space-y-0">
-            {formattedLogs.map((log, i) => {
-              const meta = ACTION_META[log.actionType] ?? ACTION_META.NOTE
-              const { date, time } = log.formattedTime
-              const isLast = i === formattedLogs.length - 1
-              const isExpanded = expandedIds.has(log.id)
-              const remarkLines = log.remark ? countLines(log.remark) : 0
-              const shouldShowCollapse = remarkLines > 3
+      <div className="flex-1 overflow-y-auto px-3 py-2">{timelineContent}</div>
 
-              return (
-                <li key={log.id} className="flex gap-2.5">
-                  {/* Timeline spine */}
-                  <div className="flex flex-col items-center pt-0.5">
-                    <div
-                      className="h-2 w-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: meta.color }}
-                    />
-                    {!isLast && <div className="mt-0.5 w-px flex-1 bg-[#e5e7eb]" />}
-                  </div>
-
-                  {/* Content */}
-                  <div className="pb-2 flex-1 min-w-0">
-                    {/* First line: Badge + Label + Time */}
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className="inline-block rounded-sm px-1 py-0.5 text-[10px] font-semibold shrink-0"
-                        style={{ color: meta.color, backgroundColor: meta.bg }}
-                      >
-                        {meta.label}
-                      </span>
-                      {log.stageId && (
-                        <span
-                          className="inline-block rounded-sm px-1 py-0.5 text-[10px] font-medium shrink-0"
-                          style={{
-                            color: STAGE_BADGE[log.stageId].color,
-                            backgroundColor: STAGE_BADGE[log.stageId].bg,
-                          }}
-                        >
-                          {log.stageId}
-                        </span>
-                      )}
-                      <span className="text-[12px] font-medium text-[#111827] truncate">
-                        {log.actionLabel}
-                      </span>
-                      <span className="font-mono text-[10px] text-[#9ca3af] shrink-0 ml-auto">
-                        {mounted ? date : '--/--'}
-                      </span>
-                    </div>
-
-                    {/* Operator + time */}
-                    <div className="mt-0.5 flex items-center gap-1.5 text-[11px]">
-                      <span className="text-[#6b7280] font-medium">{log.operatorName}</span>
-                      <span className="text-[#d1d5db]">·</span>
-                      <span className="font-mono text-[#9ca3af]">{mounted ? time : '--:--'}</span>
-                    </div>
-
-                    {/* Remark (with collapse/expand) */}
-                    {log.remark && (
-                      <div className="mt-1">
-                        <p
-                          className={`text-[11px] leading-relaxed text-[#6b7280] break-words ${
-                            shouldShowCollapse && !isExpanded ? 'line-clamp-3' : ''
-                          }`}
-                        >
-                          {log.remark}
-                        </p>
-                        {shouldShowCollapse && (
-                          <button
-                            onClick={() => toggleExpand(log.id)}
-                            className="mt-1 flex items-center gap-0.5 text-[10px] text-[#2563eb] hover:underline"
-                          >
-                            {isExpanded ? (
-                              <>
-                                <ChevronUp size={12} /> 收起
-                              </>
-                            ) : (
-                              <>
-                                <ChevronDown size={12} /> 展开
-                              </>
-                            )}
-                          </button>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Attachments */}
-                    {log.attachments && log.attachments.length > 0 && (
-                      <div className="mt-1.5 flex flex-wrap gap-1">
-                        {log.attachments.map((att) => (
-                          <a
-                            key={att.id}
-                            href={att.fileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-0.5 rounded-sm bg-[#f3f4f6] px-1.5 py-0.5 text-[10px] text-[#374151] hover:bg-[#e5e7eb] transition-colors"
-                            title={att.fileName}
-                          >
-                            <FileText size={11} />
-                            <span className="truncate max-w-16">{att.fileName}</span>
-                            <span className="text-[#9ca3af] text-[9px]">
-                              ({formatFileSize(att.fileSize)})
-                            </span>
-                          </a>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </div>
-
-      {/* Divider */}
       <div className="border-t border-[#e5e7eb]" />
 
-      {/* Input area */}
       <div className="flex flex-col gap-2 p-2">
-        {/* Remark textarea */}
         <textarea
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           placeholder="添加备注..."
-          disabled={isSubmitting}
+          disabled={isSubmitting || !opportunity?.id}
           className="h-16 w-full resize-none rounded-sm border border-[#e5e7eb] bg-white px-2 py-1.5 text-[12px] text-[#111827] placeholder:text-[#9ca3af] outline-none focus:border-[#2563eb] disabled:bg-[#f9fafb] disabled:text-[#9ca3af]"
         />
 
-        {/* File preview */}
-        {uploadedFiles.length > 0 && (
-          <div className="flex flex-col gap-1">
-            {uploadedFiles.map((file, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between gap-2 rounded-sm bg-[#f3f4f6] px-1.5 py-1 text-[11px]"
-              >
-                <div className="flex items-center gap-1 min-w-0">
-                  <FileText size={12} className="text-[#6b7280] shrink-0" />
-                  <span className="truncate text-[#374151] font-medium">{file.name}</span>
-                  <span className="text-[#9ca3af] text-[10px] shrink-0">
-                    ({formatFileSize(file.size)})
-                  </span>
-                </div>
-                <button
-                  onClick={() => removeFile(i)}
-                  className="flex h-5 w-5 items-center justify-center rounded-sm text-[#9ca3af] hover:bg-[#e5e7eb] hover:text-[#dc2626] transition-colors shrink-0"
-                  aria-label="删除文件"
-                >
-                  <Trash2 size={11} />
-                </button>
-              </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          onChange={handleFileSelect}
+          disabled={isSubmitting || !opportunity?.id}
+          className="hidden"
+        />
+
+        {selectedFiles.length > 0 ? (
+          <div className="flex flex-col gap-1 rounded-sm border border-dashed border-[#d1d5db] bg-[#f9fafb] p-1.5">
+            {selectedFiles.map((file) => (
+              <SelectedFileRow
+                key={`${file.name}-${file.size}-${file.lastModified}`}
+                file={file}
+                onRemove={handleRemoveSelectedFile}
+              />
             ))}
           </div>
-        )}
+        ) : null}
 
-        {/* Action buttons */}
         <div className="flex items-center gap-1">
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            onChange={handleFileSelect}
-            className="hidden"
-            disabled={isSubmitting}
-          />
           <button
+            type="button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isSubmitting}
-            className="flex h-7 items-center gap-1 rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#374151] hover:bg-[#f9fafb] disabled:bg-[#f9fafb] disabled:text-[#9ca3af] transition-colors"
-            aria-label="上传文件"
+            disabled={isSubmitting || !opportunity?.id}
+            className="flex h-7 items-center gap-1 rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#4b5563] hover:bg-[#f9fafb] disabled:bg-[#f9fafb] disabled:text-[#9ca3af]"
+            aria-label="选择附件"
+            title="选择附件"
           >
-            <Upload size={12} />
-            上传
+            <Paperclip size={12} />
+            附件
+            {selectedFiles.length > 0 ? <span className="text-[10px] text-[#6b7280]">{selectedFiles.length}</span> : null}
           </button>
           <button
             onClick={handleSubmit}
-            disabled={isSubmitting || (!inputValue.trim() && uploadedFiles.length === 0)}
-            className="flex-1 h-7 rounded-sm bg-[#2563eb] text-white text-[12px] font-medium hover:bg-[#1d4ed8] disabled:bg-[#d1d5db] disabled:text-[#9ca3af] transition-colors"
+            disabled={isSubmitting || !inputValue.trim() || !opportunity?.id}
+            className="flex h-7 flex-1 items-center justify-center gap-1 rounded-sm bg-[#2563eb] text-[12px] font-medium text-white hover:bg-[#1d4ed8] disabled:bg-[#d1d5db] disabled:text-[#9ca3af] transition-colors"
           >
+            {isSubmitting ? <Clock size={12} className="animate-spin" /> : <Send size={12} />}
             {isSubmitting ? '提交中...' : '提交'}
           </button>
         </div>

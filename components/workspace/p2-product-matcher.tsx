@@ -1,7 +1,7 @@
 'use client'
 
 import { Plus, Minus, Search } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 export interface DraftOpportunityItem {
   tempId: string
@@ -75,6 +75,11 @@ export function P2ProductMatcher({
   )
 
   const [activeTab, setActiveTab] = useState<string>('')
+
+  useEffect(() => {
+    setSearchQuery('')
+    setActiveTab('')
+  }, [selectedData])
 
   const currentTab = activeTab || categories[0] || ''
 

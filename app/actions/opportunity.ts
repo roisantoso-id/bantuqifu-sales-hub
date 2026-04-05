@@ -1,10 +1,11 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { uploadContractToOss } from '@/lib/oss'
+import { uploadContractToOss, uploadInteractionAttachmentToOss } from '@/lib/oss'
 import { cookies } from 'next/headers'
 import { createDeliveryProjectAction } from './delivery'
-import type { OpportunityP2Data, OpportunityP3Data, OpportunityP4Data, StageId } from '@/lib/types'
+import type { InteractionAttachmentRow, InteractionWithAttachmentsRow } from './interaction'
+import type { OpportunityP2Data, OpportunityP3Data, OpportunityP4Data, OpportunityP5Data, OpportunityP6Data, OpportunityP7Data, OpportunityP8Data, StageId } from '@/lib/types'
 
 export interface OpportunityRow {
   id: string
@@ -45,6 +46,10 @@ export interface HydratedOpportunityRow extends OpportunityRow {
   p2Data: OpportunityP2Data[]
   p3Data: OpportunityP3Data[]
   p4Data?: OpportunityP4Data
+  p5Data?: OpportunityP5Data
+  p6Data?: OpportunityP6Data
+  p7Data?: OpportunityP7Data
+  p8Data?: OpportunityP8Data
 }
 
 const DEFAULT_P4_DATA: OpportunityP4Data = {
@@ -90,6 +95,124 @@ function buildP4UpsertPayload(
   }
 }
 
+function mapP5DataRow(row: any): OpportunityP5Data {
+  return {
+    bankAccount: row?.bankAccount ?? undefined,
+    bankName: row?.bankName ?? undefined,
+    accountHolder: row?.accountHolder ?? undefined,
+    swiftCode: row?.swiftCode ?? undefined,
+    dueAmount: typeof row?.dueAmount === 'number' ? row.dueAmount : 0,
+    receivedAmount: typeof row?.receivedAmount === 'number' ? row.receivedAmount : 0,
+    receiptFileUrl: row?.receiptFileUrl ?? undefined,
+    receiptFileName: row?.receiptFileName ?? undefined,
+    receiptUploadedAt: row?.receiptUploadedAt ?? undefined,
+    receiptUploadedBy: row?.receiptUploadedBy ?? undefined,
+    paymentStatus: row?.paymentStatus === 'verified' || row?.paymentStatus === 'rejected' ? row.paymentStatus : 'pending',
+    rejectionReason: row?.rejectionReason ?? undefined,
+    confirmedAt: row?.confirmedAt ?? undefined,
+    confirmedBy: row?.confirmedById ?? undefined,
+  }
+}
+
+function mapP6DataRow(row: any): OpportunityP6Data {
+  return {
+    materials: [],
+    lastUpdatedAt: row?.lastUpdatedAt ?? undefined,
+  }
+}
+
+function mapP7DataRow(row: any): OpportunityP7Data {
+  return {
+    progressPoints: [],
+    deliveryStatus: row?.deliveryStatus ?? 'in_transit',
+    assignmentLogic: undefined,
+    finalDocumentUrl: row?.finalDocumentUrl ?? undefined,
+    finalDocumentName: row?.finalDocumentName ?? undefined,
+    deliveredAt: row?.deliveredAt ?? undefined,
+    completedAt: row?.completedAt ?? undefined,
+    notes: row?.notes ?? undefined,
+  }
+}
+
+function mapP8DataRow(row: any): OpportunityP8Data {
+  return {
+    totalAmount: typeof row?.totalAmount === 'number' ? row.totalAmount : 0,
+    paidAmount: typeof row?.paidAmount === 'number' ? row.paidAmount : 0,
+    balanceDue: typeof row?.balanceDue === 'number' ? row.balanceDue : 0,
+    balanceReceiptUrl: row?.balanceReceiptUrl ?? undefined,
+    balanceReceivedAt: row?.balanceReceivedAt ?? undefined,
+    balanceStatus: row?.balanceStatus === 'received' || row?.balanceStatus === 'partial' ? row.balanceStatus : 'pending',
+    refunds: [],
+    totalRefund: typeof row?.totalRefund === 'number' ? row.totalRefund : 0,
+    expenses: [],
+    totalExpense: typeof row?.totalExpense === 'number' ? row.totalExpense : 0,
+    netBalance: typeof row?.netBalance === 'number' ? row.netBalance : 0,
+    profitMargin: typeof row?.profitMargin === 'number' ? row.profitMargin : undefined,
+    settledAt: row?.settledAt ?? undefined,
+    settledBy: row?.settledById ?? undefined,
+    archived: Boolean(row?.archived),
+    notes: row?.notes ?? undefined,
+  }
+}
+
+function mapProgressPointRow(row: any) {
+  return {
+    id: row.id,
+    label: row.label,
+    status: row.status,
+    timestamp: row.timestamp ?? undefined,
+    serviceId: row.productId ?? undefined,
+  }
+}
+
+function mapMaterialItemRow(row: any) {
+  return {
+    id: row.id,
+    name: row.name,
+    requirement: row.requirement,
+    fileUrl: row.fileUrl ?? undefined,
+    fileName: row.fileName ?? undefined,
+    fileSize: typeof row.fileSize === 'number' ? row.fileSize : undefined,
+    status: row.status,
+    uploadedAt: row.uploadedAt ?? undefined,
+    uploadedBy: row.uploadedBy ?? undefined,
+    approvedAt: row.approvedAt ?? undefined,
+    approvedBy: row.approvedById ?? undefined,
+    rejectionReason: row.rejectionReason ?? undefined,
+    serviceId: row.productId ?? undefined,
+    serviceName: row.productName ?? undefined,
+  }
+}
+
+function mapRefundItemRow(row: any) {
+  return {
+    id: row.id,
+    serviceId: row.serviceId,
+    serviceName: row.serviceName,
+    originalAmount: row.originalAmount,
+    refundedAmount: row.refundedAmount,
+    reason: row.reason,
+    refundedAt: row.refundedAt ?? undefined,
+    refundedBy: row.refundedBy ?? undefined,
+    receiptUrl: row.receiptUrl ?? undefined,
+  }
+}
+
+function mapExpenseItemRow(row: any) {
+  return {
+    id: row.id,
+    description: row.description,
+    amount: row.amount,
+    category: row.category,
+    receiptUrl: row.receiptUrl ?? undefined,
+    receiptFileName: row.receiptFileName ?? undefined,
+    createdBy: row.createdBy,
+    createdAt: row.createdAt,
+    approvedBy: row.approvedById ?? undefined,
+    approvedAt: row.approvedAt ?? undefined,
+  }
+}
+
 function buildP3DataFromItems(items: OpportunityP2Data[]): OpportunityP3Data[] {
   return items.map((item) => ({
     tempId: item.tempId,
@@ -114,6 +237,43 @@ function buildP3DataFromItems(items: OpportunityP2Data[]): OpportunityP3Data[] {
 async function getCurrentTenantId(): Promise<string> {
   const cookieStore = await cookies()
   return cookieStore.get('selectedTenant')?.value ?? 'org_bantu_id'
+}
+
+function isBrowserFile(value: FormDataEntryValue | null): value is File {
+  return typeof File !== 'undefined' && value instanceof File
+}
+
+function getFormFiles(formData: FormData, fieldName: string): File[] {
+  return formData
+    .getAll(fieldName)
+    .filter((value): value is File => isBrowserFile(value) && value.size > 0)
+}
+
+async function getAttachmentsByInteractionIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  interactionIds: string[]
+): Promise<Map<string, InteractionAttachmentRow[]>> {
+  if (interactionIds.length === 0) {
+    return new Map()
+  }
+
+  const { data: attachments, error } = await supabase
+    .from('interaction_attachments')
+    .select('id, interactionId, fileName, fileUrl, fileSize, createdAt')
+    .in('interactionId', interactionIds)
+    .order('createdAt', { ascending: true })
+
+  if (error) {
+    console.error('[getAttachmentsByInteractionIds] Query error:', error)
+    return new Map()
+  }
+
+  return (attachments ?? []).reduce((map, attachment) => {
+    const existing = map.get(attachment.interactionId) ?? []
+    existing.push(attachment as InteractionAttachmentRow)
+    map.set(attachment.interactionId, existing)
+    return map
+  }, new Map<string, InteractionAttachmentRow[]>())
 }
 
 export async function saveOpportunityItemsAction(
@@ -293,7 +453,6 @@ export async function getOpportunityTimelineAction(oppId: string) {
     .select('*')
     .eq('organizationId', tenantId)
 
-  // 构建 OR 条件：商机ID 或 线索ID
   if (opp.convertedFromLeadId) {
     query = query.or(`opportunityId.eq.${oppId},leadId.eq.${opp.convertedFromLeadId}`)
   } else {
@@ -307,14 +466,226 @@ export async function getOpportunityTimelineAction(oppId: string) {
     return { success: false, error: '查询跟进记录失败' }
   }
 
+  const operatorIds = Array.from(
+    new Set((interactions ?? []).map((interaction: any) => interaction.operatorId).filter(Boolean))
+  ) as string[]
+
+  let operatorMap = new Map<string, { name: string | null; email: string | null }>()
+
+  if (operatorIds.length > 0) {
+    const { data: operators, error: operatorsError } = await supabase
+      .from('users_auth')
+      .select('id, name, email')
+      .in('id', operatorIds)
+
+    if (operatorsError) {
+      console.error('[getOpportunityTimelineAction] Operator query error:', operatorsError)
+    } else {
+      operatorMap = new Map(
+        (operators ?? []).map((operator: any) => [
+          operator.id,
+          {
+            name: operator.name ?? null,
+            email: operator.email ?? null,
+          },
+        ])
+      )
+    }
+  }
+
+  const enrichedInteractions: InteractionWithAttachmentsRow[] = (interactions || []).map((interaction: any) => {
+    const operator = interaction.operatorId ? operatorMap.get(interaction.operatorId) : undefined
+
+    return {
+      ...interaction,
+      operatorName: operator?.name ?? null,
+      operatorEmail: operator?.email ?? null,
+      attachments: [],
+    }
+  })
+
+  const attachmentMap = await getAttachmentsByInteractionIds(
+    supabase,
+    enrichedInteractions.map((interaction) => interaction.id)
+  )
+
+  const interactionsWithAttachments = enrichedInteractions.map((interaction) => ({
+    ...interaction,
+    attachments: attachmentMap.get(interaction.id) ?? [],
+  }))
+
   return {
     success: true,
     data: {
       opportunity: opp,
-      interactions: interactions || [],
+      interactions: interactionsWithAttachments,
       hasLeadHistory: !!opp.convertedFromLeadId,
     },
   }
+}
+
+export async function createOpportunityNoteWithAttachmentsAction(
+  formData: FormData
+): Promise<{ success: boolean; error?: string; attachmentErrors?: string[] }> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  const opportunityId = String(formData.get('opportunityId') ?? '')
+  const content = String(formData.get('content') ?? '').trim()
+  const nextAction = String(formData.get('nextAction') ?? '').trim()
+  const nextActionDate = String(formData.get('nextActionDate') ?? '').trim()
+  const files = getFormFiles(formData, 'files')
+
+  if (!opportunityId) {
+    return { success: false, error: '商机不存在' }
+  }
+
+  if (!content) {
+    return { success: false, error: '备注内容不能为空' }
+  }
+
+  const { data: { user } } = await supabase.auth.getUser()
+  const userId = user?.id
+
+  if (!userId) {
+    return { success: false, error: '用户未登录' }
+  }
+
+  const { data: opportunity, error: opportunityError } = await supabase
+    .from('opportunities')
+    .select('id, customerId, convertedFromLeadId')
+    .eq('id', opportunityId)
+    .eq('organizationId', tenantId)
+    .single()
+
+  if (opportunityError || !opportunity) {
+    console.error('[createOpportunityNoteWithAttachmentsAction] Opportunity not found:', opportunityError)
+    return { success: false, error: '商机不存在' }
+  }
+
+  const interactionId = crypto.randomUUID()
+  const timestamp = new Date().toISOString()
+
+  const { error: interactionError } = await supabase.from('interactions').insert({
+    id: interactionId,
+    organizationId: tenantId,
+    customerId: opportunity.customerId,
+    leadId: opportunity.convertedFromLeadId ?? null,
+    opportunityId,
+    operatorId: userId,
+    type: 'NOTE',
+    content,
+    nextAction: nextAction || null,
+    nextActionDate: nextActionDate || null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+
+  if (interactionError) {
+    console.error('[createOpportunityNoteWithAttachmentsAction] Insert error:', interactionError)
+    return { success: false, error: '保存备注失败，请稍后重试' }
+  }
+
+  const attachmentRows: Array<Pick<InteractionAttachmentRow, 'id' | 'interactionId' | 'fileName' | 'fileUrl' | 'fileSize'>> = []
+  const attachmentErrors: string[] = []
+
+  for (const file of files) {
+    try {
+      const uploaded = await uploadInteractionAttachmentToOss({
+        file,
+        tenantId,
+        opportunityId,
+        interactionId,
+      })
+
+      attachmentRows.push({
+        id: crypto.randomUUID(),
+        interactionId,
+        fileName: uploaded.fileName,
+        fileUrl: uploaded.url,
+        fileSize: uploaded.fileSize,
+      })
+    } catch (error) {
+      console.error('[createOpportunityNoteWithAttachmentsAction] Attachment upload error:', error)
+      attachmentErrors.push(error instanceof Error ? error.message : `附件 ${file.name} 上传失败`)
+    }
+  }
+
+  if (attachmentRows.length > 0) {
+    const { error: attachmentInsertError } = await supabase
+      .from('interaction_attachments')
+      .insert(attachmentRows)
+
+    if (attachmentInsertError) {
+      console.error('[createOpportunityNoteWithAttachmentsAction] Attachment insert error:', attachmentInsertError)
+      return {
+        success: false,
+        error: '备注已保存，但附件写入失败，请稍后刷新重试',
+        attachmentErrors,
+      }
+    }
+  }
+
+  return {
+    success: true,
+    attachmentErrors: attachmentErrors.length > 0 ? attachmentErrors : undefined,
+  }
+}
+
+export async function createOpportunityNoteAction(data: {
+  opportunityId: string
+  content: string
+  nextAction?: string | null
+  nextActionDate?: string | null
+}): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  const trimmedContent = data.content.trim()
+  if (!trimmedContent) {
+    return { success: false, error: '备注内容不能为空' }
+  }
+
+  const { data: { user } } = await supabase.auth.getUser()
+  const userId = user?.id
+
+  if (!userId) {
+    return { success: false, error: '用户未登录' }
+  }
+
+  const { data: opportunity, error: opportunityError } = await supabase
+    .from('opportunities')
+    .select('id, customerId, convertedFromLeadId')
+    .eq('id', data.opportunityId)
+    .eq('organizationId', tenantId)
+    .single()
+
+  if (opportunityError || !opportunity) {
+    console.error('[createOpportunityNoteAction] Opportunity not found:', opportunityError)
+    return { success: false, error: '商机不存在' }
+  }
+
+  const { error } = await supabase.from('interactions').insert({
+    id: crypto.randomUUID(),
+    organizationId: tenantId,
+    customerId: opportunity.customerId,
+    leadId: opportunity.convertedFromLeadId ?? null,
+    opportunityId: data.opportunityId,
+    operatorId: userId ?? null,
+    type: 'NOTE',
+    content: trimmedContent,
+    nextAction: data.nextAction?.trim() || null,
+    nextActionDate: data.nextActionDate || null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  })
+
+  if (error) {
+    console.error('[createOpportunityNoteAction] Insert error:', error)
+    return { success: false, error: '保存备注失败，请稍后重试' }
+  }
+
+  return { success: true }
 }
 
 // ─── allocateWechatGroupIdAction ──────────────────────────────────────────────
@@ -527,16 +898,123 @@ export async function getOpportunityWorkspaceAction(oppId: string): Promise<Hydr
     return null
   }
 
-  const [p2Data, p4Data] = await Promise.all([
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  const [
+    p2Data,
+    p4Data,
+    p5Row,
+    p6Row,
+    p7Row,
+    p8Row,
+  ] = await Promise.all([
     getOpportunityItemsAction(oppId),
     getOpportunityP4DataAction(oppId),
+    supabase
+      .from('opportunity_p5_data')
+      .select('*')
+      .eq('opportunityId', oppId)
+      .maybeSingle(),
+    supabase
+      .from('opportunity_p6_data')
+      .select('*')
+      .eq('opportunityId', oppId)
+      .maybeSingle(),
+    supabase
+      .from('opportunity_p7_data')
+      .select('*')
+      .eq('opportunityId', oppId)
+      .maybeSingle(),
+    supabase
+      .from('opportunity_p8_data')
+      .select('*')
+      .eq('opportunityId', oppId)
+      .maybeSingle(),
   ])
+
+  const p5Data = p5Row.data ? mapP5DataRow(p5Row.data) : undefined
+  const p6Data = p6Row.data ? mapP6DataRow(p6Row.data) : undefined
+  const p7Data = p7Row.data ? mapP7DataRow(p7Row.data) : undefined
+  const p8Data = p8Row.data ? mapP8DataRow(p8Row.data) : undefined
+
+  if (p5Row.error) {
+    console.error('[getOpportunityWorkspaceAction] P5 query error:', p5Row.error)
+  }
+  if (p6Row.error) {
+    console.error('[getOpportunityWorkspaceAction] P6 query error:', p6Row.error)
+  }
+  if (p7Row.error) {
+    console.error('[getOpportunityWorkspaceAction] P7 query error:', p7Row.error)
+  }
+  if (p8Row.error) {
+    console.error('[getOpportunityWorkspaceAction] P8 query error:', p8Row.error)
+  }
+
+  if (p6Row.data) {
+    const { data: materials, error: materialsError } = await supabase
+      .from('material_items')
+      .select('*')
+      .eq('p6DataId', p6Row.data.id)
+      .order('createdAt', { ascending: true })
+
+    if (materialsError) {
+      console.error('[getOpportunityWorkspaceAction] P6 materials query error:', materialsError)
+    } else if (p6Data) {
+      p6Data.materials = (materials ?? []).map(mapMaterialItemRow)
+    }
+  }
+
+  if (p7Row.data) {
+    const { data: progressPoints, error: progressPointsError } = await supabase
+      .from('progress_points')
+      .select('*')
+      .eq('p7DataId', p7Row.data.id)
+      .order('createdAt', { ascending: true })
+
+    if (progressPointsError) {
+      console.error('[getOpportunityWorkspaceAction] P7 progress query error:', progressPointsError)
+    } else if (p7Data) {
+      p7Data.progressPoints = (progressPoints ?? []).map(mapProgressPointRow)
+    }
+  }
+
+  if (p8Row.data) {
+    const [refundsResult, expensesResult] = await Promise.all([
+      supabase
+        .from('refund_items')
+        .select('*')
+        .eq('p8DataId', p8Row.data.id)
+        .order('createdAt', { ascending: true }),
+      supabase
+        .from('expense_items')
+        .select('*')
+        .eq('p8DataId', p8Row.data.id)
+        .order('createdAt', { ascending: true }),
+    ])
+
+    if (refundsResult.error) {
+      console.error('[getOpportunityWorkspaceAction] P8 refunds query error:', refundsResult.error)
+    } else if (p8Data) {
+      p8Data.refunds = (refundsResult.data ?? []).map(mapRefundItemRow)
+    }
+
+    if (expensesResult.error) {
+      console.error('[getOpportunityWorkspaceAction] P8 expenses query error:', expensesResult.error)
+    } else if (p8Data) {
+      p8Data.expenses = (expensesResult.data ?? []).map(mapExpenseItemRow)
+    }
+  }
 
   return {
     ...opportunity,
     p2Data,
     p3Data: buildP3DataFromItems(p2Data),
     p4Data,
+    p5Data,
+    p6Data,
+    p7Data,
+    p8Data,
   }
 }
 

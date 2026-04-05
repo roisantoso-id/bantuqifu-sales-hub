@@ -1,7 +1,7 @@
 'use client'
 
 import { Upload, File, Eye, X, CheckCircle2, Circle } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { OpportunityP4Data, Opportunity } from '@/lib/types'
 
 interface P4ContractProps {
@@ -50,6 +50,18 @@ export function P4Contract({
 
   const currentData = useMemo(() => ({ ...EMPTY_P4_DATA, ...p4Data }), [p4Data])
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+
+  useEffect(() => {
+    setIsDragging(false)
+    setIsSavingDraft(false)
+    setIsSubmitting(false)
+    setErrorMessage(null)
+    setSuccessMessage(null)
+    setSelectedFile(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }, [opportunity.id, p4Data])
 
   const checklist = {
     sealVisible: currentData.sealVisible,
