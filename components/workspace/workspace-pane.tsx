@@ -23,6 +23,9 @@ interface WorkspaceProps {
   onAdvanceStage: (stage?: StageId) => Promise<boolean>
   onP4DraftSave: (data: OpportunityP4Data) => Promise<{ success: boolean; error?: string }>
   onP4Submit: (formData: FormData) => Promise<{ success: boolean; error?: string }>
+  onP5UploadReceipt: (formData: FormData) => Promise<{ success: boolean; error?: string }>
+  onP5RejectReceipt: (reason: string) => Promise<{ success: boolean; error?: string }>
+  onP5ConfirmPayment: (payload: { receivedAmount: number }) => Promise<{ success: boolean; error?: string }>
   onQuoteSent: () => void
 }
 
@@ -49,6 +52,9 @@ export function WorkspacePane({
   onAdvanceStage,
   onP4DraftSave,
   onP4Submit,
+  onP5UploadReceipt,
+  onP5RejectReceipt,
+  onP5ConfirmPayment,
   onQuoteSent,
 }: WorkspaceProps) {
   // Guard against undefined opportunity
@@ -145,7 +151,10 @@ export function WorkspacePane({
             opportunity={opportunity}
             p5Data={opportunity.p5Data}
             onDataChange={(data) => onOpportunityUpdate({ p5Data: data })}
-            onConfirmPayment={onAdvanceStage}
+            onUploadReceipt={onP5UploadReceipt}
+            onRejectReceipt={onP5RejectReceipt}
+            onConfirmPayment={onP5ConfirmPayment}
+            isReadonly={!isOnCurrentStage}
           />
         )}
         {viewingStage === 'P6' && (
@@ -199,7 +208,7 @@ export function WorkspacePane({
               )}
             </>
           )}
-          {['P5', 'P6', 'P7'].includes(viewingStage) && isOnCurrentStage && (
+          {['P6', 'P7'].includes(viewingStage) && isOnCurrentStage && (
             <button
               onClick={() => onAdvanceStage(viewingStage)}
               className="ml-auto flex h-8 items-center gap-1.5 rounded-sm bg-[#2563eb] px-3 text-[13px] font-medium text-white hover:bg-[#1d4ed8]"

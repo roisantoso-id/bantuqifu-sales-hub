@@ -13,7 +13,7 @@ import { MyDashboard } from '@/components/dashboard/my-dashboard'
 import { AuditRail } from '@/components/audit-rail/audit-panel'
 import { OpportunityListView } from '@/components/opportunities/opportunity-list-view'
 import { mockActionLogs, mockUser, mockLeads } from '@/lib/mock-data'
-import { toggleOpportunityPinAction, getOpportunitiesAction, saveOpportunityItemsAction, getOpportunityWorkspaceAction, updateOpportunityAction, updateOpportunityStageAction, saveOpportunityP4DraftAction, submitOpportunityContractAction, createOpportunityNoteWithAttachmentsAction } from '@/app/actions/opportunity'
+import { toggleOpportunityPinAction, getOpportunitiesAction, saveOpportunityItemsAction, getOpportunityWorkspaceAction, updateOpportunityAction, updateOpportunityStageAction, saveOpportunityP4DraftAction, submitOpportunityContractAction, saveOpportunityP5ReceiptAction, rejectOpportunityP5ReceiptAction, confirmOpportunityP5PaymentAction, createOpportunityNoteWithAttachmentsAction } from '@/app/actions/opportunity'
 import { getProductsByCategoryAction } from '@/app/actions/product'
 import type { Opportunity, NavSection, StageId, ActionLog, Lead, LeadRow, OpportunityRow, OpportunityStatus, Currency, Product, OpportunityP2Data, OpportunityP3Data, OpportunityP4Data } from '@/lib/types'
 
@@ -543,6 +543,113 @@ export function DashboardClient({
     [appendLog, reloadOpportunity, selectedOpportunity]
   )
 
+  const handleP5UploadReceipt = useCallback(
+    async (formData: FormData) => {
+      if (!selectedOpportunity) {
+        return { success: false, error: '未选择商机' }
+      }
+
+      const result = await saveOpportunityP5ReceiptAction(selectedOpportunity.id, formData)
+      if (!result.success) {
+        console.error('[handleP5UploadReceipt] Failed:', result.error)
+        return { success: false, error: result.error }
+      }
+
+      if (result.data) {
+        const mapped = mapOpportunityRowToOpportunity(result.data, {
+          p2Data: result.data.p2Data,
+          p3Data: result.data.p3Data,
+          p4Data: result.data.p4Data,
+          p5Data: result.data.p5Data,
+          p6Data: result.data.p6Data,
+          p7Data: result.data.p7Data,
+          p8Data: result.data.p8Data,
+        })
+        setOpportunities((prev) => mergeOpportunityIntoList(prev, mapped))
+        setActiveOpportunity(mapped)
+      } else {
+        await reloadOpportunity(selectedOpportunity.id)
+      }
+
+      setAuditRailReloadToken((prev) => prev + 1)
+      return { success: true }
+    },
+    [reloadOpportunity, selectedOpportunity]
+  )
+
+  const handleP5RejectReceipt = useCallback(
+    async (reason: string) => {
+      if (!selectedOpportunity) {
+        return { success: false, error: '未选择商机' }
+      }
+
+      const result = await rejectOpportunityP5ReceiptAction(selectedOpportunity.id, reason)
+      if (!result.success) {
+        console.error('[handleP5RejectReceipt] Failed:', result.error)
+        return { success: false, error: result.error }
+      }
+
+      if (result.data) {
+        const mapped = mapOpportunityRowToOpportunity(result.data, {
+          p2Data: result.data.p2Data,
+          p3Data: result.data.p3Data,
+          p4Data: result.data.p4Data,
+          p5Data: result.data.p5Data,
+          p6Data: result.data.p6Data,
+          p7Data: result.data.p7Data,
+          p8Data: result.data.p8Data,
+        })
+        setOpportunities((prev) => mergeOpportunityIntoList(prev, mapped))
+        setActiveOpportunity(mapped)
+      } else {
+        await reloadOpportunity(selectedOpportunity.id)
+      }
+
+      setAuditRailReloadToken((prev) => prev + 1)
+      return { success: true }
+    },
+    [reloadOpportunity, selectedOpportunity]
+  )
+
+  const handleP5ConfirmPayment = useCallback(
+    async (payload: { receivedAmount: number }) => {
+      if (!selectedOpportunity) {
+        return { success: false, error: '未选择商机' }
+      }
+
+      const result = await confirmOpportunityP5PaymentAction(selectedOpportunity.id, payload)
+      if (!result.success) {
+        console.error('[handleP5ConfirmPayment] Failed:', result.error)
+        return { success: false, error: result.error }
+      }
+
+      let nextOpportunity: Opportunity | null = null
+      if (result.data) {
+        nextOpportunity = mapOpportunityRowToOpportunity(result.data, {
+          p2Data: result.data.p2Data,
+          p3Data: result.data.p3Data,
+          p4Data: result.data.p4Data,
+          p5Data: result.data.p5Data,
+          p6Data: result.data.p6Data,
+          p7Data: result.data.p7Data,
+          p8Data: result.data.p8Data,
+        })
+        setOpportunities((prev) => mergeOpportunityIntoList(prev, nextOpportunity!))
+        setActiveOpportunity(nextOpportunity)
+      } else {
+        nextOpportunity = await reloadOpportunity(selectedOpportunity.id)
+      }
+
+      if (nextOpportunity) {
+        setViewingStage(nextOpportunity.stageId)
+      }
+
+      setAuditRailReloadToken((prev) => prev + 1)
+      return { success: true }
+    },
+    [reloadOpportunity, selectedOpportunity]
+  )
+
   const handleQuoteSent = () => {
     appendLog(selectedId, {
       actionType: 'QUOTE',
@@ -655,6 +762,9 @@ export function DashboardClient({
               onAdvanceStage={handleAdvanceStage}
               onP4DraftSave={handleP4DraftSave}
               onP4Submit={handleP4Submit}
+              onP5UploadReceipt={handleP5UploadReceipt}
+              onP5RejectReceipt={handleP5RejectReceipt}
+              onP5ConfirmPayment={handleP5ConfirmPayment}
               onQuoteSent={handleQuoteSent}
             />
           )}
