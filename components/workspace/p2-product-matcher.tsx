@@ -1,7 +1,9 @@
 'use client'
 
-import { Plus, Minus, Search } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { Check, Minus, Plus, Search } from 'lucide-react'
+import { useMemo, useState } from 'react'
+
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 export interface DraftOpportunityItem {
   tempId: string
@@ -58,6 +60,10 @@ function getDifficultyStars(difficulty?: number): string {
   return '★'.repeat(difficulty) + '☆'.repeat(Math.max(0, 5 - difficulty))
 }
 
+function formatCurrency(currency: 'CNY' | 'IDR', amount: number) {
+  return `${currency === 'CNY' ? '¥' : 'Rp'}${Math.round(amount).toLocaleString()}`
+}
+
 export function P2ProductMatcher({
   allProducts,
   productCategories,
@@ -76,11 +82,6 @@ export function P2ProductMatcher({
 
   const [activeTab, setActiveTab] = useState<string>('')
 
-  useEffect(() => {
-    setSearchQuery('')
-    setActiveTab('')
-  }, [selectedData])
-
   const currentTab = activeTab || categories[0] || ''
 
   const filteredProducts = useMemo(() => {
@@ -95,6 +96,29 @@ export function P2ProductMatcher({
         product.description?.toLowerCase().includes(q)
     )
   }, [grouped, currentTab, searchQuery])
+
+  const selectedCounts = useMemo(() => {
+    return selectedData.reduce<Record<string, number>>((acc, item) => {
+      acc[item.productId] = (acc[item.productId] || 0) + 1
+      return acc
+    }, {})
+  }, [selectedData])
+
+  const totalByCurrency = useMemo(() => {
+    return selectedData.reduce<Partial<Record<'CNY' | 'IDR', number>>>((acc, item) => {
+      acc[item.currency] = (acc[item.currency] || 0) + item.basePrice
+      return acc
+    }, {})
+  }, [selectedData])
+
+  const totalSummary = useMemo(() => {
+    const entries = Object.entries(totalByCurrency) as Array<['CNY' | 'IDR', number]>
+    if (entries.length === 0) return '暂无估算'
+    return entries
+      .sort(([currencyA], [currencyB]) => currencyA.localeCompare(currencyB))
+      .map(([currency, amount]) => formatCurrency(currency, amount))
+      .join(' / ')
+  }, [totalByCurrency])
 
   const addProductInstance = (product: ProductLike) => {
     const newItem: DraftOpportunityItem = {
@@ -146,10 +170,10 @@ export function P2ProductMatcher({
         ))}
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        <div className="flex min-w-0 w-1/2 flex-col border-r border-[#e5e7eb]">
-          <div className="border-b border-[#e5e7eb] p-2">
-            <div className="flex items-center gap-1 rounded-sm border border-[#e5e7eb] bg-white px-2 py-1">
+      <div className="flex flex-1 gap-4 overflow-hidden px-3 py-3">
+        <div className="flex min-w-0 w-1/2 flex-col rounded-lg border border-[#e5e7eb] bg-white">
+          <div className="border-b border-[#e5e7eb] p-3">
+            <div className="flex items-center gap-1 rounded-md border border-[#e5e7eb] bg-white px-2.5 py-1.5">
               <Search size={12} className="text-[#9ca3af]" />
               <input
                 type="text"
@@ -161,55 +185,79 @@ export function P2ProductMatcher({
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-2">
-            <div className="space-y-1">
+          <div className="flex-1 overflow-y-auto p-3">
+            <div className="space-y-2">
               {filteredProducts.map((product) => {
-                const categoryName = getCategoryName(product)
+                const selectedCount = selectedCounts[product.id] || 0
 
                 return (
                   <div
                     key={product.id}
-                    className="flex items-start gap-2 rounded-sm border border-[#e5e7eb] px-2 py-1.5 transition-colors hover:border-[#d1d5db]"
+                    className={`rounded-lg border px-3 py-2.5 transition-colors ${
+                      selectedCount > 0
+                        ? 'border-[#bfdbfe] bg-[#f8fbff]'
+                        : 'border-[#e5e7eb] bg-white hover:border-[#d1d5db]'
+                    }`}
                   >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <p className="truncate text-[13px] font-medium text-[#111827]">
-                          {product.name}
-                        </p>
-                        {product.difficulty ? (
-                          <span className="shrink-0 text-[10px] text-[#f59e0b]">
-                            {getDifficultyStars(product.difficulty)}
-                          </span>
-                        ) : null}
+                    <div className="flex items-start gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="truncate text-[13px] font-medium text-[#111827]">
+                            {product.name}
+                          </p>
+                          <p className="shrink-0 text-right font-mono text-[12px] font-semibold text-[#374151]">
+                            {formatCurrency(product.currency === 'CNY' ? 'CNY' : 'IDR', product.price)}
+                          </p>
+                        </div>
+
+                        <div className="mt-1 flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 text-[11px] text-[#6b7280]">
+                              {product.difficulty ? (
+                                <span className="shrink-0 text-[#f59e0b]">
+                                  难度 {getDifficultyStars(product.difficulty)}
+                                </span>
+                              ) : (
+                                <span className="text-[#9ca3af]">标准服务</span>
+                              )}
+                              {selectedCount > 0 ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-[#e0f2fe] px-2 py-0.5 text-[#0369a1]">
+                                  <Check size={11} />
+                                  已添加 {selectedCount} 个
+                                </span>
+                              ) : null}
+                            </div>
+
+                            {product.description ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <p className="mt-1 line-clamp-2 cursor-help text-[11px] leading-5 text-[#9ca3af]">
+                                    {product.description}
+                                  </p>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="max-w-xs px-3 py-2 text-[11px] leading-5">
+                                  {product.description}
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : null}
+                          </div>
+
+                          <button
+                            onClick={() => addProductInstance(product)}
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[#d1d5db] bg-white text-[#6b7280] transition-colors hover:border-[#93c5fd] hover:text-[#2563eb]"
+                            aria-label="添加"
+                          >
+                            <Plus size={14} />
+                          </button>
+                        </div>
                       </div>
-
-                      <p className="mt-0.5 text-[11px] text-[#6b7280]">{categoryName}</p>
-
-                      {product.description ? (
-                        <p className="mt-0.5 line-clamp-1 text-[11px] text-[#9ca3af]">
-                          {product.description}
-                        </p>
-                      ) : null}
-
-                      <p className="mt-1 font-mono text-[11px] text-[#374151]">
-                        {product.currency === 'CNY' ? '¥' : 'Rp'}
-                        {Math.round(product.price).toLocaleString()}
-                      </p>
                     </div>
-
-                    <button
-                      onClick={() => addProductInstance(product)}
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm bg-[#2563eb] text-white transition-colors hover:bg-[#1d4ed8]"
-                      aria-label="添加"
-                    >
-                      <Plus size={13} />
-                    </button>
                   </div>
                 )
               })}
 
               {filteredProducts.length === 0 && (
-                <div className="flex items-center justify-center rounded-sm border border-dashed border-[#e5e7eb] py-8 text-[12px] text-[#9ca3af]">
+                <div className="flex items-center justify-center rounded-lg border border-dashed border-[#e5e7eb] py-10 text-[12px] text-[#9ca3af]">
                   当前分类下暂无匹配产品
                 </div>
               )}
@@ -217,52 +265,68 @@ export function P2ProductMatcher({
           </div>
         </div>
 
-        <div className="flex w-1/2 shrink-0 flex-col p-2">
-          <div className="mb-2 border-b border-[#e5e7eb] pb-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">
-              已选服务实例
-            </span>
+        <div className="flex w-1/2 shrink-0 flex-col rounded-lg border border-[#e5e7eb] bg-slate-50 p-3">
+          <div className="mb-3 rounded-md border border-[#e5e7eb] bg-white/80 px-3 py-2">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-[#94a3b8]">
+                  已选方案区
+                </p>
+                <p className="mt-1 text-[13px] font-medium text-[#111827]">
+                  已添加 {selectedData.length} 个服务实例
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[11px] text-[#94a3b8]">展示型总价估算</p>
+                <p className="mt-1 font-mono text-[13px] font-semibold text-[#0f172a]">
+                  {totalSummary}
+                </p>
+              </div>
+            </div>
+            <p className="mt-2 text-[10px] text-[#94a3b8]">
+              仅用于 P2 方案浏览，不代表正式报价或锁价。
+            </p>
           </div>
 
           {selectedData.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center text-[13px] text-[#9ca3af]">
-              从左侧添加服务实例
+            <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-[#cbd5e1] bg-white/70 px-6 text-center text-[13px] text-[#94a3b8]">
+              从左侧添加服务后，将在这里集中查看已选方案与办理对象。
             </div>
           ) : (
             <div className="flex-1 space-y-2 overflow-y-auto">
               {selectedData.map((item, index) => (
                 <div
                   key={item.tempId}
-                  className="rounded-sm border border-[#e5e7eb] bg-white p-3 transition-colors hover:border-[#d1d5db]"
+                  className="rounded-lg border border-[#e2e8f0] bg-white p-3 transition-colors hover:border-[#cbd5e1]"
                 >
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <p className="truncate text-[13px] font-medium text-[#111827]">
                           {item.productName}
                         </p>
-                        <span className="rounded-sm bg-[#f3f4f6] px-1.5 py-0.5 text-[10px] text-[#6b7280]">
+                        <span className="rounded-full bg-[#f1f5f9] px-2 py-0.5 text-[10px] text-[#64748b]">
                           实例 {index + 1}
                         </span>
                       </div>
-
-                      <p className="mt-1 font-mono text-[11px] text-[#6b7280]">
-                        {item.currency === 'CNY' ? '¥' : 'Rp'}
-                        {Math.round(item.basePrice).toLocaleString()}
-                      </p>
                     </div>
 
-                    <button
-                      onClick={() => removeProductInstance(item.tempId)}
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm bg-[#fee2e2] text-[#dc2626] transition-colors hover:bg-[#fecaca]"
-                      aria-label="移除"
-                    >
-                      <Minus size={13} />
-                    </button>
+                    <div className="flex items-start gap-2">
+                      <p className="min-w-[88px] text-right font-mono text-[12px] font-semibold text-[#334155]">
+                        {formatCurrency(item.currency, item.basePrice)}
+                      </p>
+                      <button
+                        onClick={() => removeProductInstance(item.tempId)}
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[#fecaca] bg-white text-[#dc2626] transition-colors hover:bg-[#fff1f2]"
+                        aria-label="移除"
+                      >
+                        <Minus size={14} />
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="mt-3">
-                    <label className="mb-1 block text-[11px] font-medium text-[#6b7280]">
+                  <div className="mt-3 grid gap-1.5 sm:grid-cols-[72px_minmax(0,1fr)] sm:items-center">
+                    <label className="text-[11px] font-medium text-[#6b7280]">
                       办理人 / 标的
                     </label>
                     <input
@@ -270,7 +334,7 @@ export function P2ProductMatcher({
                       value={item.targetName}
                       onChange={(e) => updateTargetName(item.tempId, e.target.value)}
                       placeholder="请输入办理人姓名，如: 张三"
-                      className="h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#111827] outline-none placeholder:text-[#9ca3af] focus:border-[#2563eb]"
+                      className="h-8 w-full rounded-md border border-[#dbe2ea] bg-white px-2.5 text-[12px] text-[#111827] outline-none placeholder:text-[#9ca3af] focus:border-[#2563eb]"
                     />
                   </div>
                 </div>
