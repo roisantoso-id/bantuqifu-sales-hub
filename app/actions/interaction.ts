@@ -27,6 +27,7 @@ export type InteractionAttachmentRow = {
   interactionId: string
   fileName: string
   fileUrl: string
+  previewUrl?: string
   fileSize: number
   createdAt: string
 }

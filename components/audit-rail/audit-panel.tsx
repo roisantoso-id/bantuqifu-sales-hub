@@ -232,7 +232,7 @@ export function AuditRail({ opportunity, visible, reloadToken = 0, onToggle, onA
                       {interaction.attachments.map((attachment) => (
                         <a
                           key={attachment.id}
-                          href={attachment.fileUrl}
+                          href={attachment.previewUrl ?? attachment.fileUrl}
                           target="_blank"
                           rel="noreferrer"
                           className="inline-flex min-w-0 items-center gap-1 rounded-sm border border-[#e5e7eb] px-1.5 py-1 text-[10px] text-[#2563eb] hover:bg-[#f8fafc]"

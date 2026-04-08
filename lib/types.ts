@@ -156,6 +156,7 @@ export interface OpportunityP3Data {
 // ─── Stage P4-P7 Data ────────────────────────────────────────────────────────
 export interface OpportunityP4Data {
   contractFileUrl?: string // 合同PDF文件URL
+  contractPreviewUrl?: string
   contractFileName?: string
   contractFileSize?: number
   contractStatus: 'pending' | 'returned' | 'archived' // 待签署 | 已回传 | 归档中
@@ -174,6 +175,7 @@ export interface OpportunityP5Data {
   dueAmount: number
   receivedAmount: number
   receiptFileUrl?: string
+  receiptPreviewUrl?: string
   receiptFileName?: string
   receiptUploadedAt?: string
   receiptUploadedBy?: string
@@ -345,6 +347,7 @@ export interface ActionLogAttachment {
   fileName: string
   fileSize: number // bytes
   fileUrl: string // 文件URL (OSS)
+  previewUrl?: string
   uploadedAt: string
 }
 

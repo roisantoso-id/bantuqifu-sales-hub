@@ -1,14 +1,17 @@
 'use client'
 
-import { Copy, Check, X, Upload, Eye, AlertCircle, Lock } from 'lucide-react'
-import { useState, useRef } from 'react'
+import { Copy, Check, X, Upload, Eye, AlertCircle, Lock, Loader2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { OpportunityP5Data, Opportunity } from '@/lib/types'
 
 interface P5FinanceProps {
   opportunity: Opportunity
   p5Data?: OpportunityP5Data
   onDataChange: (data: OpportunityP5Data) => void
-  onConfirmPayment?: () => void
+  onUploadReceipt: (formData: FormData) => Promise<{ success: boolean; error?: string }>
+  onRejectReceipt: (reason: string) => Promise<{ success: boolean; error?: string }>
+  onConfirmPayment: (payload: { receivedAmount: number }) => Promise<{ success: boolean; error?: string }>
+  isReadonly?: boolean
 }
 
 const STATUS_BADGE: Record<string, { label: string; color: string; bg: string }> = {
@@ -38,11 +41,18 @@ export function P5Finance({
   opportunity,
   p5Data,
   onDataChange,
+  onUploadReceipt,
+  onRejectReceipt,
   onConfirmPayment,
+  isReadonly = false,
 }: P5FinanceProps) {
   const [copied, setCopied] = useState<'account' | 'code' | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [isConfirming, setIsConfirming] = useState(false)
+  const [isRejecting, setIsRejecting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [auditForm, setAuditForm] = useState({
     paymentDate: '',
     actualAmount: '',
@@ -57,6 +67,33 @@ export function P5Finance({
     receivedAmount: 0,
     paymentStatus: 'pending',
   }
+
+  useEffect(() => {
+    setIsDragging(false)
+    setPreviewOpen(false)
+    setIsUploading(false)
+    setIsConfirming(false)
+    setIsRejecting(false)
+    setErrorMessage(null)
+    setRejectionForm('')
+    setShowRejectionUI(false)
+    setAuditForm({
+      paymentDate: '',
+      actualAmount: currentData.receivedAmount ? String(currentData.receivedAmount) : '',
+      notes: '',
+    })
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }, [opportunity.id, p5Data, currentData.receivedAmount])
+
+  const previewUrl = useMemo(() => {
+    if (!currentData.receiptPreviewUrl && !currentData.receiptFileUrl) {
+      return undefined
+    }
+
+    return currentData.receiptPreviewUrl ?? currentData.receiptFileUrl
+  }, [currentData.receiptPreviewUrl, currentData.receiptFileUrl])
 
   const bankInfo = {
     accountHolder: currentData.accountHolder || 'PT Bantu Global',
@@ -80,54 +117,86 @@ export function P5Finance({
     setIsDragging(false)
   }
 
-  const handleDrop = (e: React.DragEvent) => {
+  const uploadReceipt = async (file: File) => {
+    if (isReadonly || isUploading) {
+      return
+    }
+
+    setErrorMessage(null)
+    setIsUploading(true)
+
+    const formData = new FormData()
+    formData.set('file', file)
+    formData.set('dueAmount', String(currentData.dueAmount || 0))
+
+    const result = await onUploadReceipt(formData)
+
+    setIsUploading(false)
+
+    if (!result.success) {
+      setErrorMessage(result.error || '打款凭证上传失败')
+      return
+    }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
     const file = e.dataTransfer.files?.[0]
     if (file) {
-      onDataChange({
-        ...currentData,
-        receiptFileUrl: URL.createObjectURL(file),
-        receiptFileName: file.name,
-        receiptUploadedAt: new Date().toISOString(),
-      })
+      await uploadReceipt(file)
     }
   }
 
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      onDataChange({
-        ...currentData,
-        receiptFileUrl: URL.createObjectURL(file),
-        receiptFileName: file.name,
-        receiptUploadedAt: new Date().toISOString(),
-      })
+      await uploadReceipt(file)
     }
   }
 
-  const handleConfirmAudit = () => {
+  const handleConfirmAudit = async () => {
+    if (isReadonly || isConfirming) {
+      return
+    }
+
     const actualAmount = parseInt(auditForm.actualAmount.replace(/\D/g, ''), 10) || 0
-    onDataChange({
-      ...currentData,
-      receivedAmount: actualAmount,
-      paymentStatus: 'verified',
-      confirmedAt: new Date().toISOString(),
-    })
-    if (onConfirmPayment) onConfirmPayment()
+    setErrorMessage(null)
+    setIsConfirming(true)
+    const result = await onConfirmPayment({ receivedAmount: actualAmount })
+    setIsConfirming(false)
+
+    if (!result.success) {
+      setErrorMessage(result.error || '确认到账失败')
+      return
+    }
+
     setAuditForm({ paymentDate: '', actualAmount: '', notes: '' })
   }
 
-  const handleRejectSubmit = () => {
-    if (rejectionForm.trim()) {
-      onDataChange({
-        ...currentData,
-        paymentStatus: 'rejected',
-        rejectionReason: rejectionForm,
-      })
-      setRejectionForm('')
-      setShowRejectionUI(false)
+  const handleRejectSubmit = async () => {
+    const trimmedReason = rejectionForm.trim()
+
+    if (!trimmedReason || isReadonly || isRejecting) {
+      return
     }
+
+    setErrorMessage(null)
+    setIsRejecting(true)
+    const result = await onRejectReceipt(trimmedReason)
+    setIsRejecting(false)
+
+    if (!result.success) {
+      setErrorMessage(result.error || '驳回凭证失败')
+      return
+    }
+
+    setRejectionForm('')
+    setShowRejectionUI(false)
   }
 
   const amountRemaining = Math.max(0, currentData.dueAmount - currentData.receivedAmount)
@@ -258,26 +327,36 @@ export function P5Finance({
                   : currentData.receiptFileUrl
                     ? 'border-[#10b981] bg-[#ecfdf5]'
                     : 'border-[#d1d5db] bg-[#f9fafb]'
-              }`}
+              } ${isReadonly ? 'opacity-70' : ''}`}
             >
               {currentData.receiptFileUrl ? (
                 <>
                   <Eye size={28} className="text-[#10b981]" />
                   <p className="text-[12px] font-medium text-[#047857]">凭证已上传</p>
                   <p className="text-[11px] text-[#9ca3af]">{currentData.receiptFileName}</p>
-                  <button
-                    onClick={() =>
-                      onDataChange({
-                        ...currentData,
-                        receiptFileUrl: undefined,
-                        receiptFileName: undefined,
-                      })
-                    }
-                    className="mt-1 flex h-6 items-center gap-1 rounded-sm bg-[#fee2e2] px-2 text-[11px] text-[#dc2626] hover:bg-[#fecaca]"
-                  >
-                    <X size={12} />
-                    重新上传
-                  </button>
+                  <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
+                    {previewUrl ? (
+                      <a
+                        href={previewUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex h-6 items-center gap-1 rounded-sm bg-white px-2 text-[11px] text-[#2563eb] hover:bg-[#dbeafe]"
+                      >
+                        <Eye size={12} />
+                        预览文件
+                      </a>
+                    ) : null}
+                    {!isReadonly ? (
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex h-6 items-center gap-1 rounded-sm bg-[#fee2e2] px-2 text-[11px] text-[#dc2626] hover:bg-[#fecaca]"
+                        disabled={isUploading}
+                      >
+                        {isUploading ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
+                        重新上传
+                      </button>
+                    ) : null}
+                  </div>
                 </>
               ) : (
                 <>
@@ -292,14 +371,23 @@ export function P5Finance({
                     accept=".png,.jpg,.jpeg,.pdf"
                     onChange={handleFileInput}
                     className="hidden"
+                    disabled={isReadonly || isUploading}
                   />
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="mt-1.5 flex h-7 items-center gap-1 rounded-sm bg-[#2563eb] px-3 text-[11px] font-medium text-white hover:bg-[#1d4ed8]"
-                  >
-                    <Upload size={12} />
-                    选择文件
-                  </button>
+                  {!isReadonly ? (
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="mt-1.5 flex h-7 items-center gap-1 rounded-sm bg-[#2563eb] px-3 text-[11px] font-medium text-white hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-70"
+                      disabled={isUploading}
+                    >
+                      {isUploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                      {isUploading ? '上传中...' : '选择文件'}
+                    </button>
+                  ) : (
+                    <div className="mt-1.5 inline-flex items-center gap-1 rounded-sm bg-[#f3f4f6] px-2.5 py-1 text-[11px] text-[#6b7280]">
+                      <Lock size={12} />
+                      当前阶段只读
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -308,6 +396,12 @@ export function P5Finance({
                 上传于 {new Date(currentData.receiptUploadedAt).toLocaleString('zh-CN')}
               </p>
             )}
+            {errorMessage ? (
+              <div className="mt-2 flex items-start gap-2 rounded-sm border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-[11px] text-[#b91c1c]">
+                <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                <span>{errorMessage}</span>
+              </div>
+            ) : null}
           </div>
 
           {/* 财务对账操作区 */}
@@ -323,6 +417,7 @@ export function P5Finance({
                     value={auditForm.paymentDate}
                     onChange={(e) => setAuditForm({ ...auditForm, paymentDate: e.target.value })}
                     className="mt-0.5 h-7 w-full rounded-sm border border-[#e5e7eb] px-2 text-[12px] outline-none focus:border-[#2563eb]"
+                    disabled={isReadonly || isConfirming}
                   />
                 </div>
 
@@ -345,6 +440,7 @@ export function P5Finance({
                       }}
                       placeholder="0"
                       className="flex-1 px-2 py-1.5 text-[12px] font-mono outline-none"
+                      disabled={isReadonly || isConfirming}
                     />
                   </div>
                 </div>
@@ -357,6 +453,7 @@ export function P5Finance({
                     onChange={(e) => setAuditForm({ ...auditForm, notes: e.target.value })}
                     placeholder="输入审核备注..."
                     className="mt-0.5 h-16 w-full rounded-sm border border-[#e5e7eb] px-2 py-1.5 text-[12px] outline-none placeholder:text-[#9ca3af] focus:border-[#2563eb]"
+                    disabled={isReadonly || isConfirming}
                   />
                 </div>
 
@@ -364,15 +461,16 @@ export function P5Finance({
                 <div className="flex gap-2 pt-2">
                   <button
                     onClick={handleConfirmAudit}
-                    disabled={!auditForm.paymentDate || !auditForm.actualAmount}
+                    disabled={!auditForm.paymentDate || !auditForm.actualAmount || isReadonly || isConfirming}
                     className="flex-1 flex h-8 items-center justify-center gap-1.5 rounded-sm bg-[#10b981] text-[12px] font-semibold text-white hover:bg-[#059669] disabled:bg-[#d1d5db] disabled:cursor-not-allowed"
                   >
-                    <Check size={13} />
-                    确认到账并解锁 P6
+                    {isConfirming ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                    {isConfirming ? '确认中...' : '确认到账并解锁 P6'}
                   </button>
                   <button
                     onClick={() => setShowRejectionUI(true)}
-                    className="flex-1 flex h-8 items-center justify-center gap-1.5 rounded-sm border border-[#dc2626] text-[12px] font-semibold text-[#dc2626] hover:bg-[#fee2e2]"
+                    disabled={isReadonly || isRejecting}
+                    className="flex-1 flex h-8 items-center justify-center gap-1.5 rounded-sm border border-[#dc2626] text-[12px] font-semibold text-[#dc2626] hover:bg-[#fee2e2] disabled:border-[#d1d5db] disabled:text-[#9ca3af] disabled:hover:bg-transparent"
                   >
                     <X size={13} />
                     驳回凭证
@@ -389,18 +487,20 @@ export function P5Finance({
                     onChange={(e) => setRejectionForm(e.target.value)}
                     placeholder="请输入驳回原因..."
                     className="mb-1.5 h-14 w-full rounded-sm border border-[#fca5a5] bg-white px-2 py-1.5 text-[12px] outline-none focus:border-[#dc2626]"
+                    disabled={isReadonly || isRejecting}
                   />
                   <div className="flex gap-2">
                     <button
                       onClick={handleRejectSubmit}
-                      disabled={!rejectionForm.trim()}
+                      disabled={!rejectionForm.trim() || isReadonly || isRejecting}
                       className="flex-1 h-7 rounded-sm bg-[#dc2626] text-[11px] font-medium text-white hover:bg-[#b91c1c] disabled:bg-[#d1d5db] disabled:cursor-not-allowed"
                     >
-                      提交驳回
+                      {isRejecting ? '提交中...' : '提交驳回'}
                     </button>
                     <button
                       onClick={() => setShowRejectionUI(false)}
                       className="flex-1 h-7 rounded-sm border border-[#e5e7eb] text-[11px] text-[#6b7280] hover:bg-[#f3f4f6]"
+                      disabled={isRejecting}
                     >
                       取消
                     </button>

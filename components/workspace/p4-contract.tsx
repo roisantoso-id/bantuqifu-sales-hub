@@ -281,9 +281,9 @@ export function P4Contract({
                   <p className="truncate text-[12px] font-medium text-[#111827]">{fileDisplayName}</p>
                   <p className="text-[11px] text-[#9ca3af]">上传于 {uploadTimestamp}</p>
                 </div>
-                {currentData.contractFileUrl && (
+                {(currentData.contractPreviewUrl || currentData.contractFileUrl) && (
                   <a
-                    href={currentData.contractFileUrl}
+                    href={currentData.contractPreviewUrl ?? currentData.contractFileUrl}
                     target="_blank"
                     rel="noreferrer"
                     className="flex h-6 w-6 items-center justify-center rounded-sm text-[#9ca3af] hover:bg-[#e5e7eb]"

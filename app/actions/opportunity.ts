@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { uploadContractToOss, uploadInteractionAttachmentToOss } from '@/lib/oss'
+import { uploadContractToOss, uploadFinanceReceiptToOss, uploadInteractionAttachmentToOss, getTemporaryPreviewUrl, getTemporaryPreviewUrls } from '@/lib/oss'
 import { cookies } from 'next/headers'
 import { createDeliveryProjectAction } from './delivery'
 import type { InteractionAttachmentRow, InteractionWithAttachmentsRow } from './interaction'
@@ -60,9 +60,16 @@ const DEFAULT_P4_DATA: OpportunityP4Data = {
   qualityClear: false,
 }
 
+const DEFAULT_P5_DATA: OpportunityP5Data = {
+  dueAmount: 0,
+  receivedAmount: 0,
+  paymentStatus: 'pending',
+}
+
 function mapP4DataRow(row: any): OpportunityP4Data {
   return {
     contractFileUrl: row?.contractFileUrl ?? undefined,
+    contractPreviewUrl: row?.contractPreviewUrl ?? undefined,
     contractFileName: row?.contractFileName ?? undefined,
     contractFileSize: typeof row?.contractFileSize === 'number' ? row.contractFileSize : undefined,
     contractStatus: row?.contractStatus === 'returned' || row?.contractStatus === 'archived' ? row.contractStatus : 'pending',
@@ -104,6 +111,7 @@ function mapP5DataRow(row: any): OpportunityP5Data {
     dueAmount: typeof row?.dueAmount === 'number' ? row.dueAmount : 0,
     receivedAmount: typeof row?.receivedAmount === 'number' ? row.receivedAmount : 0,
     receiptFileUrl: row?.receiptFileUrl ?? undefined,
+    receiptPreviewUrl: row?.receiptPreviewUrl ?? undefined,
     receiptFileName: row?.receiptFileName ?? undefined,
     receiptUploadedAt: row?.receiptUploadedAt ?? undefined,
     receiptUploadedBy: row?.receiptUploadedBy ?? undefined,
@@ -111,6 +119,32 @@ function mapP5DataRow(row: any): OpportunityP5Data {
     rejectionReason: row?.rejectionReason ?? undefined,
     confirmedAt: row?.confirmedAt ?? undefined,
     confirmedBy: row?.confirmedById ?? undefined,
+  }
+}
+
+function buildP5UpsertPayload(
+  oppId: string,
+  data: OpportunityP5Data,
+  overrides?: Partial<Record<'bankAccount' | 'bankName' | 'accountHolder' | 'swiftCode' | 'dueAmount' | 'receivedAmount' | 'receiptFileUrl' | 'receiptFileName' | 'receiptUploadedAt' | 'receiptUploadedBy' | 'paymentStatus' | 'rejectionReason' | 'confirmedAt' | 'confirmedById', string | number | null>>
+) {
+  return {
+    id: crypto.randomUUID(),
+    opportunityId: oppId,
+    bankAccount: data.bankAccount ?? null,
+    bankName: data.bankName ?? null,
+    accountHolder: data.accountHolder ?? null,
+    swiftCode: data.swiftCode ?? null,
+    dueAmount: data.dueAmount,
+    receivedAmount: data.receivedAmount,
+    receiptFileUrl: data.receiptFileUrl ?? null,
+    receiptFileName: data.receiptFileName ?? null,
+    receiptUploadedAt: data.receiptUploadedAt ?? null,
+    receiptUploadedBy: data.receiptUploadedBy ?? null,
+    paymentStatus: data.paymentStatus,
+    rejectionReason: data.rejectionReason?.trim() || null,
+    confirmedAt: data.confirmedAt ?? null,
+    confirmedById: data.confirmedBy ?? null,
+    ...overrides,
   }
 }
 
@@ -249,6 +283,79 @@ function getFormFiles(formData: FormData, fieldName: string): File[] {
     .filter((value): value is File => isBrowserFile(value) && value.size > 0)
 }
 
+async function getAuthorizedOpportunity(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  oppId: string,
+  tenantId: string
+): Promise<{ id: string; customerId: string; stageId: string } | null> {
+  const { data: opportunity, error } = await supabase
+    .from('opportunities')
+    .select('id, customerId, stageId')
+    .eq('id', oppId)
+    .eq('organizationId', tenantId)
+    .single()
+
+  if (error || !opportunity) {
+    return null
+  }
+
+  return opportunity
+}
+
+async function getAuthenticatedUserId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  context: string,
+  tenantId: string,
+  oppId: string
+): Promise<string | null> {
+  const { data: { user } } = await supabase.auth.getUser()
+  const userId = user?.id
+
+  if (!userId) {
+    const cookieStore = await cookies()
+    const { data: authSession } = await supabase.auth.getSession()
+
+    console.error(`[${context}] Missing auth user`, {
+      hasSession: Boolean(authSession.session),
+      tenantId,
+      oppId,
+      cookieNames: cookieStore.getAll().map((cookie) => cookie.name),
+    })
+
+    return null
+  }
+
+  return userId
+}
+
+async function insertOpportunityInteraction(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  payload: {
+    tenantId: string
+    customerId: string
+    opportunityId: string
+    operatorId?: string | null
+    type?: string
+    content: string
+  }
+) {
+  const { error } = await supabase.from('interactions').insert({
+    id: crypto.randomUUID(),
+    organizationId: payload.tenantId,
+    customerId: payload.customerId,
+    opportunityId: payload.opportunityId,
+    operatorId: payload.operatorId ?? null,
+    type: payload.type ?? 'FORM',
+    content: payload.content,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  })
+
+  if (error) {
+    console.error('[insertOpportunityInteraction] Interaction log error:', error)
+  }
+}
+
 async function getAttachmentsByInteractionIds(
   supabase: Awaited<ReturnType<typeof createClient>>,
   interactionIds: string[]
@@ -268,9 +375,14 @@ async function getAttachmentsByInteractionIds(
     return new Map()
   }
 
+  const previewUrlMap = await getTemporaryPreviewUrls((attachments ?? []).map((attachment) => attachment.fileUrl))
+
   return (attachments ?? []).reduce((map, attachment) => {
     const existing = map.get(attachment.interactionId) ?? []
-    existing.push(attachment as InteractionAttachmentRow)
+    existing.push({
+      ...(attachment as InteractionAttachmentRow),
+      previewUrl: previewUrlMap.get(attachment.fileUrl) ?? attachment.fileUrl,
+    })
     map.set(attachment.interactionId, existing)
     return map
   }, new Map<string, InteractionAttachmentRow[]>())
@@ -1006,6 +1118,19 @@ export async function getOpportunityWorkspaceAction(oppId: string): Promise<Hydr
     }
   }
 
+  const [contractPreviewUrl, receiptPreviewUrl] = await Promise.all([
+    getTemporaryPreviewUrl(p4Data?.contractFileUrl),
+    getTemporaryPreviewUrl(p5Data?.receiptFileUrl),
+  ])
+
+  if (p4Data) {
+    p4Data.contractPreviewUrl = contractPreviewUrl ?? p4Data.contractFileUrl
+  }
+
+  if (p5Data) {
+    p5Data.receiptPreviewUrl = receiptPreviewUrl ?? p5Data.receiptFileUrl
+  }
+
   return {
     ...opportunity,
     p2Data,
@@ -1022,15 +1147,10 @@ export async function getOpportunityP4DataAction(oppId: string): Promise<Opportu
   const supabase = await createClient()
   const tenantId = await getCurrentTenantId()
 
-  const { data: opportunity, error: opportunityError } = await supabase
-    .from('opportunities')
-    .select('id')
-    .eq('id', oppId)
-    .eq('organizationId', tenantId)
-    .single()
+  const opportunity = await getAuthorizedOpportunity(supabase, oppId, tenantId)
 
-  if (opportunityError || !opportunity) {
-    console.error('[getOpportunityP4DataAction] Opportunity not found:', opportunityError)
+  if (!opportunity) {
+    console.error('[getOpportunityP4DataAction] Opportunity not found')
     return undefined
   }
 
@@ -1052,6 +1172,35 @@ export async function getOpportunityP4DataAction(oppId: string): Promise<Opportu
   return mapP4DataRow(data)
 }
 
+export async function getOpportunityP5DataAction(oppId: string): Promise<OpportunityP5Data | undefined> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  const opportunity = await getAuthorizedOpportunity(supabase, oppId, tenantId)
+
+  if (!opportunity) {
+    console.error('[getOpportunityP5DataAction] Opportunity not found')
+    return undefined
+  }
+
+  const { data, error } = await supabase
+    .from('opportunity_p5_data')
+    .select('bankAccount, bankName, accountHolder, swiftCode, dueAmount, receivedAmount, receiptFileUrl, receiptFileName, receiptUploadedAt, receiptUploadedBy, paymentStatus, rejectionReason, confirmedAt, confirmedById')
+    .eq('opportunityId', oppId)
+    .maybeSingle()
+
+  if (error) {
+    console.error('[getOpportunityP5DataAction] Error:', error)
+    return undefined
+  }
+
+  if (!data) {
+    return undefined
+  }
+
+  return mapP5DataRow(data)
+}
+
 export async function saveOpportunityP4DraftAction(
   oppId: string,
   data: OpportunityP4Data
@@ -1059,15 +1208,10 @@ export async function saveOpportunityP4DraftAction(
   const supabase = await createClient()
   const tenantId = await getCurrentTenantId()
 
-  const { data: opportunity, error: opportunityError } = await supabase
-    .from('opportunities')
-    .select('id')
-    .eq('id', oppId)
-    .eq('organizationId', tenantId)
-    .single()
+  const opportunity = await getAuthorizedOpportunity(supabase, oppId, tenantId)
 
-  if (opportunityError || !opportunity) {
-    console.error('[saveOpportunityP4DraftAction] Opportunity not found:', opportunityError)
+  if (!opportunity) {
+    console.error('[saveOpportunityP4DraftAction] Opportunity not found')
     return { success: false, error: '商机不存在' }
   }
 
@@ -1102,32 +1246,16 @@ export async function submitOpportunityContractAction(
   const supabase = await createClient()
   const tenantId = await getCurrentTenantId()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  const userId = user?.id
+  const userId = await getAuthenticatedUserId(supabase, 'submitOpportunityContractAction', tenantId, oppId)
 
   if (!userId) {
-    const cookieStore = await cookies()
-    const { data: authSession } = await supabase.auth.getSession()
-
-    console.error('[submitOpportunityContractAction] Missing auth user', {
-      hasSession: Boolean(authSession.session),
-      tenantId,
-      oppId,
-      cookieNames: cookieStore.getAll().map((cookie) => cookie.name),
-    })
-
     return { success: false, error: '用户未登录' }
   }
 
-  const { data: opportunity, error: opportunityError } = await supabase
-    .from('opportunities')
-    .select('id, customerId, stageId')
-    .eq('id', oppId)
-    .eq('organizationId', tenantId)
-    .single()
+  const opportunity = await getAuthorizedOpportunity(supabase, oppId, tenantId)
 
-  if (opportunityError || !opportunity) {
-    console.error('[submitOpportunityContractAction] Opportunity not found:', opportunityError)
+  if (!opportunity) {
+    console.error('[submitOpportunityContractAction] Opportunity not found')
     return { success: false, error: '商机不存在' }
   }
 
@@ -1208,26 +1336,289 @@ export async function submitOpportunityContractAction(
     return { success: false, error: '合同已上传，但推进到 P5 失败' }
   }
 
-  const { error: interactionError } = await supabase.from('interactions').insert({
-    id: crypto.randomUUID(),
-    organizationId: tenantId,
+  await insertOpportunityInteraction(supabase, {
+    tenantId,
     customerId: opportunity.customerId,
     opportunityId: oppId,
     operatorId: userId,
     type: 'STAGE_CHANGE',
     content: '合同已上传并通过质检，商机阶段变更为：P5',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
   })
-
-  if (interactionError) {
-    console.error('[submitOpportunityContractAction] Interaction log error:', interactionError)
-  }
 
   const hydrated = await getOpportunityWorkspaceAction(oppId)
 
   if (!hydrated) {
     return { success: false, error: '刷新合同数据失败' }
+  }
+
+  return { success: true, data: hydrated }
+}
+
+export async function saveOpportunityP5ReceiptAction(
+  oppId: string,
+  formData: FormData
+): Promise<{ success: boolean; data?: HydratedOpportunityRow; error?: string }> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  const userId = await getAuthenticatedUserId(supabase, 'saveOpportunityP5ReceiptAction', tenantId, oppId)
+
+  if (!userId) {
+    return { success: false, error: '用户未登录' }
+  }
+
+  const opportunity = await getAuthorizedOpportunity(supabase, oppId, tenantId)
+
+  if (!opportunity) {
+    console.error('[saveOpportunityP5ReceiptAction] Opportunity not found')
+    return { success: false, error: '商机不存在' }
+  }
+
+  if (!['P5', 'P6', 'P7', 'P8'].includes(opportunity.stageId)) {
+    return { success: false, error: '当前商机尚未进入财务阶段' }
+  }
+
+  const fileEntry = formData.get('file')
+  if (!(fileEntry instanceof File)) {
+    return { success: false, error: '请先选择打款凭证文件' }
+  }
+
+  const existingP5 = await getOpportunityP5DataAction(oppId)
+  const dueAmountValue = Number(formData.get('dueAmount'))
+  const dueAmount = Number.isFinite(dueAmountValue)
+    ? dueAmountValue
+    : existingP5?.dueAmount ?? 0
+
+  let uploadedFile
+  try {
+    uploadedFile = await uploadFinanceReceiptToOss({
+      file: fileEntry,
+      tenantId,
+      opportunityId: oppId,
+    })
+  } catch (error) {
+    console.error('[saveOpportunityP5ReceiptAction] OSS upload error:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '打款凭证上传失败，请稍后重试',
+    }
+  }
+
+  const receiptUploadedAt = new Date().toISOString()
+  const nextP5Data: OpportunityP5Data = {
+    ...DEFAULT_P5_DATA,
+    ...existingP5,
+    dueAmount,
+    receiptFileUrl: uploadedFile.url,
+    receiptFileName: uploadedFile.fileName,
+    receiptUploadedAt,
+    receiptUploadedBy: userId,
+    paymentStatus: 'pending',
+    rejectionReason: undefined,
+    confirmedAt: undefined,
+    confirmedBy: undefined,
+  }
+
+  const { error: upsertError } = await supabase
+    .from('opportunity_p5_data')
+    .upsert(
+      buildP5UpsertPayload(oppId, nextP5Data, {
+        dueAmount,
+        receiptFileUrl: uploadedFile.url,
+        receiptFileName: uploadedFile.fileName,
+        receiptUploadedAt,
+        receiptUploadedBy: userId,
+        paymentStatus: 'pending',
+        rejectionReason: null,
+        confirmedAt: null,
+        confirmedById: null,
+      }),
+      { onConflict: 'opportunityId' }
+    )
+
+  if (upsertError) {
+    console.error('[saveOpportunityP5ReceiptAction] Upsert error:', upsertError)
+    return { success: false, error: '保存打款凭证失败' }
+  }
+
+  await insertOpportunityInteraction(supabase, {
+    tenantId,
+    customerId: opportunity.customerId,
+    opportunityId: oppId,
+    operatorId: userId,
+    type: 'FORM',
+    content: `已上传打款凭证：${uploadedFile.fileName}`,
+  })
+
+  const hydrated = await getOpportunityWorkspaceAction(oppId)
+
+  if (!hydrated) {
+    return { success: false, error: '刷新财务数据失败' }
+  }
+
+  return { success: true, data: hydrated }
+}
+
+export async function rejectOpportunityP5ReceiptAction(
+  oppId: string,
+  rejectionReason: string
+): Promise<{ success: boolean; data?: HydratedOpportunityRow; error?: string }> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  const userId = await getAuthenticatedUserId(supabase, 'rejectOpportunityP5ReceiptAction', tenantId, oppId)
+
+  if (!userId) {
+    return { success: false, error: '用户未登录' }
+  }
+
+  const opportunity = await getAuthorizedOpportunity(supabase, oppId, tenantId)
+
+  if (!opportunity) {
+    console.error('[rejectOpportunityP5ReceiptAction] Opportunity not found')
+    return { success: false, error: '商机不存在' }
+  }
+
+  const existingP5 = await getOpportunityP5DataAction(oppId)
+  if (!existingP5?.receiptFileUrl) {
+    return { success: false, error: '请先上传打款凭证' }
+  }
+
+  const trimmedReason = rejectionReason.trim()
+  if (!trimmedReason) {
+    return { success: false, error: '请填写驳回原因' }
+  }
+
+  const nextP5Data: OpportunityP5Data = {
+    ...DEFAULT_P5_DATA,
+    ...existingP5,
+    paymentStatus: 'rejected',
+    rejectionReason: trimmedReason,
+  }
+
+  const { error: upsertError } = await supabase
+    .from('opportunity_p5_data')
+    .upsert(
+      buildP5UpsertPayload(oppId, nextP5Data, {
+        paymentStatus: 'rejected',
+        rejectionReason: trimmedReason,
+      }),
+      { onConflict: 'opportunityId' }
+    )
+
+  if (upsertError) {
+    console.error('[rejectOpportunityP5ReceiptAction] Upsert error:', upsertError)
+    return { success: false, error: '驳回打款凭证失败' }
+  }
+
+  await insertOpportunityInteraction(supabase, {
+    tenantId,
+    customerId: opportunity.customerId,
+    opportunityId: oppId,
+    operatorId: userId,
+    type: 'FORM',
+    content: `财务驳回了打款凭证：${trimmedReason}`,
+  })
+
+  const hydrated = await getOpportunityWorkspaceAction(oppId)
+
+  if (!hydrated) {
+    return { success: false, error: '刷新财务数据失败' }
+  }
+
+  return { success: true, data: hydrated }
+}
+
+export async function confirmOpportunityP5PaymentAction(
+  oppId: string,
+  payload: { receivedAmount: number }
+): Promise<{ success: boolean; data?: HydratedOpportunityRow; error?: string }> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  const userId = await getAuthenticatedUserId(supabase, 'confirmOpportunityP5PaymentAction', tenantId, oppId)
+
+  if (!userId) {
+    return { success: false, error: '用户未登录' }
+  }
+
+  const opportunity = await getAuthorizedOpportunity(supabase, oppId, tenantId)
+
+  if (!opportunity) {
+    console.error('[confirmOpportunityP5PaymentAction] Opportunity not found')
+    return { success: false, error: '商机不存在' }
+  }
+
+  if (opportunity.stageId !== 'P5') {
+    return { success: false, error: '当前商机不在 P5 阶段' }
+  }
+
+  const existingP5 = await getOpportunityP5DataAction(oppId)
+  if (!existingP5?.receiptFileUrl) {
+    return { success: false, error: '请先上传打款凭证' }
+  }
+
+  const receivedAmount = Number(payload.receivedAmount)
+  if (!Number.isFinite(receivedAmount) || receivedAmount < 0) {
+    return { success: false, error: '到账金额无效' }
+  }
+
+  const confirmedAt = new Date().toISOString()
+  const nextP5Data: OpportunityP5Data = {
+    ...DEFAULT_P5_DATA,
+    ...existingP5,
+    receivedAmount,
+    paymentStatus: 'verified',
+    confirmedAt,
+    confirmedBy: userId,
+    rejectionReason: undefined,
+  }
+
+  const { error: upsertError } = await supabase
+    .from('opportunity_p5_data')
+    .upsert(
+      buildP5UpsertPayload(oppId, nextP5Data, {
+        receivedAmount,
+        paymentStatus: 'verified',
+        confirmedAt,
+        confirmedById: userId,
+        rejectionReason: null,
+      }),
+      { onConflict: 'opportunityId' }
+    )
+
+  if (upsertError) {
+    console.error('[confirmOpportunityP5PaymentAction] Upsert error:', upsertError)
+    return { success: false, error: '确认到账失败' }
+  }
+
+  const { error: stageError } = await supabase
+    .from('opportunities')
+    .update({
+      stageId: 'P6',
+      updatedAt: new Date().toISOString(),
+    })
+    .eq('id', oppId)
+    .eq('organizationId', tenantId)
+
+  if (stageError) {
+    console.error('[confirmOpportunityP5PaymentAction] Stage update error:', stageError)
+    return { success: false, error: '到账已确认，但推进到 P6 失败' }
+  }
+
+  await insertOpportunityInteraction(supabase, {
+    tenantId,
+    customerId: opportunity.customerId,
+    opportunityId: oppId,
+    operatorId: userId,
+    type: 'STAGE_CHANGE',
+    content: `财务已确认到账，金额为 ${receivedAmount}，商机阶段变更为：P6`,
+  })
+
+  const hydrated = await getOpportunityWorkspaceAction(oppId)
+
+  if (!hydrated) {
+    return { success: false, error: '刷新财务数据失败' }
   }
 
   return { success: true, data: hydrated }
