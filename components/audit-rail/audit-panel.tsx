@@ -3,6 +3,7 @@
 import { X, ClipboardList, Send, Paperclip, Clock, MessageSquare, Phone, Users, Mail, TrendingUp, Info, FileText } from 'lucide-react'
 import { useState, useMemo, useEffect, useCallback, useRef, type ChangeEvent } from 'react'
 import { toast } from 'sonner'
+import { ImagePreviewDialog, isImagePreviewable } from '@/components/ui/image-preview-dialog'
 import { getOpportunityTimelineAction } from '@/app/actions/opportunity'
 import type { InteractionAttachmentRow, InteractionWithAttachmentsRow } from '@/app/actions/interaction'
 
@@ -86,6 +87,7 @@ export function AuditRail({ opportunity, visible, reloadToken = 0, onToggle, onA
   const [interactions, setInteractions] = useState<InteractionWithAttachmentsRow[]>([])
   const [hasLeadHistory, setHasLeadHistory] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [previewAttachment, setPreviewAttachment] = useState<InteractionAttachmentRow | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const loadTimeline = useCallback(async () => {
@@ -229,18 +231,36 @@ export function AuditRail({ opportunity, visible, reloadToken = 0, onToggle, onA
 
                   {interaction.attachments && interaction.attachments.length > 0 ? (
                     <div className="mt-1 flex flex-col gap-1">
-                      {interaction.attachments.map((attachment) => (
-                        <a
-                          key={attachment.id}
-                          href={attachment.previewUrl ?? attachment.fileUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex min-w-0 items-center gap-1 rounded-sm border border-[#e5e7eb] px-1.5 py-1 text-[10px] text-[#2563eb] hover:bg-[#f8fafc]"
-                        >
-                          <FileText className="h-3 w-3 shrink-0" />
-                          <span className="truncate">{renderAttachmentLabel(attachment)}</span>
-                        </a>
-                      ))}
+                      {interaction.attachments.map((attachment) => {
+                        const attachmentUrl = attachment.previewUrl ?? attachment.fileUrl
+                        const isImageAttachment = isImagePreviewable({
+                          url: attachmentUrl,
+                          fileName: attachment.fileName,
+                        })
+
+                        return isImageAttachment ? (
+                          <button
+                            key={attachment.id}
+                            type="button"
+                            onClick={() => setPreviewAttachment(attachment)}
+                            className="inline-flex min-w-0 items-center gap-1 rounded-sm border border-[#e5e7eb] px-1.5 py-1 text-[10px] text-[#2563eb] hover:bg-[#f8fafc]"
+                          >
+                            <FileText className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{renderAttachmentLabel(attachment)}</span>
+                          </button>
+                        ) : (
+                          <a
+                            key={attachment.id}
+                            href={attachmentUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex min-w-0 items-center gap-1 rounded-sm border border-[#e5e7eb] px-1.5 py-1 text-[10px] text-[#2563eb] hover:bg-[#f8fafc]"
+                          >
+                            <FileText className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{renderAttachmentLabel(attachment)}</span>
+                          </a>
+                        )
+                      })}
                     </div>
                   ) : null}
 
@@ -269,7 +289,8 @@ export function AuditRail({ opportunity, visible, reloadToken = 0, onToggle, onA
   if (!visible) return null
 
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-l border-[#e5e7eb] bg-white">
+    <>
+      <aside className="flex h-full w-64 shrink-0 flex-col border-l border-[#e5e7eb] bg-white">
       <div className="flex items-center justify-between border-b border-[#e5e7eb] px-3 py-2">
         <div className="flex items-center gap-1.5">
           <ClipboardList size={13} className="text-[#6b7280]" />
@@ -344,6 +365,17 @@ export function AuditRail({ opportunity, visible, reloadToken = 0, onToggle, onA
           </button>
         </div>
       </div>
-    </aside>
+      </aside>
+      <ImagePreviewDialog
+        open={Boolean(previewAttachment)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPreviewAttachment(null)
+          }
+        }}
+        src={previewAttachment ? previewAttachment.previewUrl ?? previewAttachment.fileUrl : undefined}
+        title={previewAttachment?.fileName || '图片预览'}
+      />
+    </>
   )
 }

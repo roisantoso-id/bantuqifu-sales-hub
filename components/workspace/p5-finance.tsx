@@ -2,6 +2,7 @@
 
 import { Copy, Check, X, Upload, Eye, AlertCircle, Lock, Loader2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { ImagePreviewDialog, isImagePreviewable } from '@/components/ui/image-preview-dialog'
 import type { OpportunityP5Data, Opportunity } from '@/lib/types'
 
 interface P5FinanceProps {
@@ -94,6 +95,11 @@ export function P5Finance({
 
     return currentData.receiptPreviewUrl ?? currentData.receiptFileUrl
   }, [currentData.receiptPreviewUrl, currentData.receiptFileUrl])
+
+  const isImageReceipt = useMemo(
+    () => isImagePreviewable({ url: previewUrl, fileName: currentData.receiptFileName }),
+    [currentData.receiptFileName, previewUrl]
+  )
 
   const bankInfo = {
     accountHolder: currentData.accountHolder || 'PT Bantu Global',
@@ -336,15 +342,26 @@ export function P5Finance({
                   <p className="text-[11px] text-[#9ca3af]">{currentData.receiptFileName}</p>
                   <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
                     {previewUrl ? (
-                      <a
-                        href={previewUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex h-6 items-center gap-1 rounded-sm bg-white px-2 text-[11px] text-[#2563eb] hover:bg-[#dbeafe]"
-                      >
-                        <Eye size={12} />
-                        预览文件
-                      </a>
+                      isImageReceipt ? (
+                        <button
+                          type="button"
+                          onClick={() => setPreviewOpen(true)}
+                          className="flex h-6 items-center gap-1 rounded-sm bg-white px-2 text-[11px] text-[#2563eb] hover:bg-[#dbeafe]"
+                        >
+                          <Eye size={12} />
+                          预览图片
+                        </button>
+                      ) : (
+                        <a
+                          href={previewUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex h-6 items-center gap-1 rounded-sm bg-white px-2 text-[11px] text-[#2563eb] hover:bg-[#dbeafe]"
+                        >
+                          <Eye size={12} />
+                          预览文件
+                        </a>
+                      )
                     ) : null}
                     {!isReadonly ? (
                       <button
@@ -563,6 +580,14 @@ export function P5Finance({
           </div>
         </div>
       )}
+      {previewUrl && isImageReceipt ? (
+        <ImagePreviewDialog
+          open={previewOpen}
+          onOpenChange={setPreviewOpen}
+          src={previewUrl}
+          title={currentData.receiptFileName || '打款凭证预览'}
+        />
+      ) : null}
     </div>
   )
 }
