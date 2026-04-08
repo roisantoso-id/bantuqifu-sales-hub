@@ -23,6 +23,7 @@ interface WorkspaceProps {
   onAdvanceStage: (stage?: StageId) => Promise<boolean>
   onP4DraftSave: (data: OpportunityP4Data) => Promise<{ success: boolean; error?: string }>
   onP4Submit: (formData: FormData) => Promise<{ success: boolean; error?: string }>
+  onP5SaveContractEntity: (contractEntityId: string) => Promise<{ success: boolean; error?: string }>
   onP5UploadReceipt: (formData: FormData) => Promise<{ success: boolean; error?: string }>
   onP5RejectReceipt: (reason: string) => Promise<{ success: boolean; error?: string }>
   onP5ConfirmPayment: (payload: { receivedAmount: number }) => Promise<{ success: boolean; error?: string }>
@@ -52,6 +53,7 @@ export function WorkspacePane({
   onAdvanceStage,
   onP4DraftSave,
   onP4Submit,
+  onP5SaveContractEntity,
   onP5UploadReceipt,
   onP5RejectReceipt,
   onP5ConfirmPayment,
@@ -151,6 +153,7 @@ export function WorkspacePane({
             opportunity={opportunity}
             p5Data={opportunity.p5Data}
             onDataChange={(data) => onOpportunityUpdate({ p5Data: data })}
+            onSaveContractEntity={onP5SaveContractEntity}
             onUploadReceipt={onP5UploadReceipt}
             onRejectReceipt={onP5RejectReceipt}
             onConfirmPayment={onP5ConfirmPayment}
@@ -186,7 +189,7 @@ export function WorkspacePane({
 
       {/* Footer action bar - Stage advance buttons */}
       {/* P1 阶段的按钮在 P1RequirementForm 内部，此处不重复显示 */}
-      {!isHistorical && viewingStage !== 'P1' && (
+      {!isHistorical && viewingStage !== 'P1' && viewingStage !== 'P5' && (
         <div className="flex items-center justify-between border-t border-[#e5e7eb] bg-[#f9fafb] px-5 py-2">
           {['P2', 'P3'].includes(viewingStage) && (
             <>

@@ -13,7 +13,7 @@ import { MyDashboard } from '@/components/dashboard/my-dashboard'
 import { AuditRail } from '@/components/audit-rail/audit-panel'
 import { OpportunityListView } from '@/components/opportunities/opportunity-list-view'
 import { mockActionLogs, mockUser, mockLeads } from '@/lib/mock-data'
-import { toggleOpportunityPinAction, getOpportunitiesAction, saveOpportunityItemsAction, getOpportunityWorkspaceAction, updateOpportunityAction, updateOpportunityStageAction, saveOpportunityP4DraftAction, submitOpportunityContractAction, saveOpportunityP5ReceiptAction, rejectOpportunityP5ReceiptAction, confirmOpportunityP5PaymentAction, createOpportunityNoteWithAttachmentsAction } from '@/app/actions/opportunity'
+import { toggleOpportunityPinAction, getOpportunitiesAction, saveOpportunityItemsAction, getOpportunityWorkspaceAction, updateOpportunityAction, updateOpportunityStageAction, saveOpportunityP4DraftAction, submitOpportunityContractAction, saveOpportunityP5ContractEntityAction, saveOpportunityP5ReceiptAction, rejectOpportunityP5ReceiptAction, confirmOpportunityP5PaymentAction, createOpportunityNoteWithAttachmentsAction } from '@/app/actions/opportunity'
 import { getProductsByCategoryAction } from '@/app/actions/product'
 import type { Opportunity, NavSection, StageId, ActionLog, Lead, LeadRow, OpportunityRow, OpportunityStatus, Currency, Product, OpportunityP2Data, OpportunityP3Data, OpportunityP4Data } from '@/lib/types'
 
@@ -72,10 +72,10 @@ function mapOpportunityRowToOpportunity(
     customer: {
       id: opp.customer?.id || opp.customerId,
       name: opp.customer?.customerName || '未知客户',
-      passportNo: opp.customer?.passportNo || '',
-      phone: opp.customer?.phone || '',
-      email: opp.customer?.email || '',
-      wechat: opp.customer?.wechat || '',
+      passportNo: '',
+      phone: '',
+      email: '',
+      wechat: '',
       level: 'L5',
     },
     stageId: opp.stageId as StageId,
@@ -543,6 +543,40 @@ export function DashboardClient({
     [appendLog, reloadOpportunity, selectedOpportunity]
   )
 
+  const handleP5SaveContractEntity = useCallback(
+    async (contractEntityId: string) => {
+      if (!selectedOpportunity) {
+        return { success: false, error: '未选择商机' }
+      }
+
+      const result = await saveOpportunityP5ContractEntityAction(selectedOpportunity.id, contractEntityId)
+      if (!result.success) {
+        console.error('[handleP5SaveContractEntity] Failed:', result.error)
+        return { success: false, error: result.error }
+      }
+
+      if (result.data) {
+        const mapped = mapOpportunityRowToOpportunity(result.data, {
+          p2Data: result.data.p2Data,
+          p3Data: result.data.p3Data,
+          p4Data: result.data.p4Data,
+          p5Data: result.data.p5Data,
+          p6Data: result.data.p6Data,
+          p7Data: result.data.p7Data,
+          p8Data: result.data.p8Data,
+        })
+        setOpportunities((prev) => mergeOpportunityIntoList(prev, mapped))
+        setActiveOpportunity(mapped)
+      } else {
+        await reloadOpportunity(selectedOpportunity.id)
+      }
+
+      setAuditRailReloadToken((prev) => prev + 1)
+      return { success: true }
+    },
+    [reloadOpportunity, selectedOpportunity]
+  )
+
   const handleP5UploadReceipt = useCallback(
     async (formData: FormData) => {
       if (!selectedOpportunity) {
@@ -762,6 +796,7 @@ export function DashboardClient({
               onAdvanceStage={handleAdvanceStage}
               onP4DraftSave={handleP4DraftSave}
               onP4Submit={handleP4Submit}
+              onP5SaveContractEntity={handleP5SaveContractEntity}
               onP5UploadReceipt={handleP5UploadReceipt}
               onP5RejectReceipt={handleP5RejectReceipt}
               onP5ConfirmPayment={handleP5ConfirmPayment}

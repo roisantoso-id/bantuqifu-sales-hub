@@ -73,29 +73,31 @@ export interface Lead {
   wechatName: string // 微信名/称呼（必填）
   phone?: string // 联系电话
   source: LeadSource // 来源：山海图微信群、老客户推荐、Facebook、官网
-  
+
   // 业务画像
   category?: LeadCategory // 意向分类
   budget?: { min: number; max: number; currency: 'CNY' | 'IDR' } // 初步预算范围
   urgency?: LeadUrgency // 紧迫度：高、中、低
   initialIntent: string // 初步意向备注
-  
+
   // 跟进逻辑
   assignee?: string // 负责人
   nextFollowDate?: string // 下次跟进计划（关键字段，触发回收逻辑）
   lastActionAt?: string // 最后一次行动时间
   status: LeadStatus // 状态
-  
+
   // 丢弃逻辑
   discardedAt?: string // 丢弃时间
   discardReason?: DiscardReason // 丢弃原因
   discardedBy?: string // 谁丢弃的
-  
+
   createdAt: string
   updatedAt: string
   notes?: string // 备注
   convertedOpportunityId?: string // 转化后的商机ID
 }
+
+export interface LeadRow extends Lead {}
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 export type NavSection = 'leads' | 'opportunities' | 'customers' | 'analytics' | 'oppolist' | 'delivery'
@@ -153,6 +155,31 @@ export interface OpportunityP3Data {
   approvedBy?: string
 }
 
+export interface ContractEntity {
+  id: string
+  organizationId: string
+  entityCode: string
+  entityName: string
+  shortName: string
+  legalRepresentative?: string
+  taxRate: number
+  taxId?: string
+  bankName?: string
+  bankAccountNo?: string
+  bankAccountName?: string
+  swiftCode?: string
+  currency: Currency
+  address?: string
+  contactPhone?: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AvailableContractEntityOption extends ContractEntity {
+  isRecommended: boolean
+}
+
 // ─── Stage P4-P7 Data ────────────────────────────────────────────────────────
 export interface OpportunityP4Data {
   contractFileUrl?: string // 合同PDF文件URL
@@ -168,6 +195,7 @@ export interface OpportunityP4Data {
 }
 
 export interface OpportunityP5Data {
+  contractEntityId?: string
   bankAccount?: string
   bankName?: string
   accountHolder?: string
@@ -183,6 +211,9 @@ export interface OpportunityP5Data {
   rejectionReason?: string
   confirmedAt?: string
   confirmedBy?: string
+  availableContractEntities?: AvailableContractEntityOption[]
+  recommendedContractEntityId?: string
+  selectedContractEntity?: ContractEntity
 }
 
 export interface MaterialItem {

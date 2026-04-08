@@ -5,7 +5,7 @@ import { uploadContractToOss, uploadFinanceReceiptToOss, uploadInteractionAttach
 import { cookies } from 'next/headers'
 import { createDeliveryProjectAction } from './delivery'
 import type { InteractionAttachmentRow, InteractionWithAttachmentsRow } from './interaction'
-import type { OpportunityP2Data, OpportunityP3Data, OpportunityP4Data, OpportunityP5Data, OpportunityP6Data, OpportunityP7Data, OpportunityP8Data, StageId } from '@/lib/types'
+import type { OpportunityP2Data, OpportunityP3Data, OpportunityP4Data, OpportunityP5Data, OpportunityP6Data, OpportunityP7Data, OpportunityP8Data, StageId, ContractEntity, AvailableContractEntityOption, Currency } from '@/lib/types'
 
 export interface OpportunityRow {
   id: string
@@ -104,6 +104,7 @@ function buildP4UpsertPayload(
 
 function mapP5DataRow(row: any): OpportunityP5Data {
   return {
+    contractEntityId: row?.contractEntityId ?? undefined,
     bankAccount: row?.bankAccount ?? undefined,
     bankName: row?.bankName ?? undefined,
     accountHolder: row?.accountHolder ?? undefined,
@@ -125,11 +126,12 @@ function mapP5DataRow(row: any): OpportunityP5Data {
 function buildP5UpsertPayload(
   oppId: string,
   data: OpportunityP5Data,
-  overrides?: Partial<Record<'bankAccount' | 'bankName' | 'accountHolder' | 'swiftCode' | 'dueAmount' | 'receivedAmount' | 'receiptFileUrl' | 'receiptFileName' | 'receiptUploadedAt' | 'receiptUploadedBy' | 'paymentStatus' | 'rejectionReason' | 'confirmedAt' | 'confirmedById', string | number | null>>
+  overrides?: Partial<Record<'contractEntityId' | 'bankAccount' | 'bankName' | 'accountHolder' | 'swiftCode' | 'dueAmount' | 'receivedAmount' | 'receiptFileUrl' | 'receiptFileName' | 'receiptUploadedAt' | 'receiptUploadedBy' | 'paymentStatus' | 'rejectionReason' | 'confirmedAt' | 'confirmedById', string | number | null>>
 ) {
   return {
     id: crypto.randomUUID(),
     opportunityId: oppId,
+    contractEntityId: data.contractEntityId ?? null,
     bankAccount: data.bankAccount ?? null,
     bankName: data.bankName ?? null,
     accountHolder: data.accountHolder ?? null,
@@ -145,6 +147,114 @@ function buildP5UpsertPayload(
     confirmedAt: data.confirmedAt ?? null,
     confirmedById: data.confirmedBy ?? null,
     ...overrides,
+  }
+}
+
+function mapContractEntityRow(row: any): ContractEntity {
+  return {
+    id: row.id,
+    organizationId: row.organization_id,
+    entityCode: row.entity_code,
+    entityName: row.entity_name,
+    shortName: row.short_name,
+    legalRepresentative: row.legal_representative ?? undefined,
+    taxRate: typeof row.tax_rate === 'number' ? row.tax_rate : Number(row.tax_rate ?? 0),
+    taxId: row.tax_id ?? undefined,
+    bankName: row.bank_name ?? undefined,
+    bankAccountNo: row.bank_account_no ?? undefined,
+    bankAccountName: row.bank_account_name ?? undefined,
+    swiftCode: row.swift_code ?? undefined,
+    currency: (row.currency ?? 'CNY') as Currency,
+    address: row.address ?? undefined,
+    contactPhone: row.contact_phone ?? undefined,
+    isActive: Boolean(row.is_active),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+function entityMatchesOpportunityContext(entity: ContractEntity, opportunity: { currency: string }) {
+  return entity.currency === opportunity.currency
+}
+
+function rankContractEntity(entity: ContractEntity) {
+  const hasSwift = entity.swiftCode ? 1 : 0
+  const hasBank = entity.bankName && entity.bankAccountNo && entity.bankAccountName ? 1 : 0
+  const hasTax = entity.taxId ? 1 : 0
+
+  return [hasBank, hasSwift, hasTax, entity.updatedAt, entity.shortName]
+}
+
+function hasUsableContractEntityBankInfo(entity: ContractEntity) {
+  return Boolean(entity.bankName?.trim() && entity.bankAccountNo?.trim())
+}
+
+async function getMatchingContractEntities(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  tenantId: string,
+  opportunity: { currency: string }
+): Promise<{ available: AvailableContractEntityOption[]; recommended?: ContractEntity }> {
+  const { data, error } = await supabase
+    .from('contract_entities')
+    .select('*')
+    .eq('organization_id', tenantId)
+    .eq('is_active', true)
+    .order('updated_at', { ascending: false })
+    .order('short_name', { ascending: true })
+
+  if (error) {
+    console.error('[getMatchingContractEntities] Query error:', error)
+    return { available: [] }
+  }
+
+  const matched = (data ?? [])
+    .map(mapContractEntityRow)
+    .filter(hasUsableContractEntityBankInfo)
+    .sort((left, right) => {
+      const leftRank = rankContractEntity(left)
+      const rightRank = rankContractEntity(right)
+      for (let index = 0; index < leftRank.length; index += 1) {
+        if (leftRank[index] < rightRank[index]) return 1
+        if (leftRank[index] > rightRank[index]) return -1
+      }
+      return 0
+    })
+
+  const currentCurrencyEntities = matched.filter((entity) => entityMatchesOpportunityContext(entity, opportunity))
+  const recommended = currentCurrencyEntities[0] ?? matched[0]
+
+  return {
+    recommended,
+    available: matched.map((entity) => ({
+      ...entity,
+      isRecommended: entity.id === recommended?.id,
+    })),
+  }
+}
+
+async function enrichP5DataWithContractEntities(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  tenantId: string,
+  opportunity: { currency: string },
+  dueAmount: number,
+  p5Data?: OpportunityP5Data
+): Promise<OpportunityP5Data | undefined> {
+  const { available, recommended } = await getMatchingContractEntities(supabase, tenantId, opportunity)
+  const selected = p5Data?.contractEntityId
+    ? available.find((entity) => entity.id === p5Data.contractEntityId)
+    : undefined
+
+  if (!p5Data && available.length === 0) {
+    return undefined
+  }
+
+  return {
+    ...DEFAULT_P5_DATA,
+    ...p5Data,
+    dueAmount,
+    availableContractEntities: available,
+    recommendedContractEntityId: recommended?.id,
+    selectedContractEntity: selected,
   }
 }
 
@@ -267,6 +377,14 @@ function buildP3DataFromItems(items: OpportunityP2Data[]): OpportunityP3Data[] {
   }))
 }
 
+function getP3DueAmount(items?: OpportunityP3Data[]): number {
+  if (!items?.length) {
+    return 0
+  }
+
+  return items.reduce((sum, item) => sum + item.lockedPrice, 0)
+}
+
 // ─── getCurrentTenantId helper ─────────────────────────────────────────────────
 async function getCurrentTenantId(): Promise<string> {
   const cookieStore = await cookies()
@@ -287,10 +405,10 @@ async function getAuthorizedOpportunity(
   supabase: Awaited<ReturnType<typeof createClient>>,
   oppId: string,
   tenantId: string
-): Promise<{ id: string; customerId: string; stageId: string } | null> {
+): Promise<{ id: string; customerId: string; stageId: string; currency: string; serviceType: string } | null> {
   const { data: opportunity, error } = await supabase
     .from('opportunities')
-    .select('id, customerId, stageId')
+    .select('id, customerId, stageId, currency, serviceType')
     .eq('id', oppId)
     .eq('organizationId', tenantId)
     .single()
@@ -345,7 +463,7 @@ async function insertOpportunityInteraction(
     customerId: payload.customerId,
     opportunityId: payload.opportunityId,
     operatorId: payload.operatorId ?? null,
-    type: payload.type ?? 'FORM',
+    type: payload.type ?? 'SYSTEM',
     content: payload.content,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -1045,7 +1163,15 @@ export async function getOpportunityWorkspaceAction(oppId: string): Promise<Hydr
       .maybeSingle(),
   ])
 
-  const p5Data = p5Row.data ? mapP5DataRow(p5Row.data) : undefined
+  const p3Data = opportunity.p3Data ?? buildP3DataFromItems(p2Data)
+  const p5DueAmount = getP3DueAmount(p3Data)
+  const p5Data = await enrichP5DataWithContractEntities(
+    supabase,
+    tenantId,
+    { currency: opportunity.currency },
+    p5DueAmount,
+    p5Row.data ? mapP5DataRow(p5Row.data) : undefined,
+  )
   const p6Data = p6Row.data ? mapP6DataRow(p6Row.data) : undefined
   const p7Data = p7Row.data ? mapP7DataRow(p7Row.data) : undefined
   const p8Data = p8Row.data ? mapP8DataRow(p8Row.data) : undefined
@@ -1185,7 +1311,7 @@ export async function getOpportunityP5DataAction(oppId: string): Promise<Opportu
 
   const { data, error } = await supabase
     .from('opportunity_p5_data')
-    .select('bankAccount, bankName, accountHolder, swiftCode, dueAmount, receivedAmount, receiptFileUrl, receiptFileName, receiptUploadedAt, receiptUploadedBy, paymentStatus, rejectionReason, confirmedAt, confirmedById')
+    .select('contractEntityId, bankAccount, bankName, accountHolder, swiftCode, dueAmount, receivedAmount, receiptFileUrl, receiptFileName, receiptUploadedAt, receiptUploadedBy, paymentStatus, rejectionReason, confirmedAt, confirmedById')
     .eq('opportunityId', oppId)
     .maybeSingle()
 
@@ -1194,11 +1320,13 @@ export async function getOpportunityP5DataAction(oppId: string): Promise<Opportu
     return undefined
   }
 
-  if (!data) {
-    return undefined
-  }
-
-  return mapP5DataRow(data)
+  return enrichP5DataWithContractEntities(
+    supabase,
+    tenantId,
+    { currency: opportunity.currency },
+    getP3DueAmount(opportunity.p3Data),
+    data ? mapP5DataRow(data) : undefined,
+  )
 }
 
 export async function saveOpportunityP4DraftAction(
@@ -1349,6 +1477,85 @@ export async function submitOpportunityContractAction(
 
   if (!hydrated) {
     return { success: false, error: '刷新合同数据失败' }
+  }
+
+  return { success: true, data: hydrated }
+}
+
+export async function saveOpportunityP5ContractEntityAction(
+  oppId: string,
+  contractEntityId: string
+): Promise<{ success: boolean; data?: HydratedOpportunityRow; error?: string }> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+  const userId = await getAuthenticatedUserId(supabase, 'saveOpportunityP5ContractEntityAction', tenantId, oppId)
+
+  if (!userId) {
+    return { success: false, error: '用户未登录' }
+  }
+
+  const opportunity = await getAuthorizedOpportunity(supabase, oppId, tenantId)
+
+  if (!opportunity) {
+    return { success: false, error: '商机不存在' }
+  }
+
+  const { data: entityRow, error: entityError } = await supabase
+    .from('contract_entities')
+    .select('*')
+    .eq('id', contractEntityId)
+    .eq('organization_id', tenantId)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (entityError) {
+    console.error('[saveOpportunityP5ContractEntityAction] Entity query error:', entityError)
+    return { success: false, error: '付款主体查询失败' }
+  }
+
+  if (!entityRow) {
+    return { success: false, error: '付款主体不存在' }
+  }
+
+  const entity = mapContractEntityRow(entityRow)
+
+  if (!entityMatchesOpportunityContext(entity, { currency: opportunity.currency })) {
+    return { success: false, error: '该付款主体不适用于当前商机币种' }
+  }
+
+  const existingP5 = await getOpportunityP5DataAction(oppId)
+  const nextP5Data: OpportunityP5Data = {
+    ...DEFAULT_P5_DATA,
+    ...existingP5,
+    contractEntityId: entity.id,
+  }
+
+  const { error: upsertError } = await supabase
+    .from('opportunity_p5_data')
+    .upsert(
+      buildP5UpsertPayload(oppId, nextP5Data, {
+        contractEntityId: entity.id,
+      }),
+      { onConflict: 'opportunityId' }
+    )
+
+  if (upsertError) {
+    console.error('[saveOpportunityP5ContractEntityAction] Upsert error:', upsertError)
+    return { success: false, error: '保存付款主体失败' }
+  }
+
+  await insertOpportunityInteraction(supabase, {
+    tenantId,
+    customerId: opportunity.customerId,
+    opportunityId: oppId,
+    operatorId: userId,
+    type: 'FORM',
+    content: `P5 付款主体已设置为：${entity.shortName}`,
+  })
+
+  const hydrated = await getOpportunityWorkspaceAction(oppId)
+  if (!hydrated) {
+    return { success: false, error: '刷新财务数据失败' }
   }
 
   return { success: true, data: hydrated }
@@ -1712,7 +1919,11 @@ export async function updateOpportunityAction(
       .single()
 
     if (opp) {
-      const projectName = `${opp.customer?.customerName || '客户'} - ${opp.serviceTypeLabel || opp.opportunityCode}`
+      const customerRelation = opp.customer as { customerName?: string } | Array<{ customerName?: string }> | null | undefined
+      const customerName = Array.isArray(customerRelation)
+        ? customerRelation[0]?.customerName
+        : customerRelation?.customerName
+      const projectName = `${customerName || '客户'} - ${opp.serviceTypeLabel || opp.opportunityCode}`
       await createDeliveryProjectAction({
         opportunityId: opp.id,
         customerId: opp.customerId,
