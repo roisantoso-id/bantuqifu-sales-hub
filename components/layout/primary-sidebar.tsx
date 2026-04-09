@@ -9,7 +9,6 @@ import {
   LogOut,
   Monitor,
   List,
-  Truck,
 } from 'lucide-react'
 import type { NavSection } from '@/lib/types'
 
@@ -20,16 +19,13 @@ interface PrimarySidebarProps {
 }
 
 // 使用独立路由的模块（点击后跳转到对应路由而非 ?nav= 参数）
-const ROUTE_BASED_NAV: Partial<Record<NavSection, string>> = {
-  delivery: '/delivery',
-}
+const ROUTE_BASED_NAV: Partial<Record<NavSection, string>> = {}
 
 const navItems: { id: NavSection; icon: React.ReactNode; label: string; subtitle: string }[] = [
   { id: 'leads', icon: <LayoutDashboard size={18} />, label: '线索', subtitle: '线索' },
   { id: 'opportunities', icon: <Monitor size={18} />, label: '工作台', subtitle: '工作台' },
   { id: 'oppolist', icon: <List size={18} />, label: '商机列表', subtitle: '商机' },
   { id: 'customers', icon: <Users size={18} />, label: '客户', subtitle: '客户' },
-  { id: 'delivery', icon: <Truck size={18} />, label: '交付中心', subtitle: '交付' },
   { id: 'analytics', icon: <BarChart2 size={18} />, label: '数据', subtitle: '看板' },
 ]
 
