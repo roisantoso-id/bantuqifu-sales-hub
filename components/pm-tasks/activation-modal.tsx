@@ -21,20 +21,17 @@ import {
 import { activateOpportunityAction } from '@/app/actions/opportunity-list'
 import { format } from 'date-fns'
 import { Calendar as CalendarIcon, AlertCircle } from 'lucide-react'
+import type { PMTaskOpportunity } from '@/app/actions/opportunity-list'
 
 interface ActivationModalProps {
-  open: boolean
+  isOpen: boolean
   onOpenChange: (open: boolean) => void
-  opportunity: {
-    id: string
-    opportunityCode: string
-    customer?: { customerName: string } | null
-  } | null
+  opportunity: PMTaskOpportunity | null
   onSuccess?: () => void
 }
 
-export default function ActivationModal({
-  open,
+export function ActivationModal({
+  isOpen,
   onOpenChange,
   opportunity,
   onSuccess,
@@ -90,7 +87,7 @@ export default function ActivationModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>激活商机</DialogTitle>

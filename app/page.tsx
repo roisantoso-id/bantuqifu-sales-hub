@@ -1,5 +1,6 @@
 import { getLeadsAction } from '@/app/actions/lead'
 import { getOpportunitiesAction } from '@/app/actions/opportunity'
+import { getPMTaskOpportunitiesAction, getDepartmentMetricsAction } from '@/app/actions/opportunity-list'
 import { createClient } from '@/lib/supabase/server'
 import { DashboardClient } from '@/app/dashboard-client'
 
@@ -32,11 +33,21 @@ export default async function DashboardPage({
     ? await getOpportunitiesAction()
     : null
 
+  const initialPMTasks = activeNav === 'pm_tasks'
+    ? await getPMTaskOpportunitiesAction()
+    : null
+
+  const initialMetrics = activeNav === 'pm_tasks'
+    ? await getDepartmentMetricsAction()
+    : null
+
   return (
     <DashboardClient
       initialNav={activeNav}
       initialLeads={initialLeads}
       initialOpportunities={initialOpportunities}
+      initialPMTasks={initialPMTasks}
+      initialMetrics={initialMetrics}
       initialLeadTab={leadTab}
       initialLeadSearch={leadSearch}
       selectedLeadId={selectedLeadId}

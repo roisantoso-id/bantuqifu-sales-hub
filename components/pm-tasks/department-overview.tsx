@@ -10,7 +10,7 @@ interface DepartmentOverviewProps {
   }
 }
 
-export default function DepartmentOverview({ metrics }: DepartmentOverviewProps) {
+export function DepartmentOverview({ metrics }: DepartmentOverviewProps) {
   const statCards = [
     {
       label: '待P6激活',
@@ -36,7 +36,7 @@ export default function DepartmentOverview({ metrics }: DepartmentOverviewProps)
   ]
 
   return (
-    <div className="mb-8 grid grid-cols-3 gap-4">
+    <div className="grid grid-cols-3 gap-4">
       {statCards.map((card) => (
         <div
           key={card.label}
