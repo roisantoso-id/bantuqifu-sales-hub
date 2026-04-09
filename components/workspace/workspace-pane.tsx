@@ -1,6 +1,6 @@
 'use client'
 
-import type { Opportunity, Product, StageId, OpportunityP2Data, OpportunityP3Data, OpportunityP4Data, OpportunityP5Data, OpportunityP6Data, OpportunityP7Data, OpportunityP8Data } from '@/lib/types'
+import type { Opportunity, Product, StageId, OpportunityP4Data, OpportunityP5Data, OpportunityP6Data, OpportunityP7Data, OpportunityP8Data } from '@/lib/types'
 import { BreadcrumbStepper } from './breadcrumb-stepper'
 import { P1RequirementForm } from './p1-requirement-form'
 import { P2ProductMatcher } from './p2-product-matcher'
@@ -13,13 +13,20 @@ import { P8Settlement } from './p8-settlement'
 import { ChevronRight, Save } from 'lucide-react'
 
 interface WorkspaceProps {
-  opportunity: Opportunity
+  opportunity?: Opportunity | null
   allProducts: Product[]
+  productCategories?: Array<{ id: string; nameZh: string }>
   viewingStage: StageId
   onViewingStageChange: (stage: StageId) => void
   onOpportunityUpdate: (data: Partial<Opportunity>) => void
-  onSave: () => void
-  onAdvanceStage: () => void
+  onSave: (stage?: StageId) => Promise<boolean>
+  onAdvanceStage: (stage?: StageId) => Promise<boolean>
+  onP4DraftSave: (data: OpportunityP4Data) => Promise<{ success: boolean; error?: string }>
+  onP4Submit: (formData: FormData) => Promise<{ success: boolean; error?: string }>
+  onP5SaveContractEntity: (contractEntityId: string) => Promise<{ success: boolean; error?: string }>
+  onP5UploadReceipt: (formData: FormData) => Promise<{ success: boolean; error?: string }>
+  onP5RejectReceipt: (reason: string) => Promise<{ success: boolean; error?: string }>
+  onP5ConfirmPayment: (payload: { receivedAmount: number }) => Promise<{ success: boolean; error?: string }>
   onQuoteSent: () => void
 }
 
@@ -38,11 +45,18 @@ const STAGE_NEXT_LABEL: Record<StageId, string> = {
 export function WorkspacePane({
   opportunity,
   allProducts,
+  productCategories,
   viewingStage,
   onViewingStageChange,
   onOpportunityUpdate,
   onSave,
   onAdvanceStage,
+  onP4DraftSave,
+  onP4Submit,
+  onP5SaveContractEntity,
+  onP5UploadReceipt,
+  onP5RejectReceipt,
+  onP5ConfirmPayment,
   onQuoteSent,
 }: WorkspaceProps) {
   // Guard against undefined opportunity
@@ -98,13 +112,19 @@ export function WorkspacePane({
       )}
 
       {/* Stage content — scrollable */}
-      <div className="flex-1 overflow-hidden">
+      <div key={opportunity.id} className="flex-1 overflow-hidden">
         {viewingStage === 'P1' && (
-          <P1RequirementForm opportunity={opportunity} onUpdate={onOpportunityUpdate} onAdvance={onAdvanceStage} />
+          <P1RequirementForm
+            opportunity={opportunity}
+            onUpdate={onOpportunityUpdate}
+            onSave={() => onSave('P1')}
+            onAdvance={() => onAdvanceStage('P1')}
+          />
         )}
         {viewingStage === 'P2' && (
           <P2ProductMatcher
             allProducts={allProducts}
+            productCategories={productCategories}
             selectedData={opportunity.p2Data || []}
             onDataChange={(data) => onOpportunityUpdate({ p2Data: data })}
           />
@@ -123,6 +143,9 @@ export function WorkspacePane({
             opportunity={opportunity}
             p4Data={opportunity.p4Data}
             onDataChange={(data) => onOpportunityUpdate({ p4Data: data })}
+            onSaveDraft={onP4DraftSave}
+            onSubmitContract={onP4Submit}
+            isReadonly={!isOnCurrentStage}
           />
         )}
         {viewingStage === 'P5' && (
@@ -130,7 +153,11 @@ export function WorkspacePane({
             opportunity={opportunity}
             p5Data={opportunity.p5Data}
             onDataChange={(data) => onOpportunityUpdate({ p5Data: data })}
-            onConfirmPayment={onAdvanceStage}
+            onSaveContractEntity={onP5SaveContractEntity}
+            onUploadReceipt={onP5UploadReceipt}
+            onRejectReceipt={onP5RejectReceipt}
+            onConfirmPayment={onP5ConfirmPayment}
+            isReadonly={!isOnCurrentStage}
           />
         )}
         {viewingStage === 'P6' && (
@@ -162,12 +189,12 @@ export function WorkspacePane({
 
       {/* Footer action bar - Stage advance buttons */}
       {/* P1 阶段的按钮在 P1RequirementForm 内部，此处不重复显示 */}
-      {!isHistorical && viewingStage !== 'P1' && (
+      {!isHistorical && viewingStage !== 'P1' && viewingStage !== 'P5' && (
         <div className="flex items-center justify-between border-t border-[#e5e7eb] bg-[#f9fafb] px-5 py-2">
           {['P2', 'P3'].includes(viewingStage) && (
             <>
               <button
-                onClick={onSave}
+                onClick={() => onSave(viewingStage)}
                 className="flex h-8 items-center gap-1.5 rounded-sm border border-[#e5e7eb] bg-white px-3 text-[13px] text-[#374151] hover:bg-white hover:border-[#d1d5db]"
               >
                 <Save size={13} />
@@ -175,7 +202,7 @@ export function WorkspacePane({
               </button>
               {isOnCurrentStage && (
                 <button
-                  onClick={onAdvanceStage}
+                  onClick={() => onAdvanceStage(viewingStage)}
                   className="flex h-8 items-center gap-1.5 rounded-sm bg-[#2563eb] px-3 text-[13px] font-medium text-white hover:bg-[#1d4ed8]"
                 >
                   {STAGE_NEXT_LABEL[opportunity.stageId]}
@@ -184,9 +211,9 @@ export function WorkspacePane({
               )}
             </>
           )}
-          {['P4', 'P5', 'P6', 'P7'].includes(viewingStage) && isOnCurrentStage && (
+          {['P6', 'P7'].includes(viewingStage) && isOnCurrentStage && (
             <button
-              onClick={onAdvanceStage}
+              onClick={() => onAdvanceStage(viewingStage)}
               className="ml-auto flex h-8 items-center gap-1.5 rounded-sm bg-[#2563eb] px-3 text-[13px] font-medium text-white hover:bg-[#1d4ed8]"
             >
               {STAGE_NEXT_LABEL[opportunity.stageId]}

@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { applyCookieDomain } from './cookies'
 
 /**
  * Browser/anon client — 用于读取数据，受 RLS 约束
@@ -18,7 +19,7 @@ export async function createClient() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, { ...options, domain: '.oabantuqifu.com' }),
+              cookieStore.set(name, value, applyCookieDomain({ ...options })),
             )
           } catch {
             // 从 Server Component 调用时可以忽略
@@ -46,7 +47,7 @@ export async function createServiceClient() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, { ...options, domain: '.oabantuqifu.com' }),
+              cookieStore.set(name, value, applyCookieDomain({ ...options })),
             )
           } catch {}
         },

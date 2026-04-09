@@ -9,28 +9,29 @@ datasource db {
 }
 
 model Organization {
-  id                 String               @id @default(cuid())
-  code               String               @unique
-  name               String
-  site               String               @default("ID")
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  wecomCorpId        String?              @unique
-  actionLogs         ActionLog[]
-  bank_transactions  bank_transactions[]
-  commission_records commission_records[]
-  customerFollowups  CustomerFollowup[]
-  customers          Customer[]
-  delivery_items     delivery_items[]
-  departments        departments[]
-  import_batches     import_batches[]
-  interactions       Interaction[]
-  leads              Lead[]
-  opportunities      Opportunity[]
-  products           Product[]
-  users              UserOrganization[]
-  vendors            vendors[]
-  wecom_bots         wecom_bots[]
+  id                      String                    @id @default(cuid())
+  code                    String                    @unique
+  name                    String
+  site                    String                    @default("ID")
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  wecomCorpId             String?                   @unique
+  actionLogs              ActionLog[]
+  bank_transactions       bank_transactions[]
+  commission_records      commission_records[]
+  customerFollowups       CustomerFollowup[]
+  customers               Customer[]
+  delivery_items          delivery_items[]
+  departments             departments[]
+  dict_product_categories dict_product_categories[]
+  import_batches          import_batches[]
+  interactions            Interaction[]
+  leads                   Lead[]
+  opportunities           Opportunity[]
+  products                Product[]
+  users                   UserOrganization[]
+  vendors                 vendors[]
+  wecom_bots              wecom_bots[]
 
   @@map("organizations")
 }
@@ -301,12 +302,14 @@ model Product {
   isExpertMode            Boolean                   @default(false)
   sla                     Int?
   expertTag               String[]                  @default([])
+  categoryId              String?
   materials               MaterialItem[]
   material_items_template material_items_template[]
   opportunity_items       opportunity_items[]
   p2Data                  OpportunityP2Data[]
   p3Data                  OpportunityP3Data[]
   product_prices          product_prices[]
+  dict_product_categories dict_product_categories?  @relation(fields: [categoryId], references: [id])
   organization            Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   progressPoints          ProgressPoint[]
   vendor_products         vendor_products[]
@@ -396,37 +399,79 @@ model OpportunityP3Data {
 }
 
 model OpportunityP4Data {
-  id              String      @id @default(cuid())
-  opportunityId   String      @unique
-  contractFileUrl String?
-  contractStatus  String      @default("pending")
-  uploadedAt      DateTime?
-  notes           String?
-  opportunity     Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  id                String      @id @default(cuid())
+  opportunityId     String      @unique
+  contractFileUrl   String?
+  contractFileName  String?
+  contractFileSize  Int?
+  contractStatus    String      @default("pending")
+  uploadedAt        DateTime?
+  notes             String?
+  sealVisible       Boolean     @default(false)
+  signatureComplete Boolean     @default(false)
+  qualityClear      Boolean     @default(false)
+  opportunity       Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
 
   @@map("opportunity_p4_data")
 }
 
 model OpportunityP5Data {
-  id                String      @id @default(cuid())
-  opportunityId     String      @unique
+  id                String         @id @default(cuid())
+  opportunityId     String         @unique
+  contractEntityId  String?
   bankAccount       String?
   bankName          String?
   accountHolder     String?
   swiftCode         String?
   dueAmount         Float
-  receivedAmount    Float       @default(0)
+  receivedAmount    Float          @default(0)
   receiptFileUrl    String?
   receiptFileName   String?
   receiptUploadedAt DateTime?
   receiptUploadedBy String?
-  paymentStatus     String      @default("pending")
+  paymentStatus     String         @default("pending")
   rejectionReason   String?
   confirmedAt       DateTime?
   confirmedById     String?
-  opportunity       Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  contractEntity    ContractEntity? @relation(fields: [contractEntityId], references: [id], onDelete: SetNull)
+  opportunity       Opportunity    @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
 
+  @@index([contractEntityId])
   @@map("opportunity_p5_data")
+}
+
+model ContractEntity {
+  id                  String              @id @default(uuid()) @db.Char(36)
+  organizationId      String              @map("organization_id") @db.VarChar(191)
+  entityCode          String              @map("entity_code") @db.VarChar(50)
+  entityName          String              @map("entity_name") @db.VarChar(255)
+  shortName           String              @map("short_name") @db.VarChar(100)
+  legalRepresentative String?             @map("legal_representative") @db.VarChar(100)
+  taxRate             Decimal             @default(0.0000) @map("tax_rate") @db.Decimal(5, 4)
+  taxId               String?             @map("tax_id") @db.VarChar(100)
+  bankName            String?             @map("bank_name") @db.VarChar(200)
+  bankAccountNo       String?             @map("bank_account_no") @db.VarChar(100)
+  bankAccountName     String?             @map("bank_account_name") @db.VarChar(200)
+  swiftCode           String?             @map("swift_code") @db.VarChar(50)
+  sealOssKey          String?             @map("seal_oss_key") @db.VarChar(500)
+  sealPositionX       Int?                @map("seal_position_x")
+  sealPositionY       Int?                @map("seal_position_y")
+  sealWidth           Int?                @map("seal_width")
+  sealHeight          Int?                @map("seal_height")
+  currency            String              @default("CNY") @db.VarChar(10)
+  address             String?
+  contactPhone        String?             @map("contact_phone") @db.VarChar(50)
+  isActive            Boolean             @default(true) @map("is_active")
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @default(now()) @updatedAt @map("updated_at")
+  createdBy           String?             @map("created_by") @db.Char(36)
+  updatedBy           String?             @map("updated_by") @db.Char(36)
+  p5Bindings          OpportunityP5Data[]
+
+  @@unique([organizationId, entityCode], map: "uk_contract_entities_org_code")
+  @@index([organizationId, isActive, currency], map: "ix_entities_org_active_currency")
+  @@index([sealOssKey], map: "idx_seal_oss_key")
+  @@map("contract_entities")
 }
 
 model OpportunityP6Data {
@@ -1072,6 +1117,24 @@ model opportunity_items {
   @@index([opportunityId])
   @@index([organizationId])
   @@index([productId])
+}
+
+model dict_product_categories {
+  id             String       @id
+  organizationId String
+  code           String
+  nameZh         String
+  nameId         String?
+  nameEn         String?
+  description    String?
+  sortOrder      Int          @default(0)
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @default(now())
+  organizations  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, map: "dict_product_categories_org_fkey")
+  products       Product[]
+
+  @@unique([organizationId, code], map: "dict_product_categories_code_key")
 }
 
 enum LeadSource {

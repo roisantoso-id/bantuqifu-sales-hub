@@ -73,29 +73,31 @@ export interface Lead {
   wechatName: string // 微信名/称呼（必填）
   phone?: string // 联系电话
   source: LeadSource // 来源：山海图微信群、老客户推荐、Facebook、官网
-  
+
   // 业务画像
   category?: LeadCategory // 意向分类
   budget?: { min: number; max: number; currency: 'CNY' | 'IDR' } // 初步预算范围
   urgency?: LeadUrgency // 紧迫度：高、中、低
   initialIntent: string // 初步意向备注
-  
+
   // 跟进逻辑
   assignee?: string // 负责人
   nextFollowDate?: string // 下次跟进计划（关键字段，触发回收逻辑）
   lastActionAt?: string // 最后一次行动时间
   status: LeadStatus // 状态
-  
+
   // 丢弃逻辑
   discardedAt?: string // 丢弃时间
   discardReason?: DiscardReason // 丢弃原因
   discardedBy?: string // 谁丢弃的
-  
+
   createdAt: string
   updatedAt: string
   notes?: string // 备注
   convertedOpportunityId?: string // 转化后的商机ID
 }
+
+export interface LeadRow extends Lead {}
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 export type NavSection = 'leads' | 'opportunities' | 'customers' | 'analytics' | 'oppolist' | 'delivery'
@@ -117,32 +119,83 @@ export interface Customer {
 export type OpportunityStatus = 'active' | 'won' | 'lost'
 
 export interface OpportunityP2Data {
+  tempId: string
   productId: string
-  cycle?: string // 服务周期（如"1个月"、"12个月"）
+  productName: string
+  targetName: string
+  basePrice: number
+  currency: Currency
+  costFloor?: number
+  profitMargin?: number
+  costPriceCny?: number
+  costPriceIdr?: number
+  partnerPriceCny?: number
+  partnerPriceIdr?: number
+  retailPriceCny?: number
+  retailPriceIdr?: number
 }
 
 export interface OpportunityP3Data {
+  tempId: string
   productId: string
-  quantity: number // 数量，默认 1
-  lockedPrice: number // 当前售价（可编辑）
-  currency: Currency // IDR or CNY
-  recommendedPrice?: number // 推荐价格（取自 Product.recommendedPrice）
-  costFloor?: number // 成本底线（取自 Product.costPrice）
-  profitMargin?: number // 利润率 = (lockedPrice - costFloor) / costFloor * 100
-  approvalStatus: 'auto-approved' | 'admin-required' | 'pending' // 自动审批 | 需管理员审核 | 待审批
+  productName: string
+  targetName: string
+  lockedPrice: number
+  currency: Currency
+  costFloor?: number
+  profitMargin?: number
+  costPriceCny?: number
+  costPriceIdr?: number
+  partnerPriceCny?: number
+  partnerPriceIdr?: number
+  retailPriceCny?: number
+  retailPriceIdr?: number
+  approvalStatus: 'auto-approved' | 'admin-required' | 'pending'
   approvedAt?: string
   approvedBy?: string
+}
+
+export interface ContractEntity {
+  id: string
+  organizationId: string
+  entityCode: string
+  entityName: string
+  shortName: string
+  legalRepresentative?: string
+  taxRate: number
+  taxId?: string
+  bankName?: string
+  bankAccountNo?: string
+  bankAccountName?: string
+  swiftCode?: string
+  currency: Currency
+  address?: string
+  contactPhone?: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AvailableContractEntityOption extends ContractEntity {
+  isRecommended: boolean
 }
 
 // ─── Stage P4-P7 Data ────────────────────────────────────────────────────────
 export interface OpportunityP4Data {
   contractFileUrl?: string // 合同PDF文件URL
+  contractPreviewUrl?: string
+  contractFileName?: string
+  contractFileSize?: number
   contractStatus: 'pending' | 'returned' | 'archived' // 待签署 | 已回传 | 归档中
   uploadedAt?: string
   notes?: string
+  sealVisible: boolean
+  signatureComplete: boolean
+  qualityClear: boolean
 }
 
 export interface OpportunityP5Data {
+  contractEntityId?: string
   bankAccount?: string
   bankName?: string
   accountHolder?: string
@@ -150,6 +203,7 @@ export interface OpportunityP5Data {
   dueAmount: number
   receivedAmount: number
   receiptFileUrl?: string
+  receiptPreviewUrl?: string
   receiptFileName?: string
   receiptUploadedAt?: string
   receiptUploadedBy?: string
@@ -157,6 +211,9 @@ export interface OpportunityP5Data {
   rejectionReason?: string
   confirmedAt?: string
   confirmedBy?: string
+  availableContractEntities?: AvailableContractEntityOption[]
+  recommendedContractEntityId?: string
+  selectedContractEntity?: ContractEntity
 }
 
 export interface MaterialItem {
@@ -277,7 +334,7 @@ export interface Opportunity {
   assignee: string
   wechatGroupId?: number | null
   wechatGroupName?: string | null
-  p2Data?: OpportunityP2Data[] // P2阶段选中的产品
+  p2Data?: OpportunityP2Data[] // P2阶段服务实例（基于 opportunity_items）
   p3Data?: OpportunityP3Data[] // P3阶段的报价数据
   p4Data?: OpportunityP4Data // P4: 合同签署
   p5Data?: OpportunityP5Data // P5: 财务确认
@@ -293,6 +350,8 @@ export interface Product {
   id: string
   name: string
   category: string
+  categoryId?: string | null
+  categoryNameZh?: string | null
   price: number
   currency: string
   description?: string
@@ -319,6 +378,7 @@ export interface ActionLogAttachment {
   fileName: string
   fileSize: number // bytes
   fileUrl: string // 文件URL (OSS)
+  previewUrl?: string
   uploadedAt: string
 }
 

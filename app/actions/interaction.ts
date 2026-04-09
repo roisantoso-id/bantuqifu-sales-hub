@@ -12,6 +12,8 @@ export type InteractionRow = {
   leadId: string | null
   opportunityId: string | null
   operatorId: string | null
+  operatorName?: string | null
+  operatorEmail?: string | null
   type: 'NOTE' | 'CALL' | 'VISIT' | 'MEETING' | 'EMAIL' | 'STAGE_CHANGE' | 'SYSTEM'
   content: string
   nextAction: string | null
@@ -25,8 +27,13 @@ export type InteractionAttachmentRow = {
   interactionId: string
   fileName: string
   fileUrl: string
+  previewUrl?: string
   fileSize: number
   createdAt: string
+}
+
+export type InteractionWithAttachmentsRow = InteractionRow & {
+  attachments?: InteractionAttachmentRow[]
 }
 
 // ─── 创建互动记录 ─────────────────────────────────────────────────────────────

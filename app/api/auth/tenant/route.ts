@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { applyCookieDomain } from '@/lib/supabase/cookies'
 import { NextResponse } from 'next/server'
 
 /**
@@ -37,14 +38,13 @@ export async function POST(request: Request) {
 
     // 设置 Cookie（30 天有效期）
     const response = NextResponse.json({ success: true })
-    response.cookies.set('selectedTenant', tenantId, {
+    response.cookies.set('selectedTenant', tenantId, applyCookieDomain({
       maxAge: 60 * 60 * 24 * 30, // 30 days
       path: '/',
-      domain: '.oabantuqifu.com',
       secure: process.env.NODE_ENV === 'production',
       httpOnly: false,
       sameSite: 'lax',
-    })
+    }))
 
     return response
   } catch (error) {

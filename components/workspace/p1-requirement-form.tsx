@@ -1,35 +1,61 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Opportunity } from '@/lib/types'
 import { mockProducts } from '@/lib/mock-data'
 
 interface P1FormProps {
   opportunity: Opportunity
   onUpdate: (data: Partial<Opportunity>) => void
-  onAdvance: () => void
+  onSave: () => Promise<boolean>
+  onAdvance: () => Promise<boolean>
 }
 
 const DEMAND_SOURCES = ['群聊转入', '老客户转介绍', '渠道', '其他']
 const BUSINESS_CATEGORIES = ['签证服务', '财务服务', '准证服务', '公司开办服务', '税务服务']
+const BUSINESS_CATEGORY_TO_SERVICE_TYPE: Record<string, Opportunity['serviceType']> = {
+  签证服务: 'VISA',
+  财务服务: 'FINANCIAL_SERVICES',
+  准证服务: 'PERMIT_SERVICES',
+  公司开办服务: 'COMPANY_REGISTRATION',
+  税务服务: 'TAX_SERVICES',
+}
+const SERVICE_TYPE_TO_BUSINESS_CATEGORY: Partial<Record<Opportunity['serviceType'], string>> = {
+  VISA: '签证服务',
+  FINANCIAL_SERVICES: '财务服务',
+  PERMIT_SERVICES: '准证服务',
+  COMPANY_REGISTRATION: '公司开办服务',
+  TAX_SERVICES: '税务服务',
+}
 const CITIES = ['Jakarta', 'Surabaya', 'Bali', 'Bandung', 'Medan']
 const URGENCY_LEVELS = ['普通', '紧急', '特急']
 
-export function P1RequirementForm({ opportunity, onUpdate, onAdvance }: P1FormProps) {
+export function P1RequirementForm({ opportunity, onUpdate, onSave, onAdvance }: P1FormProps) {
   const [formData, setFormData] = useState({
     customerName: opportunity.customer.name,
     contactName: '',
     demandSource: '',
-    businessCategory: opportunity.serviceType,
+    businessCategory: SERVICE_TYPE_TO_BUSINESS_CATEGORY[opportunity.serviceType] || opportunity.serviceTypeLabel || '',
     searchTerm: '',
     showSuggestions: false,
     processingTime: '',
-    city: '',
+    city: opportunity.destination ?? '',
     passportNo: opportunity.customer.passportNo,
     urgency: '普通',
     requirements: opportunity.requirements ?? '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      customerName: opportunity.customer.name,
+      businessCategory: SERVICE_TYPE_TO_BUSINESS_CATEGORY[opportunity.serviceType] || opportunity.serviceTypeLabel || '',
+      city: opportunity.destination ?? '',
+      passportNo: opportunity.customer.passportNo,
+      requirements: opportunity.requirements ?? '',
+    }))
+  }, [opportunity])
 
   const filteredProducts = mockProducts.filter(
     (p) =>
@@ -45,6 +71,16 @@ export function P1RequirementForm({ opportunity, onUpdate, onAdvance }: P1FormPr
     }))
   }
 
+  const syncPersistableFields = () => {
+    const nextServiceType = BUSINESS_CATEGORY_TO_SERVICE_TYPE[formData.businessCategory] || opportunity.serviceType
+
+    onUpdate({
+      serviceType: nextServiceType,
+      serviceTypeLabel: formData.businessCategory || opportunity.serviceTypeLabel,
+      requirements: formData.requirements,
+    })
+  }
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
     if (!opportunity.id) newErrors.opportunityId = '商机ID必填'
@@ -53,17 +89,16 @@ export function P1RequirementForm({ opportunity, onUpdate, onAdvance }: P1FormPr
     return Object.keys(newErrors).length === 0
   }
 
-  const handleAdvance = () => {
+  const handleSave = async () => {
     if (!validateForm()) return
-    onUpdate({
-      customer: {
-        ...opportunity.customer,
-        name: formData.customerName,
-      },
-      destination: formData.city,
-      requirements: formData.requirements,
-    })
-    onAdvance()
+    syncPersistableFields()
+    await onSave()
+  }
+
+  const handleAdvance = async () => {
+    if (!validateForm()) return
+    syncPersistableFields()
+    await onAdvance()
   }
 
   return (
@@ -98,8 +133,8 @@ export function P1RequirementForm({ opportunity, onUpdate, onAdvance }: P1FormPr
                 <input
                   type="text"
                   value={formData.customerName}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, customerName: e.target.value }))}
-                  className="h-8 flex-1 rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#111827] outline-none focus:border-[#2563eb]"
+                  disabled
+                  className="h-8 flex-1 rounded-sm border border-[#e5e7eb] bg-[#f9fafb] px-2 text-[12px] text-[#9ca3af]"
                 />
               </div>
 
@@ -128,6 +163,7 @@ export function P1RequirementForm({ opportunity, onUpdate, onAdvance }: P1FormPr
                 </select>
               </div>
             </div>
+            <p className="mt-2 text-[10px] text-[#9ca3af]">客户名称与护照号需通过客户资料维护，当前表单只保存商机字段。</p>
             {errors.opportunityId && <p className="mt-1 text-[10px] text-[#dc2626]">{errors.opportunityId}</p>}
           </div>
 
@@ -169,7 +205,7 @@ export function P1RequirementForm({ opportunity, onUpdate, onAdvance }: P1FormPr
               </div>
 
               {/* 预选产品 - 模糊搜索 */}
-              <div className="relative flex items-center gap-1.5 col-span-2">
+              <div className="relative col-span-2 flex items-center gap-1.5">
                 <label className="w-[120px] text-[12px] text-[#6b7280]">预选产品</label>
                 <div className="relative flex-1">
                   <input
@@ -187,16 +223,15 @@ export function P1RequirementForm({ opportunity, onUpdate, onAdvance }: P1FormPr
                     className="h-8 w-full rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#111827] outline-none focus:border-[#2563eb]"
                     placeholder="搜索产品"
                   />
-                  {/* Suggestions */}
                   {formData.showSuggestions && filteredProducts.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 z-10 mt-0.5 max-h-40 overflow-y-auto rounded-sm border border-[#e5e7eb] bg-white shadow-sm">
+                    <div className="absolute left-0 right-0 top-full z-10 mt-0.5 max-h-40 overflow-y-auto rounded-sm border border-[#e5e7eb] bg-white shadow-sm">
                       {filteredProducts.slice(0, 5).map((p) => (
                         <button
                           key={p.id}
                           onClick={() => handleProductSelect(p)}
                           className="flex w-full items-center gap-2 border-b border-[#f3f4f6] px-2 py-1 text-left text-[11px] hover:bg-[#f9fafb]"
                         >
-                          <span className="flex-1 truncate text-[#111827] font-medium">{p.name}</span>
+                          <span className="flex-1 truncate font-medium text-[#111827]">{p.name}</span>
                           <span className="text-[#9ca3af]">{p.category}</span>
                         </button>
                       ))}
@@ -217,8 +252,8 @@ export function P1RequirementForm({ opportunity, onUpdate, onAdvance }: P1FormPr
                 <label className="w-[120px] text-[12px] text-[#6b7280]">入境城市</label>
                 <select
                   value={formData.city}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, city: e.target.value }))}
-                  className="h-8 flex-1 rounded-sm border border-[#e5e7eb] bg-white px-2 text-[12px] text-[#111827] outline-none focus:border-[#2563eb]"
+                  disabled
+                  className="h-8 flex-1 rounded-sm border border-[#e5e7eb] bg-[#f9fafb] px-2 text-[12px] text-[#9ca3af]"
                 >
                   <option value="">请选择</option>
                   {CITIES.map((c) => (
@@ -235,8 +270,8 @@ export function P1RequirementForm({ opportunity, onUpdate, onAdvance }: P1FormPr
                 <input
                   type="text"
                   value={formData.passportNo}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, passportNo: e.target.value }))}
-                  className="h-8 flex-1 rounded-sm border border-[#e5e7eb] bg-white px-2 font-mono text-[12px] text-[#111827] outline-none focus:border-[#2563eb]"
+                  disabled
+                  className="h-8 flex-1 rounded-sm border border-[#e5e7eb] bg-[#f9fafb] px-2 font-mono text-[12px] text-[#9ca3af]"
                   placeholder="E00000000"
                 />
               </div>
@@ -249,7 +284,7 @@ export function P1RequirementForm({ opportunity, onUpdate, onAdvance }: P1FormPr
                     <button
                       key={level}
                       onClick={() => setFormData((prev) => ({ ...prev, urgency: level }))}
-                      className={`h-8 px-2 rounded-sm text-[12px] font-medium transition-colors ${
+                      className={`h-8 rounded-sm px-2 text-[12px] font-medium transition-colors ${
                         formData.urgency === level
                           ? 'bg-[#2563eb] text-white'
                           : 'border border-[#e5e7eb] text-[#6b7280] hover:border-[#2563eb]'
@@ -271,15 +306,18 @@ export function P1RequirementForm({ opportunity, onUpdate, onAdvance }: P1FormPr
               onChange={(e) => setFormData((prev) => ({ ...prev, requirements: e.target.value }))}
               placeholder="记录客户具体需求、特殊情况、备注等"
               rows={4}
-              className="w-full rounded-sm border border-[#e5e7eb] bg-white p-2 text-[12px] text-[#111827] placeholder-[#9ca3af] outline-none focus:border-[#2563eb] resize-none leading-relaxed"
+              className="w-full resize-none rounded-sm border border-[#e5e7eb] bg-white p-2 text-[12px] leading-relaxed text-[#111827] placeholder-[#9ca3af] outline-none focus:border-[#2563eb]"
             />
           </div>
         </div>
       </div>
 
       {/* Footer - 固定工具栏 */}
-      <div className="border-t border-[#e5e7eb] bg-[#f9fafb] px-5 py-2 flex items-center justify-between">
-        <button className="flex h-8 items-center gap-1.5 rounded-sm border border-[#e5e7eb] bg-white px-3 text-[13px] text-[#374151] hover:border-[#d1d5db]">
+      <div className="flex items-center justify-between border-t border-[#e5e7eb] bg-[#f9fafb] px-5 py-2">
+        <button
+          onClick={handleSave}
+          className="flex h-8 items-center gap-1.5 rounded-sm border border-[#e5e7eb] bg-white px-3 text-[13px] text-[#374151] hover:border-[#d1d5db]"
+        >
           保存草稿
         </button>
         <button
