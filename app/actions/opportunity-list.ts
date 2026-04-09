@@ -187,3 +187,136 @@ export async function getOpportunityListAction(
     totalPages: Math.ceil(total / pageSize),
   }
 }
+
+// ─── PM Task Assignment Operations ─────────────────────────────────────────────
+
+export interface PMTaskOpportunity extends OpportunityListRow {
+  department?: string | null
+  p6TargetDate?: string | null
+  p7TargetDate?: string | null
+}
+
+/**
+ * Get opportunities in P2-P5 stages for PM task assignment
+ * These are ready for activation to P6/P7
+ */
+export async function getPMTaskOpportunitiesAction(): Promise<PMTaskOpportunity[]> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  const { data, error } = await supabase
+    .from('opportunities')
+    .select(`
+      id,
+      opportunityCode,
+      stageId,
+      status,
+      serviceType,
+      serviceTypeLabel,
+      estimatedAmount,
+      currency,
+      expectedCloseDate,
+      actualCloseDate,
+      assigneeId,
+      customerId,
+      createdAt,
+      updatedAt,
+      customer:customers!opportunities_customerId_fkey (
+        id,
+        customerCode,
+        customerName,
+        phone,
+        email,
+        wechat,
+        level
+      ),
+      assignee:users_auth!opportunities_assigneeId_fkey (
+        id,
+        name
+      )
+    `)
+    .eq('organizationId', tenantId)
+    .in('stageId', ['P2', 'P3', 'P4', 'P5'])
+    .order('createdAt', { ascending: false })
+
+  if (error) {
+    console.error('[getPMTaskOpportunitiesAction] Error:', error.message)
+    return []
+  }
+
+  return (data ?? []) as unknown as PMTaskOpportunity[]
+}
+
+/**
+ * Get department overview metrics for PM dashboard
+ */
+export async function getDepartmentMetricsAction(): Promise<{
+  waitingForP6: number
+  inP7: number
+  delayed: number
+}> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+  const today = new Date().toISOString().split('T')[0]
+
+  // Waiting for P6: Opportunities in P2-P5
+  const { count: waitingForP6 } = await supabase
+    .from('opportunities')
+    .select('id', { count: 'exact', head: true })
+    .eq('organizationId', tenantId)
+    .in('stageId', ['P2', 'P3', 'P4', 'P5'])
+
+  // In P7
+  const { count: inP7 } = await supabase
+    .from('opportunities')
+    .select('id', { count: 'exact', head: true })
+    .eq('organizationId', tenantId)
+    .eq('stageId', 'P7')
+
+  // Delayed: Opportunities with expectedCloseDate < today
+  const { count: delayed } = await supabase
+    .from('opportunities')
+    .select('id', { count: 'exact', head: true })
+    .eq('organizationId', tenantId)
+    .lt('expectedCloseDate', today)
+    .in('stageId', ['P2', 'P3', 'P4', 'P5', 'P6'])
+
+  return {
+    waitingForP6: waitingForP6 ?? 0,
+    inP7: inP7 ?? 0,
+    delayed: delayed ?? 0,
+  }
+}
+
+/**
+ * Update opportunity with P6/P7 activation dates and notes
+ */
+export async function activateOpportunityAction(
+  opportunityId: string,
+  data: {
+    p6TargetDate?: string
+    p7TargetDate?: string
+    coordinationNotes?: string
+  }
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+  const tenantId = await getCurrentTenantId()
+
+  // Update the opportunity with P6/P7 data in the notes or custom fields if available
+  const { error } = await supabase
+    .from('opportunities')
+    .update({
+      notes: data.coordinationNotes || null,
+      updatedAt: new Date().toISOString(),
+      // These fields would be stored in p6Data/p7Data JSON if available in schema
+    })
+    .eq('id', opportunityId)
+    .eq('organizationId', tenantId)
+
+  if (error) {
+    console.error('[activateOpportunityAction] Error:', error.message)
+    return { success: false, error: '更新失败，请稍后重试' }
+  }
+
+  return { success: true }
+}

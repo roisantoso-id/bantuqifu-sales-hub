@@ -12,6 +12,7 @@ import { LeadManagementClient } from '@/components/leads/lead-management-client'
 import { MyDashboard } from '@/components/dashboard/my-dashboard'
 import { AuditRail } from '@/components/audit-rail/audit-panel'
 import { OpportunityListView } from '@/components/opportunities/opportunity-list-view'
+import { PMTaskAssignmentView } from '@/components/pm-tasks/pm-task-assignment-view'
 import { mockActionLogs, mockUser, mockLeads } from '@/lib/mock-data'
 import { toggleOpportunityPinAction, getOpportunitiesAction, saveOpportunityItemsAction, getOpportunityWorkspaceAction, updateOpportunityAction, updateOpportunityStageAction, saveOpportunityP4DraftAction, submitOpportunityContractAction, saveOpportunityP5ContractEntityAction, saveOpportunityP5ReceiptAction, rejectOpportunityP5ReceiptAction, confirmOpportunityP5PaymentAction, createOpportunityNoteWithAttachmentsAction } from '@/app/actions/opportunity'
 import { getProductsByCategoryAction } from '@/app/actions/product'
@@ -21,6 +22,8 @@ interface DashboardClientProps {
   initialNav: NavSection
   initialLeads: LeadRow[] | null
   initialOpportunities: OpportunityRow[] | null
+  initialPMTasks: any[] | null
+  initialMetrics: any | null
   initialLeadTab: string
   initialLeadSearch: string
   selectedLeadId: string | null
@@ -141,6 +144,8 @@ export function DashboardClient({
   initialNav,
   initialLeads,
   initialOpportunities,
+  initialPMTasks,
+  initialMetrics,
   initialLeadTab,
   initialLeadSearch,
   selectedLeadId,
@@ -834,6 +839,13 @@ export function DashboardClient({
       ) : activeNav === 'customers' ? (
         <div className="flex-1 overflow-hidden">
           <CustomerManagement />
+        </div>
+      ) : activeNav === 'pm_tasks' ? (
+        <div className="flex-1 overflow-hidden">
+          <PMTaskAssignmentView 
+            initialOpportunities={initialPMTasks || []} 
+            initialMetrics={initialMetrics}
+          />
         </div>
       ) : activeNav === 'analytics' ? (
         <div className="flex-1 overflow-hidden">
