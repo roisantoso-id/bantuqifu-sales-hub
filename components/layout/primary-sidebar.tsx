@@ -9,8 +9,8 @@ import {
   LogOut,
   Monitor,
   List,
-  LayoutGrid,
-  Wrench,
+  Briefcase,
+  CheckCircle2,
 } from 'lucide-react'
 import type { NavSection } from '@/lib/types'
 
@@ -28,8 +28,8 @@ const navItems: { id: NavSection; icon: React.ReactNode; label: string; subtitle
   { id: 'opportunities', icon: <Monitor size={18} />, label: '工作台', subtitle: '工作台' },
   { id: 'oppolist', icon: <List size={18} />, label: '商机列表', subtitle: '商机' },
   { id: 'customers', icon: <Users size={18} />, label: '客户', subtitle: '客户' },
-  { id: 'pm_tasks', icon: <LayoutGrid size={18} />, label: 'PM任务指派', subtitle: 'PM指派' },
-  { id: 'execution', icon: <Wrench size={18} />, label: '执行工作台', subtitle: '执行' },
+  { id: 'pm_tasks', icon: <Briefcase size={18} />, label: 'PM任务指派', subtitle: 'PM指派' },
+  { id: 'execution', icon: <CheckCircle2 size={18} />, label: '执行工作台', subtitle: '执行' },
   { id: 'analytics', icon: <BarChart2 size={18} />, label: '数据', subtitle: '看板' },
 ]
 
