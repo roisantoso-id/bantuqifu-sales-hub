@@ -54,7 +54,7 @@ export default function ActivationModal({
       return
     }
 
-    if (p7Date < p6Date) {
+    if (p7Date.getTime() < p6Date.getTime()) {
       setError('P7日期必须大于等于P6日期')
       return
     }
